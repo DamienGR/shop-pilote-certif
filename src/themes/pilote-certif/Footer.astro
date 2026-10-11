@@ -1,0 +1,43 @@
+---
+import type { StorefrontShellModel } from '../../features/storefront/models';
+import { t } from '../../features/i18n';
+
+/**
+ * Atelier — le pied de page, lu comme une signature.
+ *
+ * Le nom de la boutique repasse en grand, à l'échelle de l'enseigne, puis le
+ * filet, puis les liens du marchand en petites capitales. C'est l'inverse de la
+ * hiérarchie habituelle d'un pied de page, où le nom est la plus petite chose
+ * de la page : ici il ferme la lecture au lieu de la conclure en note de bas.
+ *
+ * Les liens viennent du menu du marchand, déjà filtrés sur les cibles
+ * réellement publiables — rien ici ne peut afficher un lien mort. Rendu sur
+ * chaque page, comme l'en-tête.
+ */
+interface Props {
+  model: StorefrontShellModel;
+}
+
+const { model } = Astro.props;
+---
+
+<footer class="border-t border-line">
+  <div class="mx-auto max-w-[78rem] px-6 py-14">
+    <p class="font-serif text-3xl tracking-[-0.015em] sm:text-4xl">{model.storeName}</p>
+    {
+      model.footerLinks.length > 0 && (
+        <nav
+          aria-label={t('shell.nav.footer')}
+          class="atelier-rule mt-8 flex flex-wrap gap-x-8 gap-y-3 pb-4 text-[11px] uppercase tracking-[0.18em] text-muted"
+        >
+          {model.footerLinks.map((link) => (
+            <a href={link.href} class="hover:text-brand">
+              {link.text}
+            </a>
+          ))}
+        </nav>
+      )
+    }
+    <p class="mt-6 text-[11px] uppercase tracking-[0.18em] text-faint">&copy; {model.storeName}</p>
+  </div>
+</footer>

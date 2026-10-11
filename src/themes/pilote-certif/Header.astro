@@ -1,0 +1,130 @@
+---
+import type { StorefrontShellModel } from '../../features/storefront/models';
+import StoreNav from '../../features/storefront/controls/StoreNav.astro';
+import StoreSearch from '../../features/storefront/controls/StoreSearch.astro';
+import StoreCartControl from '../../features/storefront/controls/StoreCartControl.astro';
+import StoreAccountControl from '../../features/storefront/controls/StoreAccountControl.astro';
+import { t } from '../../features/i18n';
+
+/**
+ * Atelier — l'enseigne.
+ *
+ * Un mât symétrique : la navigation à gauche, le nom au centre, les commandes
+ * à droite, et le filet de l'atelier dessous. La symétrie est le choix de
+ * dessin — le thème par défaut aligne tout à gauche, `studio` pousse tout à
+ * droite — et elle tient à toutes les largeurs parce que la cellule centrale
+ * est dimensionnée par son contenu et les deux autres se partagent le reste.
+ *
+ * Collant, contrairement à `studio`. Une boutique où l'on ajoute au panier doit
+ * garder le panier atteignable au milieu d'une longue liste ; une galerie n'a
+ * pas ce problème.
+ *
+ * Rendu sur TOUTES les pages, panier, commande, paiement et connexion admin
+ * comprises. Les commandes du cœur restent telles quelles : déplacer et
+ * restyler, oui ; réécrire leur balisage, non.
+ */
+interface Props {
+  model: StorefrontShellModel;
+}
+
+const { model } = Astro.props;
+
+/* La petite capitale de ce thème, définie une fois. Elle habille la navigation,
+   les commandes et le pied de page, ce qui est ce qui les fait lire comme une
+   seule famille au lieu de trois. */
+const small = 'text-[11px] uppercase tracking-[0.18em] text-muted hover:text-brand';
+---
+
+{
+  /* Bandeau d'annonce, statique et non fixé : l'en-tête sous lui est collant,
+     et un bandeau fixé obligerait à décaler l'en-tête d'une hauteur qui change
+     dès que le message passe à la ligne sur un téléphone. */
+  model.announcement && (
+    <div class="border-b border-line bg-surface">
+      <div class="mx-auto max-w-[78rem] px-6 py-2 text-center text-[11px] uppercase tracking-[0.16em] text-muted">
+        {model.announcement.href ? (
+          <a href={model.announcement.href} class="underline-offset-4 hover:text-brand hover:underline">
+            {model.announcement.text}
+          </a>
+        ) : (
+          model.announcement.text
+        )}
+      </div>
+    </div>
+  )
+}
+
+<header class="atelier-rule sticky top-0 z-20 bg-paper/90 backdrop-blur">
+  {/* Deux compositions, pas une mise à l'échelle.
+
+      À partir de `sm` c'est le mât symétrique : trois colonnes, le nom au
+      centre, les deux cellules latérales de largeur égale. `minmax(0,1fr)` et
+      non `1fr` — la valeur par défaut d'une piste de grille est `auto`, donc
+      une cellule refuse de descendre sous son contenu et pousse la ligne au
+      lieu de la laisser rétrécir.
+
+      En dessous, une rangée simple. Le mât symétrique ne tient pas à 390 px :
+      les deux cellules latérales prennent chacune la largeur de la PLUS LARGE
+      des deux, donc l'amas de commandes se paie deux fois et le document
+      déborde à l'horizontale — en emportant la grille du catalogue avec lui. */}
+  <div
+    class="mx-auto flex max-w-[78rem] items-center gap-4 px-6 py-4 sm:grid sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]"
+  >
+    {
+      /* Le repère n'est rendu que s'il y a quelque chose à repérer : un point
+         de repère vide et nommé est une promesse que rien ne tient. */
+      model.headerLinks.length > 0 && (
+        <nav aria-label={t('shell.nav.primary')} class="flex min-w-0 items-center">
+          <StoreNav
+            links={model.headerLinks}
+            class={`hidden min-w-0 items-center gap-6 lg:flex ${small}`}
+            disclosureClass={`relative lg:hidden ${small}`}
+          />
+        </nav>
+      )
+    }
+
+    {/* col-start-2 explicitement : sans liens marchands la cellule de gauche
+        n'existe pas, et le nom glisserait à sa place. `mr-auto` ne sert qu'à la
+        rangée simple, où il pousse les commandes au bord droit. */}
+    <a
+      href="/"
+      aria-label={model.storeName}
+      class="mr-auto min-w-0 truncate sm:col-start-2 sm:mr-0 sm:justify-self-center"
+    >
+      {
+        model.logo ? (
+          /* Jamais paresseuse : au-dessus de la ligne de flottaison sur chaque
+             page. Le nom reste le texte alternatif, donc l'en-tête se lit
+             pareil au lecteur d'écran et quand l'image ne charge pas. */
+          <img src={model.logo.src} alt={model.logo.alt} class="h-8 max-w-48 object-contain sm:h-9" />
+        ) : (
+          <span class="font-serif text-xl tracking-[-0.01em] sm:text-2xl lg:text-[1.75rem]">
+            {model.storeName}
+          </span>
+        )
+      }
+    </a>
+
+    <div class="flex min-w-0 shrink-0 items-center justify-end gap-4 sm:col-start-3 sm:gap-5">
+      <StoreSearch
+        action={model.search.action}
+        query={model.search.query}
+        class="hidden w-40 border-b border-line pb-0.5 focus-within:border-brand md:block lg:w-52"
+        inputClass="w-full bg-transparent px-0 py-0.5 text-sm focus:outline-none"
+      />
+      {/* Le champ est réservé aux écrans larges ; ailleurs la page de recherche
+          reste atteignable par un lien. */}
+      <a href={model.search.action} class={`${small} md:hidden`}>{t('shell.search.link')}</a>
+      {model.account.enabled && <StoreAccountControl href={model.account.href} class={small} />}
+      {
+        model.cart.enabled && (
+          <StoreCartControl
+            href={model.cart.href}
+            class="inline-flex items-center text-[11px] uppercase tracking-[0.18em] text-ink hover:text-brand"
+          />
+        )
+      }
+    </div>
+  </div>
+</header>

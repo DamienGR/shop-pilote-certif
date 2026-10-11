@@ -1,0 +1,87 @@
+---
+import type { CatalogPageModel } from '../../features/storefront/models';
+import ProductCard from './ProductCard.astro';
+import CatalogSort from '../../features/storefront/controls/CatalogSort.astro';
+import CatalogPagination from '../../features/storefront/controls/CatalogPagination.astro';
+import { t } from '../../features/i18n';
+
+/**
+ * Atelier — le tarif affiché au mur.
+ *
+ * Le titre et la barre d'outils tiennent sur une seule bande fermée par le
+ * filet : les catégories à gauche, le tri poussé à droite, sur la même ligne
+ * dès qu'il y a la place. Le thème par défaut empile ces trois blocs ; les
+ * mettre sur un rang donne à la page une entrée nette et rend la grille
+ * immédiatement visible sans avoir à faire défiler.
+ *
+ * Trois colonnes de portraits sur grand écran, deux ailleurs. Pas de tuiles
+ * asymétriques : l'irrégularité est le sujet de `studio`, pas d'un tarif, où
+ * l'alignement des prix d'une ligne sur l'autre est justement ce qui se lit.
+ *
+ * <CatalogSort> et <CatalogPagination> sont restylés par `class` uniquement.
+ * Leurs `href` portent la sémantique de requête dont dépendent l'URL canonique
+ * et le cache du catalogue, et leurs points de repère sont ce qui rend une
+ * série paginée lisible à un robot d'indexation.
+ */
+interface Props {
+  model: CatalogPageModel;
+}
+
+const { model } = Astro.props;
+---
+
+<header class="pt-6">
+  <p class="text-[11px] uppercase tracking-[0.28em] text-brand">{model.eyebrow}</p>
+  <h1 class="mt-3 font-serif text-[clamp(2.5rem,5.5vw,4rem)] leading-[1.02] tracking-[-0.025em]">
+    {model.heading}
+  </h1>
+</header>
+
+<div class="atelier-rule mt-8 flex flex-wrap items-baseline gap-x-8 gap-y-4 pb-4">
+  {
+    model.categories.length > 0 && (
+      <nav
+        aria-label={t('catalog.categories.label')}
+        class="flex min-w-0 flex-wrap gap-x-6 gap-y-2 text-[11px] uppercase tracking-[0.18em] text-muted"
+      >
+        {model.categories.map((category) => (
+          <a href={category.href} class="border-b border-transparent pb-0.5 hover:border-brand hover:text-brand">
+            {category.text}
+          </a>
+        ))}
+      </nav>
+    )
+  }
+  <CatalogSort
+    model={model.sort}
+    class="ml-auto flex flex-wrap items-baseline gap-x-5 gap-y-2 text-[11px] uppercase tracking-[0.18em] text-muted"
+  />
+</div>
+
+{
+  /* role="status" est le contrat, pas la formulation : un catalogue vide doit
+     s'annoncer aux technologies d'assistance au lieu d'afficher une grille
+     blanche. La formulation est celle du cœur — le catalogue de messages lui
+     appartient, et un thème de boutique n'a pas à y ajouter une clé à son nom
+     pour se dire vide. */
+  model.products.length === 0 && (
+    <p role="status" class="py-24 text-center font-serif text-2xl text-muted">
+      {t('catalog.empty.default')}
+    </p>
+  )
+}
+
+{
+  model.products.length > 0 && (
+    <ul class="grid grid-cols-2 gap-x-5 gap-y-12 py-12 sm:gap-x-8 sm:gap-y-14 lg:grid-cols-3">
+      {model.products.map((card, i) => (
+        <ProductCard card={card} index={i} />
+      ))}
+    </ul>
+  )
+}
+
+<CatalogPagination
+  model={model.pagination}
+  class="flex items-center justify-center gap-4 border-t border-line py-10 text-[11px] uppercase tracking-[0.18em] text-muted"
+/>

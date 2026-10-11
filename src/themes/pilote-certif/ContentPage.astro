@@ -1,0 +1,35 @@
+---
+import type { ContentPageModel } from '../../features/storefront/models';
+
+/**
+ * Atelier — la lettre.
+ *
+ * Le cadre est volontairement nu : ce sont les jetons `--prose-*` de
+ * `tokens.css` qui portent ce thème ici — une justification courte (36rem), un
+ * interligne ouvert, une old style à empattements — et non des classes posées
+ * autour du texte du marchand.
+ *
+ * Deux choses restent :
+ *
+ *   `markdown-content` est le crochet auquel toute la typographie de prose est
+ *   accrochée. Le retirer déshabille d'un coup chaque page écrite par le
+ *   marchand.
+ *
+ *   `style={model.layoutStyle}` porte le gabarit choisi dans l'administration —
+ *   la largeur et l'alignement du titre. Le retirer ramène silencieusement
+ *   chaque page à la largeur par défaut.
+ *
+ * Le corps arrive déjà rendu et assaini : ce fichier ne parse pas de Markdown,
+ * n'échappe rien et ne choisit aucun gabarit.
+ */
+interface Props {
+  model: ContentPageModel;
+}
+
+const { model } = Astro.props;
+---
+
+<article class="markdown-content py-10" data-page-layout={model.layout} style={model.layoutStyle}>
+  <h1>{model.title}</h1>
+  <Fragment set:html={model.html} />
+</article>

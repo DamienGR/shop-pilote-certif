@@ -1,0 +1,52 @@
+# Manifeste de la boutique Certif Minshop.
+# Généré par `shopctl new pilote-certif` depuis le socle v0.3.1.
+# Source de vérité non sensible : aucune clé, aucun secret, jamais.
+schemaVersion: 1
+# Version du socle clonée. Mise à jour par `shopctl core upgrade`.
+coreVersion: 0.3.1
+
+# Qui est la boutique.
+client:
+  slug: pilote-certif
+  displayName: Certif Minshop
+  # Fixés par le périmètre certifié (plan §2.1) : une seule valeur possible.
+  locale: fr-FR
+  timezone: Europe/Paris
+  currency: EUR
+
+# Comment elle vend.
+commerce:
+  market: FR
+  pricesIncludeTax: true
+  checkoutMode: guest
+  defaultVatRate: 20
+  # La validation comptable du jalon 3 n'a pas eu lieu pour cette boutique :
+  # la stratégie de facturation reste en attente plutôt que par défaut.
+  invoiceStrategy: pending-validation
+
+# Interrupteurs décidés à la construction. Les réglages d'exploitation vivent dans Admin → Réglages.
+features:
+  customerAccounts: false
+  semanticSearch: false
+  digitalProducts: false
+  promoCodes: true
+  shipping: true
+
+# Où elle tourne. Tous ces noms sont visibles dans le compte Cloudflare.
+cloudflare:
+  jurisdiction: eu
+  workerName: minshop-pilote-certif
+  productionDomain: certif-minshop.miijot.fr
+  # Compte Cloudflare de cette boutique. `shopctl provision` refuse tout autre
+  # compte : provisionner ailleurs ne se défait pas (ADR 0002).
+  accountId: e11ea775b0317980f1f70960d1000d09
+
+# E-mails transactionnels. Aucune clé d'API ici, jamais.
+email:
+  provider: resend
+  from: commandes@certif-minshop.miijot.fr
+
+# Quel design elle compile.
+theme:
+  # Thème propre à la boutique. Le socle ne le modifie jamais.
+  id: pilote-certif

@@ -1,0 +1,72 @@
+---
+import type { ProductCardModel } from '../../features/storefront/models';
+import StoreImage from '../../features/storefront/controls/StoreImage.astro';
+import { t } from '../../features/i18n';
+
+/**
+ * Atelier — une ligne de tarif surmontée de son objet.
+ *
+ * La vignette est en portrait (4/5) parce que les objets de cette boutique sont
+ * plus hauts que larges — une planche, un torchon plié, un savon debout — et
+ * qu'un cadre carré les couche. Sous elle, le filet, puis le nom à gauche et le
+ * prix à droite sur la même ligne de base : c'est la réglure du thème, et c'est
+ * elle qui fait qu'une grille se lit comme un tarif d'atelier plutôt que comme
+ * une planche-contact.
+ *
+ * Une seule ancre pour toute la tuile. Deux liens vers le même produit
+ * obligeraient chaque personne au clavier à tabuler deux fois, et une ancre qui
+ * n'enveloppe que l'image n'aurait aucun texte à elle.
+ *
+ * Le contrat, en entier :
+ *   - `card` est un ProductCardModel : URL, prix formaté et disponibilité sont
+ *     déjà résolus, rien ne se recalcule ici ;
+ *   - l'image passe par <StoreImage>, qui porte les attributs responsives et le
+ *     comportement LCP ;
+ *   - `card.inStock` est un booléen : le nombre d'unités reste privé.
+ */
+interface Props {
+  card: ProductCardModel;
+  /** Décalage de l'apparition à la charge de la page (plafonné à 8 crans). */
+  index?: number;
+  /** Niveau de titre, pour que les cartes imbriquées sous un titre de section
+   *  ne cassent pas le plan du document. */
+  headingLevel?: 'h2' | 'h3';
+}
+
+const { card, index = 0, headingLevel = 'h2' } = Astro.props;
+const Heading = headingLevel;
+---
+
+<li class="reveal group" style={`animation-delay:${Math.min(index, 8) * 70}ms`}>
+  <a href={card.href} class="block">
+    {/* Le filet vit sur le bas du cadre de l'image : il sépare l'objet de sa
+        ligne de tarif, ce qui est exactement ce qu'un filet fait sur un
+        imprimé. */}
+    <div class="atelier-rule overflow-hidden bg-surface">
+      <StoreImage
+        image={card.image}
+        fade
+        class={`aspect-[4/5] w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]${card.inStock ? '' : ' opacity-55'}`}
+      />
+    </div>
+
+    {/* `flex-wrap` est ce qui tient les titres très longs. Sur une colonne de
+        150 px, un nom de six mots et un prix ne partagent pas une ligne de
+        base ; sans le retour, l'un des deux sort de la vignette. Avec, le prix
+        descend sous le nom et reste aligné à droite — la réglure survit. */}
+    <div class="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+      <Heading class="min-w-0 font-serif text-base leading-snug tracking-[-0.01em] transition-colors group-hover:text-brand sm:text-lg">
+        {card.name}
+      </Heading>
+      <span class="ml-auto shrink-0 text-sm tabular-nums text-muted">{card.formattedPrice}</span>
+    </div>
+
+    {
+      /* L'indisponibilité s'écrit, elle ne se devine pas : l'opacité de la
+         vignette seule ne dit rien à qui ne voit pas la page. */
+      !card.inStock && (
+        <p class="mt-1 text-[11px] uppercase tracking-[0.18em] text-brand">{t('product.soldOut')}</p>
+      )
+    }
+  </a>
+</li>

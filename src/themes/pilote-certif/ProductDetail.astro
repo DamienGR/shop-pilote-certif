@@ -1,0 +1,151 @@
+---
+import type { ProductDetailModel, ProductPurchaseModel } from '../../features/storefront/models';
+import ProductCard from './ProductCard.astro';
+import ProductGallery from '../../features/storefront/controls/ProductGallery.astro';
+import ProductPurchaseForm from '../../features/storefront/controls/ProductPurchaseForm.astro';
+import { t } from '../../features/i18n';
+
+/**
+ * Atelier — la fiche d'atelier.
+ *
+ * L'objet à gauche sur sept colonnes, sa fiche à droite sur quatre, avec une
+ * colonne d'air entre les deux. Dans la colonne de droite tout est séparé par
+ * le filet du thème : le nom et le prix forment un bloc, la description un
+ * autre, l'achat un troisième. C'est la même réglure que la grille du
+ * catalogue, à une autre échelle, et c'est ce qui fait que les deux pages
+ * appartiennent au même dessin.
+ *
+ * Composition seulement. Chaque prix, URL, disponibilité et image de `model`
+ * est déjà résolu ; la route porte le 404, les métadonnées et le JSON-LD.
+ *
+ * <ProductGallery> et <ProductPurchaseForm> restent. La galerie possède les
+ * ancres vers lesquelles le sélecteur de variante fait défiler et le traitement
+ * LCP de la première vue ; le formulaire possède les noms de champs, les états
+ * épuisés et `data-fullpage`, sans lequel « Acheter maintenant » est intercepté
+ * par le tiroir du panier au lieu de naviguer.
+ */
+interface Props {
+  model: ProductDetailModel;
+  purchase: ProductPurchaseModel;
+}
+
+const { model, purchase } = Astro.props;
+---
+
+<a href={model.backHref} class="inline-block pt-2 text-[11px] uppercase tracking-[0.18em] text-faint hover:text-brand">
+  &larr; {t('product.backToShop')}
+</a>
+
+{
+  /* role="alert" : le message arrive après un aller-retour serveur (« choisissez
+     une taille »), donc il doit s'annoncer plutôt qu'attendre d'être trouvé. */
+  model.error && (
+    <p role="alert" class="mt-5 border-l-2 border-brand bg-surface px-4 py-3 text-sm">
+      {model.error}
+    </p>
+  )
+}
+
+<div class="mt-6 grid gap-x-14 gap-y-10 pb-4 lg:grid-cols-12">
+  <div class="reveal lg:col-span-7">
+    <ProductGallery images={model.images} hero={model.heroImage} soldOut={model.soldOut} />
+  </div>
+
+  <div class="reveal lg:col-span-4 lg:col-start-9" style="animation-delay:90ms">
+    {
+      model.categories.length > 0 && (
+        <nav
+          aria-label={t('catalog.categories.label')}
+          class="mb-4 flex flex-wrap gap-x-5 gap-y-1 text-[11px] uppercase tracking-[0.18em] text-brand"
+        >
+          {model.categories.map((category) => (
+            <a href={category.href} class="hover:text-brand-hover">
+              {category.text}
+            </a>
+          ))}
+        </nav>
+      )
+    }
+
+    <h1 class="font-serif text-[clamp(2rem,3.2vw,2.75rem)] leading-[1.08] tracking-[-0.02em]">
+      {model.name}
+    </h1>
+    {
+      model.digitalDelivery && (
+        <p class="mt-2 text-[11px] uppercase tracking-[0.18em] text-brand">{t('product.digitalDelivery')}</p>
+      )
+    }
+
+    <p
+      class="mt-4 text-xl tabular-nums text-muted"
+      data-price-display
+      data-base={model.priceCents}
+      data-currency={model.currency}
+    >
+      {model.priceVaries && <span class="text-sm text-faint">{t('product.priceFrom')}</span>}
+      {model.formattedPrice}
+    </p>
+
+    {
+      /* `data-low-stock` est le contrat, pas la formulation. Reformuler et
+         restyler librement ; garder le marqueur, pour que la rareté reste
+         distinguable d'une disponibilité normale sans figer la copie. */
+      model.lowStock && (
+        <p data-low-stock class="mt-2 text-sm text-brand">
+          {t('product.lowStock')}
+        </p>
+      )
+    }
+
+    {
+      model.descriptionHtml && (
+        <div class="atelier-rule mt-6 pb-6">
+          <div class="markdown-content max-w-[38ch] text-[0.95rem]" set:html={model.descriptionHtml} />
+        </div>
+      )
+    }
+
+    <ProductPurchaseForm model={purchase} />
+
+    {/* Partage — masqué tant que le script n'a pas confirmé que le navigateur
+        sait partager ou copier. API Web Share, avec repli sur le presse-papier. */}
+    <button
+      type="button"
+      data-share
+      data-share-title={model.name}
+      class="mt-6 hidden w-fit items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-faint transition hover:text-brand"
+    >
+      <svg
+        width="13"
+        height="13"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <circle cx="18" cy="5" r="3" />
+        <circle cx="6" cy="12" r="3" />
+        <circle cx="18" cy="19" r="3" />
+        <line x1="8.6" y1="13.5" x2="15.4" y2="17.5" />
+        <line x1="15.4" y1="6.5" x2="8.6" y2="10.5" />
+      </svg>
+      <span data-share-label>{t('product.share')}</span>
+    </button>
+  </div>
+</div>
+
+{
+  model.related.length > 0 && (
+    <section class="border-t border-line py-14">
+      <h2 class="mb-8 text-[11px] uppercase tracking-[0.28em] text-faint">{t('product.related')}</h2>
+      <ul class="grid grid-cols-2 gap-x-5 gap-y-12 sm:gap-x-8 lg:grid-cols-4">
+        {model.related.map((card, i) => (
+          <ProductCard card={card} index={i} headingLevel="h3" />
+        ))}
+      </ul>
+    </section>
+  )
+}

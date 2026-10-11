@@ -1,0 +1,135 @@
+/*
+ * ── Atelier — l'établi : linge, terre cuite, réglures ─────────────────────
+ *
+ * La boutique vend des objets faits à la main — grès, hêtre, lin, savon. Le
+ * socle propose déjà trois réponses : le papier chaud et éditorial du thème
+ * `default`, le mur sombre de `studio`, la densité de fiche technique de
+ * `market`. Celle-ci en prend une quatrième : la liste de prix d'un atelier.
+ *
+ * L'identité n'est donc pas d'abord une palette, c'est une RÉGLURE. Chaque
+ * produit s'inscrit sur un filet, le nom à gauche et le prix à droite sur la
+ * même ligne de base, comme sur un tarif affiché au mur. La couleur ne fait
+ * que réchauffer ce squelette : lin pour le papier, terre d'ombre pour l'encre,
+ * terre cuite pour tout ce qui se clique.
+ *
+ * Aucune police distante. Les deux piles sont des faces système, parce qu'une
+ * boutique servie depuis un Worker n'a rien à gagner à faire attendre son
+ * premier rendu derrière un fichier de fonte.
+ */
+@theme {
+  /* Terre cuite. 6,76:1 sur le papier et 6,14:1 sur les panneaux : le lien de
+     texte passe AA aux deux endroits où il se pose, ce qu'un orange plus vif
+     n'aurait pas fait. */
+  --color-brand: #8a3f1e;
+  /* Le survol FONCE au lieu d'éclaircir. Sur une page claire, éclaircir un
+     lien c'est le faire reculer au moment où on le vise. */
+  --color-brand-hover: #6f3218;
+
+  /* Terre d'ombre plutôt que noir : 14,87:1 sur le lin, donc largement au-delà
+     d'AAA, sans la dureté d'un #000 sur un fond chaud. */
+  --color-ink: #251e17;
+
+  /* Les liens de prose portent la même terre cuite que les actions. Un second
+     accent (le bleu du thème par défaut) rendrait la page bavarde là où elle
+     doit se lire comme un imprimé à une seule encre. */
+  --color-accent: #8a3f1e;
+
+  /* Lin. Le papier du thème par défaut est chaud lui aussi, mais neutre ; ici
+     il tire franchement vers le jaune, ce qui est la couleur d'un établi. */
+  --color-paper: #f7f3ec;
+  /* Le filet, et donc l'essentiel du dessin. Volontairement un cran plus
+     marqué que le cheveu du thème par défaut : ici il porte la composition au
+     lieu de séparer deux blocs. */
+  --color-line: #d8cdb9;
+
+  /* Sur un papier clair, un panneau surélevé descend. */
+  --color-surface: #efe8dc;
+
+  /* Deux niveaux, tous deux au-dessus de 4,5:1 sur `surface`, la plus claire
+     des deux surfaces qu'ils rencontrent — 6,41:1 et 4,97:1. */
+  --color-muted: #5c5045;
+  --color-faint: #6e6055;
+
+  /* Lin sur terre cuite, 6,76:1. Le blanc pur y passerait aussi, mais il
+     jurerait : rien d'autre sur cette page n'est blanc. */
+  --color-on-brand: #f7f3ec;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    Helvetica, Arial, sans-serif;
+  /* Une old style à empattements francs. Chaque secours est une face système :
+     rien ici n'exige une fonte distante pour s'afficher. */
+  --font-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua',
+    Georgia, 'Times New Roman', serif;
+
+  /* Presque droit. Un objet tourné ou raboté a une arête, pas un rayon de 8px ;
+     2px suffisent à ce qu'un champ de saisie ne paraisse pas cassé. */
+  --radius-md: 2px;
+  --radius-lg: 3px;
+}
+
+/*
+ * Conteneur de page. Plus large que la colonne éditoriale du thème par défaut,
+ * parce que la grille tient sur trois colonnes de vignettes en portrait ; plus
+ * étroit que le mur de `studio`, parce qu'un tarif se lit d'un coup d'œil.
+ *
+ * La gouttière est celle que l'en-tête et le pied de page écrivent en dur
+ * (`px-6`). Les deux valeurs DOIVENT rester égales : le filet de l'en-tête et
+ * le filet d'une vignette sont censés tomber sur la même verticale, et un écart
+ * d'un demi-rem entre les deux se voit immédiatement. 1,5rem plutôt que 2rem
+ * parce qu'à 390 px de large, deux colonnes de vignettes ne survivent pas à
+ * 64 px de marges.
+ */
+:root {
+  --page-max: 78rem;
+  --page-pad-x: 1.5rem;
+  --page-pad-y: 2.5rem;
+}
+
+/*
+ * Échelle de prose des pages de contenu. Une boutique d'atelier écrit des
+ * lettres — l'histoire de la maison, l'entretien d'un objet, les CGV — donc la
+ * justification est courte et l'interligne ouvert. Hors de @theme : le cœur les
+ * consomme directement et elles ne définissent aucune famille d'utilitaires.
+ */
+:root {
+  --prose-measure: 36rem;
+  --prose-leading: 1.8;
+  --prose-h1-size: 2.75rem;
+  --prose-h1-tracking: -0.02em;
+  --prose-h2-size: 1.625rem;
+  --prose-h2-tracking: -0.012em;
+  --prose-h3-size: 1.15rem;
+}
+
+@layer base {
+  /*
+   * Le filet de l'atelier, en une seule déclaration réutilisable.
+   *
+   * Deux traits : un plein d'un pixel, puis un cheveu à trois pixels sous lui.
+   * C'est le geste de l'imprimeur pour marquer un titre, et c'est ce qui
+   * distingue cette page d'une suite de blocs séparés par des bordures.
+   */
+  .atelier-rule {
+    border-bottom: 1px solid var(--color-line);
+    box-shadow: 0 3px 0 -2px var(--color-line);
+  }
+
+  /* La prose reprend l'encre de la page plutôt que le gris du cœur : sur un
+     fond aussi chaud, un gris neutre paraît délavé. */
+  .markdown-content {
+    color: #3b3128;
+  }
+  .markdown-content h1,
+  .markdown-content h2,
+  .markdown-content h3 {
+    color: var(--color-ink);
+  }
+
+  /* L'anneau de focus est en terre cuite et décollé de deux pixels : sur une
+     page beige, un anneau à la couleur de l'encre se confond avec le texte
+     qu'il entoure. */
+  :where(a, button, input, select, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+}
