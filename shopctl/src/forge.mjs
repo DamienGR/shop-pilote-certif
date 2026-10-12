@@ -123,9 +123,13 @@ export function defaultOwner({ cwd } = {}) {
  * at the first push, which is after the repository has been created. HTTPS is
  * the fallback because it is `gh`'s own default and works with the credential
  * helper `gh auth login` installs.
+ *
+ * Asked for github.com, not globally: `gh auth login` records the protocol it
+ * chose under the host, and the global key keeps its `https` default. `gh`
+ * falls back to the global value itself when the host has none.
  */
 export function gitProtocol({ cwd } = {}) {
-  const result = gh(['config', 'get', 'git_protocol'], { cwd, allowFailure: true });
+  const result = gh(['config', 'get', 'git_protocol', '--host', 'github.com'], { cwd, allowFailure: true });
   return (result.status === 0 ? result.stdout.trim() : '') === 'ssh' ? 'ssh' : 'https';
 }
 

@@ -3,7 +3,7 @@
 # Source de vérité non sensible : aucune clé, aucun secret, jamais.
 schemaVersion: 1
 # Version du socle clonée. Mise à jour par `shopctl core upgrade`.
-coreVersion: 0.3.1
+coreVersion: 0.3.2
 
 # Qui est la boutique.
 client:

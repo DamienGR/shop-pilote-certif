@@ -46,7 +46,7 @@ export const HUMAN_CHECKLIST = [
   ['un widget Turnstile sur les noms d\'hôte de la boutique', 'Ses deux clés se saisissent dans Admin → Réglages → Protection.'],
   ['domaine de production dans une zone du compte du commerçant', 'Le domaine personnalisé d\'un Worker demande une zone active sur le compte qui porte ce Worker.'],
   ['domaine d\'expédition vérifié chez le fournisseur d\'e-mail', 'Sans SPF/DKIM alignés, les confirmations de commande partent en spam.'],
-  ['GitHub Pro au minimum sur le compte qui porte le dépôt de la boutique', 'Un dépôt privé n\'a pas de secrets d\'environnement sous GitHub Free ; les relecteurs obligatoires y demandent Enterprise.'],
+  ['GitHub Pro au minimum sur le compte qui porte le dépôt de la boutique, ou un dépôt public (`shopctl repo --public`)', 'Un dépôt privé n\'a pas de secrets d\'environnement sous GitHub Free ; les relecteurs obligatoires y demandent Enterprise. Un dépôt public a les deux sous tous les plans, et publie le socle avec son historique.'],
   ['un jeton API Cloudflare par environnement, limité à son compte et à sa zone', 'shopctl repo les pose (CLOUDFLARE_API_TOKEN_STAGING, CLOUDFLARE_API_TOKEN_PRODUCTION) ; un jeton commun donne au staging les droits de la production.'],
 ];
 

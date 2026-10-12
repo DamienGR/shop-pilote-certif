@@ -261,6 +261,24 @@ describe('shopctl repo', () => {
       expect(configured.stdout.trim()).toBe(`git@github.com:studiomaestro/shop-${target.slug}.git`);
     });
 
+    // Where `gh auth login` writes the choice: under the host, the global key
+    // left at its `https` default. Read globally, the remote came out HTTPS on
+    // an SSH-only machine and the first push asked for a password (étape 2 de
+    // la certification, 2026-10-11).
+    it('reads the protocol gh recorded for github.com over the global default', () => {
+      const target = forgeShop();
+      spawnSync('git', ['remote', 'remove', 'origin'], { cwd: target.root });
+      target.github({
+        login: 'studiomaestro',
+        config: { git_protocol: 'https' },
+        hosts: { 'github.com': { git_protocol: 'ssh' } },
+      });
+
+      target.run(['repo', '--no-push'], TOKENS);
+      const configured = spawnSync('git', ['config', '--get', 'remote.origin.url'], { cwd: target.root, encoding: 'utf8' });
+      expect(configured.stdout.trim()).toBe(`git@github.com:studiomaestro/shop-${target.slug}.git`);
+    });
+
     // An existing remote always wins: the shop already says where it lives.
     it('never overrides a remote the tree already has', () => {
       const target = forgeShop();

@@ -1,6 +1,6 @@
 # Boutique témoin du pilote (plan §2.3). Fixture, pas un déploiement.
 schemaVersion: 1
-coreVersion: 0.3.1
+coreVersion: 0.3.2
 
 client:
   slug: pilot-fr

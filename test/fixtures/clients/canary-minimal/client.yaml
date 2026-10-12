@@ -1,7 +1,7 @@
 # Contre-épreuve (plan §2.3) : tout ce que pilot-fr active, celle-ci le coupe.
 # Une valeur du pilote codée en dur dans le cœur casse cette boutique, pas l'autre.
 schemaVersion: 1
-coreVersion: 0.3.1
+coreVersion: 0.3.2
 
 client:
   slug: canary-minimal

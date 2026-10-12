@@ -106,6 +106,12 @@ fichier auquel il n'a jamais touché. Les slugs que la documentation emploie son
 donc réservés (`RESERVED_SLUGS`), et le test « core documentation only uses
 reserved example slugs » le vérifie.
 
+Les noms des boutiques témoins de `test/fixtures/clients/` sont pris aussi,
+par un autre mécanisme : chaque boutique en garde une copie, chaque témoin y
+réclame son slug et tous les noms qui en dérivent, et `config:validate` refuse
+deux boutiques pour un nom. `new` refuse donc avant de cloner un slug dont un
+nom tombe sur celui d'un témoin — le témoin lui-même, ou `<témoin>-staging`.
+
 Elle clone **un tag**, **avec son historique**, renomme le remote du socle en
 `core`, crée la branche de travail, écrit le manifeste et le thème de la
 boutique, rend `wrangler.jsonc` depuis le manifeste, exécute les portes que la
@@ -170,8 +176,9 @@ lire « déjà correct » : ce pourrait être le jeton du mois dernier. Rien en 
 n'est chiffré avec, donc réécrire ne coûte rien.
 
 **Les règles de protection sont tentées, jamais supposées.** Sur un dépôt privé
-hors GitHub Pro, l'API refuse les relecteurs obligatoires et accepte
-l'environnement. La commande garde l'environnement — c'est lui qui porte les
+hors GitHub Enterprise, l'API refuse les relecteurs obligatoires et accepte
+l'environnement (sous GitHub Free, un dépôt privé n'a pas non plus de secrets
+d'environnement ; un dépôt public, créé avec `--public`, a les deux). La commande garde l'environnement — c'est lui qui porte les
 secrets — et dit que l'approbation n'est pas opposable, plutôt que de laisser
 croire qu'elle l'est.
 
@@ -476,7 +483,7 @@ autre réponse que la CI — et c'est la CLI que l'exploitant croit.
 | --- | --- |
 | `0` | Succès. |
 | `2` | Ligne de commande erronée : commande ou option inconnue, valeur manquante. |
-| `3` | Valeur inutilisable : slug réservé, slug que le cœur emploie déjà, tag qui n'en est pas un. |
+| `3` | Valeur inutilisable : slug réservé, slug que le cœur emploie déjà ou qu'un témoin réclame, tag qui n'en est pas un. |
 | `4` | Prérequis absent : répertoire occupé, `git` manquant, pas d'identité Git. |
 | `5` | Commande externe en échec (`git`, `npm`, `wrangler`). |
 | `6` | Résultat produit puis refusé par une porte. L'arbre est laissé en place. |
