@@ -1,0 +1,108 @@
+{
+  "command": "provision",
+  "ok": true,
+  "dryRun": false,
+  "shop": "pilote-certif",
+  "env": "staging",
+  "account": {
+    "id": "e11ea775b0317980f1f70960d1000d09",
+    "name": "Damien.gr34@gmail.com's Account"
+  },
+  "jurisdiction": "eu",
+  "resources": {
+    "worker": "minshop-pilote-certif-staging",
+    "database": "minshop-pilote-certif-staging-db",
+    "images": "minshop-pilote-certif-staging-images",
+    "files": "minshop-pilote-certif-staging-files",
+    "backups": "minshop-pilote-certif-staging-backups",
+    "sessions": "minshop-pilote-certif-staging-session"
+  },
+  "databaseId": "42136d04-8561-487d-bf2d-044ce11ea2ea",
+  "steps": [
+    {
+      "resource": "base D1",
+      "name": "minshop-pilote-certif-staging-db",
+      "action": "keep",
+      "detail": "42136d04-8561-487d-bf2d-044ce11ea2ea"
+    },
+    {
+      "resource": "bucket images",
+      "name": "minshop-pilote-certif-staging-images",
+      "action": "keep",
+      "detail": "eu"
+    },
+    {
+      "resource": "bucket fichiers",
+      "name": "minshop-pilote-certif-staging-files",
+      "action": "keep",
+      "detail": "eu"
+    },
+    {
+      "resource": "bucket sauvegardes",
+      "name": "minshop-pilote-certif-staging-backups",
+      "action": "keep",
+      "detail": "eu"
+    }
+  ],
+  "jurisdictionChecks": [
+    {
+      "resource": "minshop-pilote-certif-staging-db",
+      "expected": "eu",
+      "reported": "eu",
+      "ok": true
+    },
+    {
+      "resource": "minshop-pilote-certif-staging-images",
+      "expected": "eu",
+      "reported": "eu",
+      "ok": true
+    },
+    {
+      "resource": "minshop-pilote-certif-staging-files",
+      "expected": "eu",
+      "reported": "eu",
+      "ok": true
+    },
+    {
+      "resource": "minshop-pilote-certif-staging-backups",
+      "expected": "eu",
+      "reported": "eu",
+      "ok": true
+    }
+  ],
+  "exposure": {
+    "files": {
+      "devUrl": null,
+      "domains": [],
+      "public": false,
+      "known": true
+    },
+    "images": {
+      "devUrl": null,
+      "domains": [],
+      "public": false,
+      "known": true
+    },
+    "backups": {
+      "devUrl": null,
+      "domains": [],
+      "public": false,
+      "known": true
+    }
+  },
+  "retention": {
+    "days": 90,
+    "action": "keep"
+  },
+  "config": "wrangler.jsonc",
+  "migrations": "applied",
+  "secrets": {
+    "present": [],
+    "created": [],
+    "pending": [
+      "AUTH_SECRET",
+      "SECRETS_KEK"
+    ]
+  },
+  "workerDeployed": false
+}

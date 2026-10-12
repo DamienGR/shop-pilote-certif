@@ -1,0 +1,10 @@
+{
+  "ok": false,
+  "error": {
+    "kind": "precondition",
+    "code": 4,
+    "message": "deux sources désignent des comptes différents : le manifeste (cloudflare.accountId) = e11ea775b0317980f1f70960d1000d09, --account = b8505b293a291d9d82edf5417b02084d, CLOUDFLARE_ACCOUNT_ID = e11ea775b0317980f1f70960d1000d09.",
+    "hint": "Alignez-les avant de provisionner ; le manifeste fait foi une fois la boutique créée.",
+    "details": null
+  }
+}
