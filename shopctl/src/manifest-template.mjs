@@ -101,8 +101,8 @@ export function buildManifest({ slug, displayName, domain, email, theme, coreVer
  * Comments carried into the generated file, by dotted path.
  *
  * They are the ones a merchant needs while editing and cannot recover from the
- * schema: which values are placeholders the shop must replace before it is
- * provisioned, and which are fixed by the certified scope rather than by taste.
+ * schema: which values are fixed by the certified scope rather than by taste,
+ * and what a field commits the shop to. Placeholders have their own list below.
  */
 const NOTES = {
   coreVersion: ['Version du socle clonée. Mise à jour par `shopctl core upgrade`.'],
@@ -111,16 +111,26 @@ const NOTES = {
     'La validation comptable du jalon 3 n\'a pas eu lieu pour cette boutique :',
     'la stratégie de facturation reste en attente plutôt que par défaut.',
   ],
-  'cloudflare.productionDomain': [
-    'PLACEHOLDER : domaine réservé à la documentation (RFC 2606).',
-    'À remplacer par le domaine du commerçant avant tout provisioning.',
-  ],
   'cloudflare.accountId': [
     'Compte Cloudflare de cette boutique. `shopctl provision` refuse tout autre',
     'compte : provisionner ailleurs ne se défait pas (ADR 0002).',
   ],
-  'email.from': ['PLACEHOLDER : suit le domaine ci-dessus.'],
   'theme.id': ['Thème propre à la boutique. Le socle ne le modifie jamais.'],
+};
+
+/**
+ * Comments for the values that are placeholders, written only when they ARE.
+ *
+ * A "replace this" note next to the merchant's real domain is a note someone
+ * eventually obeys, or learns to read past — and then reads past the one that
+ * mattered.
+ */
+const PLACEHOLDER_NOTES = {
+  'cloudflare.productionDomain': [
+    'PLACEHOLDER : domaine réservé à la documentation (RFC 2606).',
+    'À remplacer par le domaine du commerçant avant tout provisioning.',
+  ],
+  'email.from': ['PLACEHOLDER : suit le domaine ci-dessus.'],
 };
 
 /** Section-level headings, in the order buildManifest() emits them. */
@@ -141,7 +151,11 @@ const SECTION_NOTES = {
  * the same options produce the same bytes, which is what makes the generated
  * shop reviewable as a diff.
  */
-export function renderManifest(manifest, { header } = {}) {
+export function renderManifest(manifest, { header, placeholders = [] } = {}) {
+  const notesFor = (path) => [
+    ...(NOTES[path] ?? []),
+    ...(placeholders.includes(path) ? (PLACEHOLDER_NOTES[path] ?? []) : []),
+  ];
   const lines = [];
   if (header) for (const line of header) lines.push(`# ${line}`);
 
@@ -152,12 +166,12 @@ export function renderManifest(manifest, { header } = {}) {
       if (SECTION_NOTES[key]) lines.push(`# ${SECTION_NOTES[key]}`);
       lines.push(`${key}:`);
       for (const [field, fieldValue] of Object.entries(value)) {
-        for (const note of NOTES[`${key}.${field}`] ?? []) lines.push(`  # ${note}`);
+        for (const note of notesFor(`${key}.${field}`)) lines.push(`  # ${note}`);
         lines.push(`  ${field}: ${yamlScalar(fieldValue)}`);
       }
       continue;
     }
-    for (const note of NOTES[key] ?? []) lines.push(`# ${note}`);
+    for (const note of notesFor(key)) lines.push(`# ${note}`);
     lines.push(`${key}: ${yamlScalar(value)}`);
   }
 

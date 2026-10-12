@@ -25,10 +25,17 @@ import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } fro
 import { tmpdir } from 'node:os';
 import { relative, resolve } from 'node:path';
 import { RESERVED_SLUGS, validateManifest } from '../../../scripts/manifest-schema.mjs';
-import { CLIENT_MANIFEST, resourceNames } from '../../../scripts/manifest.mjs';
+import {
+  CLIENT_MANIFEST,
+  WITNESS_CLIENTS_DIR,
+  detectFleetCollisions,
+  discoverManifests,
+  loadManifest,
+  resourceNames,
+} from '../../../scripts/manifest.mjs';
 import { setupRepository } from './repo.mjs';
 import { assertForgeReady, defaultOwner, gitProtocol, repositoryNameFor, repositoryUrl } from '../forge.mjs';
-import { RESERVED_THEME_IDS, THEMES_DIR, isValidThemeId, normalizeThemeId } from '../../../scripts/themes.mjs';
+import { RESERVED_THEME_IDS, SHOP_SIGNATURES_DIR, SIGNATURES_DIR, THEMES_DIR, isValidThemeId, normalizeThemeId } from '../../../scripts/themes.mjs';
 import { CORE_ROOT, corePackage } from '../paths.mjs';
 import { EXIT_CODES, ShopctlError, inputError, preconditionError, usageError, verificationError } from '../errors.mjs';
 import { capture, run } from '../process.mjs';
@@ -364,6 +371,12 @@ export function runNew(args, reporter) {
       'Nothing was created.',
     );
   }
+  // Asked of the witnesses THIS core carries, before the clone. The gate run
+  // after it asks the cloned tag's, which is the authority; this only makes the
+  // common case — host and tag carrying the same fixtures — fail before a byte
+  // is written.
+  const witnesses = witnessCollisions(manifest, CORE_ROOT);
+  if (witnesses.length > 0) throw takenByWitness(slug, witnesses, 'Nothing was created.');
 
   const cwd = process.cwd();
   // Under --json, stdout belongs to the report and nothing else, so a child's
@@ -410,6 +423,15 @@ export function runNew(args, reporter) {
     );
   }
   cpSync(referenceDir, themeDir, { recursive: true });
+  // The copy renders exactly as its reference, so the reference's design
+  // signature is the copy's, and the shop's browser gate is green at its first
+  // commit. It goes under client/: test/ is the core's, and a shop recording
+  // its own signature there would be a core change at every upgrade.
+  const referenceSignature = resolve(target, SIGNATURES_DIR, `${referenceTheme}.json`);
+  if (existsSync(referenceSignature)) {
+    mkdirSync(resolve(target, SHOP_SIGNATURES_DIR), { recursive: true });
+    cpSync(referenceSignature, resolve(target, SHOP_SIGNATURES_DIR, `${theme}.json`));
+  }
 
   const manifestText = renderManifest(manifest, {
     header: [
@@ -417,6 +439,12 @@ export function runNew(args, reporter) {
       `Généré par \`shopctl new ${slug}\` depuis le socle ${tag}.`,
       'Source de vérité non sensible : aucune clé, aucun secret, jamais.',
     ],
+    // The sender follows the domain unless it was given, so it is a
+    // placeholder exactly when it was derived from one.
+    placeholders:
+      domainFrom === 'placeholder'
+        ? ['cloudflare.productionDomain', ...(args.values['--email'] === undefined ? ['email.from'] : [])]
+        : [],
   });
   // Read back what was rendered. A generator and a parser that disagree about
   // quoting would produce a shop whose display name quietly lost a character,
@@ -468,8 +496,14 @@ export function runNew(args, reporter) {
       // pick another slug. RESERVED_SLUGS catches the known ones before the
       // clone; it can never catch them all, because the gate also trips on
       // ordinary English the core happens to use.
+      const manifestOnly = checks.every((check) => check.ok || check.check === 'manifeste');
+      const claimed = witnessClaims(manifestGate, slug);
+      if (claimed.length > 0 && manifestOnly) {
+        if (createdTarget) rmSync(target, { recursive: true, force: true });
+        throw takenByWitness(slug, claimed, 'Nothing was kept.');
+      }
       const collisions = ownSlugCollisions(manifestGate, slug);
-      if (collisions.length > 0 && checks.every((check) => check.ok || check.check === 'manifeste')) {
+      if (collisions.length > 0 && manifestOnly) {
         if (createdTarget) rmSync(target, { recursive: true, force: true });
         throw inputError(
           `"${slug}" is a word this core already uses, in ${collisions.length} of its own file${collisions.length > 1 ? 's' : ''}.`,
@@ -634,6 +668,66 @@ function ownSlugCollisions(gate, slug) {
   if (manifestErrors || (report?.collisions ?? []).length > 0) return [];
   if (!findings.every((finding) => finding.slug === slug)) return [];
   return [...new Set(findings.map((finding) => finding.path))];
+}
+
+const isWitnessFile = (file) => file.startsWith(`${WITNESS_CLIENTS_DIR}/`);
+
+/**
+ * The witness manifests a would-be shop collides with, in the core at `root`.
+ *
+ * A witness is a shop as far as the manifest gate is concerned: it claims its
+ * slug and every name derived from it, in every environment. A shop that takes
+ * one of those names fails its own CI for as long as the fixture exists, and
+ * the fixture is core — removing it from the shop is a conflict at every
+ * upgrade. Not RESERVED_SLUGS: the schema refuses a reserved slug, and the
+ * witnesses are validated by that same schema.
+ */
+export function witnessCollisions(manifest, root) {
+  const witnesses = discoverManifests(root)
+    .filter(isWitnessFile)
+    .map((file) => loadManifest(file, { root, checkTheme: false }))
+    .filter((entry) => entry.errors.length === 0);
+  return [
+    ...new Set(
+      detectFleetCollisions([{ file: CLIENT_MANIFEST, manifest }, ...witnesses])
+        .filter((claim) => claim.files.includes(CLIENT_MANIFEST))
+        .flatMap((claim) => claim.files.filter(isWitnessFile)),
+    ),
+  ];
+}
+
+/**
+ * The same question read from the manifest gate's report on the cloned shop.
+ *
+ * Only when witnesses are the whole story: every collision is between this
+ * shop's manifest and a witness, no manifest is invalid, and any neutrality
+ * finding names this shop. Anything else keeps the report it deserves.
+ */
+export function witnessClaims(gate, slug) {
+  let report;
+  try {
+    report = JSON.parse(gate.stdout);
+  } catch {
+    return [];
+  }
+  const collisions = report?.collisions ?? [];
+  if (collisions.length === 0) return [];
+  if ((report?.manifests ?? []).some((entry) => entry.errors?.length > 0)) return [];
+  if (!(report?.coreNeutrality?.findings ?? []).every((finding) => finding.slug === slug)) return [];
+  const betweenShopAndWitness = ({ files }) =>
+    files.includes(CLIENT_MANIFEST) && files.every((file) => file === CLIENT_MANIFEST || isWitnessFile(file));
+  if (!collisions.every(betweenShopAndWitness)) return [];
+  return [...new Set(collisions.flatMap(({ files }) => files.filter(isWitnessFile)))];
+}
+
+function takenByWitness(slug, files, outcome) {
+  return inputError(
+    `"${slug}" collides with a witness shop this core carries (${files.join(', ')}).`,
+    [
+      'A witness claims its slug and every resource name derived from it, and the manifest gate refuses two shops claiming one name, so this shop could never pass its own CI.',
+      `Choose another slug. ${outcome}`,
+    ].join('\n'),
+  );
 }
 
 /** The README `shopctl new` drops in a shop's imports/ directory.

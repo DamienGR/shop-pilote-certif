@@ -20,6 +20,8 @@
  *   authenticated   boolean                 false makes `gh auth status` exit 1
  *   login           string                  what `gh api user --jq .login` says
  *   config          { git_protocol }        what `gh config get` answers
+ *   hosts           { host: { git_protocol } }  what `gh config get --host` answers
+ *                                           first, as `gh auth login` writes it
  *   repos           { "owner/name": { visibility, environments, secrets, pulls } }
  *   users           { login: id }
  *   refuseReviewers boolean                 the free-plan private-repo refusal
@@ -76,7 +78,9 @@ const fail = (text, code = 1) => {
 if (argv.includes('--version')) done('gh version 2.62.0 (double)');
 
 if (argv[0] === 'config' && argv[1] === 'get') {
-  done(String((state.config ?? {})[argv[2]] ?? ''));
+  const host = flag('--host') ?? flag('-h');
+  const scoped = host ? (state.hosts ?? {})[host]?.[argv[2]] : undefined;
+  done(String(scoped ?? (state.config ?? {})[argv[2]] ?? ''));
 }
 
 if (argv[0] === 'auth' && argv[1] === 'status') {

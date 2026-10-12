@@ -561,7 +561,9 @@ What it asserts, and why each one is here rather than in vitest:
   one refactor away from a 500 on an apostrophe.
 - **design signature** (`design-signature.spec.mjs`) — visual regression as the
   COMPUTED style of ten probes, committed per theme under
-  `test/browser/__signatures__/`. Not `toHaveScreenshot`: a PNG baseline is only
+  `test/browser/__signatures__/` for the shipped themes and under the shop's
+  `client/signatures/` for its own theme (`shopctl new` seeds it from the
+  reference theme's). Not `toHaveScreenshot`: a PNG baseline is only
   meaningful against the renderer that recorded it, so it needs a pinned
   container or it reports failures nobody caused — and this repository already
   spends a workflow measuring one flake. What actually regresses in a

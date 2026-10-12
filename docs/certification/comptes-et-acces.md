@@ -159,23 +159,47 @@ autre jeton, sur B : Account Analytics et D1 en lecture, rien d'autre (plan
 
 ## 7. GitHub : le plan
 
-Les dépôts de boutique sont privés (`shopctl repo`), et les workflows `Deploy`
-et `Nightly` lisent leurs secrets dans les environnements `staging` et
-`production`. D'après la
+Les workflows `Deploy` et `Nightly` lisent leurs secrets dans les environnements
+`staging` et `production`. D'après la
 [documentation de GitHub](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments),
-relue le 2026-10-06 :
+relue le 2026-10-06 puis le 2026-10-08 :
 
-| Plan du compte | Secrets d'environnement, dépôt privé | Relecteurs obligatoires, dépôt privé |
+| Plan du compte, visibilité du dépôt | Secrets d'environnement | Relecteurs obligatoires |
 |---|---|---|
-| Free | non | non |
-| Pro, Team | oui | non |
-| Enterprise | oui | oui |
+| Free, Pro ou Team, dépôt public | oui | oui |
+| Free, dépôt privé | non | non |
+| Pro ou Team, dépôt privé | oui | non |
+| Enterprise, dépôt privé | oui | oui |
 
-Il faut donc **GitHub Pro au minimum** sur le compte qui porte les dépôts. Les
+Les minutes d'Actions comptent aussi
+([facturation](https://docs.github.com/en/billing/concepts/product-billing/github-actions)) :
+gratuites et sans limite sur un dépôt public, 2 000 par mois sous Free et 3 000
+sous Pro pour l'ensemble des dépôts privés du compte. Sans moyen de paiement,
+Actions s'arrête au quota.
+
+**Une vraie boutique** a un dépôt privé, ce que `shopctl repo` crée par défaut.
+Il faut alors **GitHub Pro au minimum** sur le compte qui porte les dépôts. Les
 relecteurs obligatoires n'existent sur un dépôt privé qu'avec Enterprise : sans
 lui, la ligne §9 « approbation humaine » prend la dérogation du plan §6 — seul
 l'opérateur a les droits d'écriture, et `deploy --env production` exige `--yes`.
 `shopctl repo` tente les relecteurs et dit quand GitHub les refuse.
+
+**Le pilote**, décidé le 2026-10-08 : le compte reste en Free et les deux dépôts
+de boutique sont publics, créés par `shopctl repo --public`. Ils ont les
+secrets d'environnement, un relecteur obligatoire sur `production` et des
+minutes sans limite. Ce qui devient public :
+
+- le socle et tout son historique jusqu'au tag cloné, adresses e-mail des
+  auteurs de commits comprises, puis l'historique de chaque tag fusionné par
+  une montée de version (étape 8) ;
+- le manifeste : identifiants de compte, domaines, nom d'équipe et AUD
+  d'Access, dont aucun n'est un secret ;
+- les journaux de la CI, et les rapports qu'elle garde en artefacts :
+  identifiants, comptes de lignes, empreintes, verdicts.
+
+Les secrets ne le deviennent pas : GitHub les masque dans les journaux et ne
+les rend jamais. Les archives de sauvegarde non plus : elles vont dans le
+bucket `-backups` de l'environnement, jamais en artefact.
 
 ## 8. Poste de l'opérateur
 
@@ -211,7 +235,7 @@ Secrets, créés au moment où leur destination existe :
 | Secret | Créé à l'étape | Collé dans |
 |---|---|---|
 | clé de sauvegarde | 2, `shopctl backup keygen` dans l'arbre de la boutique, avant de relancer `shopctl repo` | `.shopctl/backup.key` (0600), puis `SHOPCTL_BACKUP_KEY` posé par `shopctl repo` ; sans elle, la sauvegarde du nocturne de l'étape 3 échoue |
-| jeton API de staging (A) | 2, juste avant `shopctl new --create-repo` | variable `CLOUDFLARE_API_TOKEN_STAGING` du shell qui lance `shopctl new` puis `shopctl repo` |
+| jeton API de staging (A) | 2, juste avant le premier `shopctl repo` | variable `CLOUDFLARE_API_TOKEN_STAGING` du shell qui lance `shopctl repo` |
 | clé Stripe test restreinte, secret du webhook test | 3 | coffre, Admin → Réglages → Paiements |
 | clé Stripe test du nocturne | 3 | secret `STRIPE_TEST_SECRET_KEY` de `staging` |
 | clé Resend | 3 | coffre |

@@ -196,6 +196,13 @@ jobs:
             --json > "$RUNNER_TEMP/report.json"
           cat "$RUNNER_TEMP/report.json"
 
+      # A shop's own CI checks out `origin` alone. `shopctl new` leaves a `core`
+      # remote that no shop runner has, and a gate relying on it passed here
+      # while every real shop went red (étape 2 de la certification).
+      - name: Leave the shop as its own CI checks it out
+        working-directory: ${{ runner.temp }}/generated-shop
+        run: git remote remove core
+
       # Everything below runs in the SHOP, with the tooling the shop carries.
       - name: Install the shop's dependencies
         working-directory: ${{ runner.temp }}/generated-shop

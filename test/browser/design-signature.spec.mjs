@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { expect, test } from './fixtures.mjs';
-import { resolveTheme } from '../../scripts/themes.mjs';
+import { SHOP_SIGNATURES_DIR, SIGNATURES_DIR, resolveTheme } from '../../scripts/themes.mjs';
 import { REMOTE, settle } from './pages.mjs';
 
 /**
@@ -46,8 +46,14 @@ import { REMOTE, settle } from './pages.mjs';
  */
 
 const theme = resolveTheme().id;
-const DIR = new URL('./__signatures__/', import.meta.url);
-const FILE = new URL(`${theme}.json`, DIR);
+// A shipped theme's signature is the core's, beside this spec. A shop's own
+// theme records its signature under client/ — test/ is the core's, and the
+// shop could not write there without a core change at every upgrade.
+const ROOT = new URL('../../', import.meta.url);
+const CORE_FILE = new URL(`${SIGNATURES_DIR}/${theme}.json`, ROOT);
+const IN_SHOP = existsSync(new URL('client/client.yaml', ROOT));
+const FILE = existsSync(CORE_FILE) || !IN_SHOP ? CORE_FILE : new URL(`${SHOP_SIGNATURES_DIR}/${theme}.json`, ROOT);
+const DIR = new URL('./', FILE);
 
 /**
  * What to look at, and where.
