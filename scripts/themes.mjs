@@ -13,6 +13,10 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 export const THEMES_DIR = 'src/themes';
+/** Design signatures (test/browser/design-signature.spec.mjs): the shipped
+ *  themes' beside the spec, a shop's own theme's under client/. */
+export const SIGNATURES_DIR = 'test/browser/__signatures__';
+export const SHOP_SIGNATURES_DIR = 'client/signatures';
 export const CONFIG_FILE = 'theme.config.json';
 
 /** Ids upstream owns. A store may not claim one, or a later upstream release

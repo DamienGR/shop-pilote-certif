@@ -9,13 +9,23 @@ import { dirname, join, relative, resolve } from 'node:path';
 
 import { EXIT_CODES } from '../../shopctl/src/errors.mjs';
 import { parseArguments } from '../../shopctl/src/cli.mjs';
-import { NEW_OPTIONS, cloneableRepositoryUrl, displayNameFromSlug, resolveAccountId, resolveDomain, resolveThemeId, versionFromTag } from '../../shopctl/src/commands/new.mjs';
+import {
+  NEW_OPTIONS,
+  cloneableRepositoryUrl,
+  displayNameFromSlug,
+  resolveAccountId,
+  resolveDomain,
+  resolveThemeId,
+  versionFromTag,
+  witnessClaims,
+} from '../../shopctl/src/commands/new.mjs';
 import { buildManifest, renderManifest, yamlScalar } from '../../shopctl/src/manifest-template.mjs';
 import { assertNoCredentialsInArgv, classifyCredential, redact } from '../../shopctl/src/secrets.mjs';
 import { HUMAN_CHECKLIST } from '../../shopctl/src/commands/doctor.mjs';
 import { parseManifestYaml } from '../../scripts/manifest-yaml.mjs';
 import { CREDENTIAL_PATTERNS, RESERVED_SLUGS, validateManifest } from '../../scripts/manifest-schema.mjs';
 import { RESERVED_THEME_IDS } from '../../scripts/themes.mjs';
+import { WITNESS_CLIENTS_DIR, discoverManifests } from '../../scripts/manifest.mjs';
 // The core fixture and the git identity live in a helper: the fleet suite
 // (jalon 9) creates the same "core at a tag" and a second copy would drift.
 import { CORE_TAG, CORE_VERSION, GIT_ENV, createCoreRepository, git } from '../helpers/core-repository.mjs';
@@ -61,6 +71,15 @@ function core() {
 
 function workspace() {
   return mkdtempSync(join(tmpdir(), 'shopctl-work-'));
+}
+
+/** The witnesses' slugs, read from their own manifests. Not clientSlugs():
+ *  CI also runs this suite inside a generated shop, where that list starts
+ *  with the shop itself. */
+function witnessSlugs() {
+  return discoverManifests(CORE)
+    .filter((file) => file.startsWith(`${WITNESS_CLIENTS_DIR}/`))
+    .map((file) => parseManifestYaml(readFileSync(join(CORE, file), 'utf8'), { file }).client.slug);
 }
 
 // ---------------------------------------------------------------------------
@@ -160,6 +179,16 @@ describe('the generated manifest', () => {
       const back = parseManifestYaml(renderManifest(manifest), { file: 'client/client.yaml' });
       expect(back.client.displayName).toBe(displayName);
     }
+  });
+
+  // A "replace this" note next to the merchant's real domain is one someone
+  // eventually obeys, or learns to read past.
+  it('marks a placeholder only where there is one', () => {
+    const manifest = buildManifest(values);
+    expect(renderManifest(manifest)).not.toMatch(/PLACEHOLDER/);
+    const marked = renderManifest(manifest, { placeholders: ['cloudflare.productionDomain'] });
+    expect(marked.match(/PLACEHOLDER/g)).toHaveLength(1);
+    expect(marked).toMatch(/# PLACEHOLDER : domaine réservé à la documentation \(RFC 2606\)\.\n(.*\n)  productionDomain:/);
   });
 
   it('quotes only what would otherwise change meaning', () => {
@@ -425,6 +454,35 @@ describe('shopctl new', () => {
     expect(result.stderr).toMatch(/reserved by the platform/);
   });
 
+  // A witness the core carries is a shop as far as the manifest gate goes, so a
+  // shop named after one could never pass its own CI — and the fixture cannot
+  // leave the shop without a conflict at every upgrade. Found rehearsing the
+  // certification's step 2, whose plan named the real shops after witnesses.
+  it('refuses a witness slug before cloning', () => {
+    const [witness] = witnessSlugs();
+    const work = workspace();
+    const result = shopctl(['new', witness, '--from', core(), '--core', CORE_TAG, '--no-install'], work);
+
+    expect(result.status).toBe(EXIT_CODES.input);
+    expect(result.stderr).toMatch(/collides with a witness shop/);
+    expect(result.stderr).toContain(`test/fixtures/clients/${witness}/client.yaml`);
+    expect(result.stderr).toMatch(/Choose another slug/);
+    expect(result.stderr).not.toMatch(/core bug/);
+    expect(treeFiles(work)).toEqual([]);
+  });
+
+  // Not only the slug: `<witness>-staging` derives the witness's own staging
+  // Worker and database.
+  it('refuses a slug whose derived names are a witness\'s', () => {
+    const [witness] = witnessSlugs();
+    const work = workspace();
+    const result = shopctl(['new', `${witness}-staging`, '--from', core(), '--core', CORE_TAG, '--no-install'], work);
+
+    expect(result.status).toBe(EXIT_CODES.input);
+    expect(result.stderr).toMatch(/collides with a witness shop/);
+    expect(treeFiles(work)).toEqual([]);
+  });
+
   // The reserved list can never be complete: the neutrality gate also trips on
   // ordinary English the core happens to use, and `clean-clone` — a word this
   // core writes into its own tooling — is deliberately NOT reserved so this
@@ -450,6 +508,18 @@ describe('shopctl new', () => {
     const result = shopctl(['new', 'boutique-du-port', '--from', core(), '--core', CORE_TAG, '--no-install', '--json'], work);
     expect(result.status, result.stderr).toBe(0);
     expect(JSON.parse(result.stdout).checks.every((check) => check.ok)).toBe(true);
+  });
+
+  it('writes no placeholder note next to a real domain', () => {
+    const work = workspace();
+    const result = shopctl(
+      ['new', 'boutique-du-port', '--from', core(), '--core', CORE_TAG, '--domain', 'boutique-du-port.fr', '--no-install'],
+      work,
+    );
+    expect(result.status, result.stderr).toBe(0);
+    const text = readFileSync(join(work, 'shop-boutique-du-port/client/client.yaml'), 'utf8');
+    expect(text).toMatch(/productionDomain: boutique-du-port\.fr\n/);
+    expect(text).not.toMatch(/PLACEHOLDER/);
   });
 
   it('refuses a malformed slug before touching the disk', () => {
@@ -540,6 +610,7 @@ describe('shopctl new', () => {
     // it would otherwise add. The paths do not move; only the letter does.
     const expected = [
       'client/client.yaml',
+      'client/signatures/boutique-du-port.json',
       'imports/README.md',
       'src/themes/boutique-du-port/Catalog.astro',
       'src/themes/boutique-du-port/ContentPage.astro',
@@ -556,6 +627,13 @@ describe('shopctl new', () => {
       .split('\n')
       .map((line) => line.split('\t'));
     expect(changed).toEqual(expected);
+
+    // The copied theme renders as its reference, so its browser gate starts
+    // from the reference's signature rather than from none (étape 2 de la
+    // certification: every real shop's Browser job was red at its first PR).
+    expect(readFileSync(join(shop, 'client/signatures/boutique-du-port.json'), 'utf8')).toBe(
+      readFileSync(join(core(), 'test/browser/__signatures__/default.json'), 'utf8'),
+    );
 
     expect(readFileSync(join(shop, 'client/client.yaml'), 'utf8')).toBe(
       `# Manifeste de la boutique Boutique Du Port.
@@ -770,12 +848,41 @@ describe('example slugs in core documentation', () => {
   });
 });
 
+// The gate run on the CLONED tag is the authority on witnesses — the host core
+// may carry other fixtures than the tag it clones — so its report is read too.
+describe('a manifest gate report naming a witness', () => {
+  const OWN = 'client/client.yaml';
+  const WITNESS = 'test/fixtures/clients/w/client.yaml';
+  const gate = (report) => ({
+    stdout: JSON.stringify({ manifests: [], collisions: [], coreNeutrality: { findings: [] }, ...report }),
+  });
+  const claim = (...files) => ({ kind: 'slug', value: 'w', files });
+
+  it('names the witnesses when they are the whole story', () => {
+    expect(witnessClaims(gate({ collisions: [claim(OWN, WITNESS), claim(OWN, WITNESS)] }), 'w')).toEqual([WITNESS]);
+  });
+
+  it('leaves every other failure to the report it deserves', () => {
+    // Two witnesses claiming one name is the core's bug, not a bad slug.
+    expect(witnessClaims(gate({ collisions: [claim(WITNESS, 'test/fixtures/clients/v/client.yaml')] }), 'w')).toEqual([]);
+    expect(witnessClaims(gate({ collisions: [claim(OWN, WITNESS)], manifests: [{ file: OWN, errors: [{}] }] }), 'w')).toEqual([]);
+    expect(
+      witnessClaims(gate({ collisions: [claim(OWN, WITNESS)], coreNeutrality: { findings: [{ slug: 'other' }] } }), 'w'),
+    ).toEqual([]);
+    expect(witnessClaims({ stdout: 'not json' }, 'w')).toEqual([]);
+  });
+});
+
 describe('shopctl doctor', () => {
   it('reports on the tree it runs in, with nothing failing', () => {
     const result = shopctl(['doctor', '--offline', '--json'], CORE);
     const report = JSON.parse(result.stdout);
     expect(report.tree).toBe(existsSync(join(CORE, 'client/client.yaml')) ? 'shop' : 'core');
-    expect(report.checks.filter((entry) => entry.status === 'fail')).toEqual([]);
+    // A shop's CI checks out `origin` alone: the missing `core` remote
+    // describes that clone, not the code under test, and doctor is right to
+    // name it on an operator's machine.
+    const describesTheClone = (entry) => entry.message.startsWith('aucun remote "core"');
+    expect(report.checks.filter((entry) => entry.status === 'fail' && !describesTheClone(entry))).toEqual([]);
   });
 
   it('names what stays human rather than pretending to verify it', () => {

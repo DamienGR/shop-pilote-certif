@@ -42,14 +42,21 @@ coché :
 
 ### 2.1 Les boutiques
 
-- **`pilot-fr`**, la boutique certifiée. Elle sort de son état de fixture :
-  un vrai dépôt créé par `shopctl new pilot-fr --core v0.2.0 --create-repo`
-  (ou la version du socle en cours au moment de la campagne), un vrai
-  manifeste, un vrai domaine. Le catalogue témoin de vingt produits est importé
-  tel quel.
-- **`canary-minimal`**, la contre-épreuve. Elle ne sert qu'à l'étape 7 :
-  déployée en staging à côté de `pilot-fr`, dans le même compte, pour rejouer
-  les lignes du §8.3 que la porte d'isolation ne peut pas tenir.
+- **`pilote-certif`**, la boutique certifiée : un vrai dépôt, un vrai
+  manifeste, de vrais domaines, sur le modèle du témoin `pilot-fr` dont elle
+  reprend le thème (`--from-theme atelier`). Le catalogue témoin de vingt
+  produits est importé tel quel.
+- **`canari-certif`**, la contre-épreuve, sur le modèle de `canary-minimal`
+  (`--from-theme market`). Elle ne sert qu'à l'étape 7 : déployée en staging à
+  côté de `pilote-certif`, dans le même compte, pour rejouer les lignes du §8.3
+  que la porte d'isolation ne peut pas tenir.
+
+Elles ne peuvent pas porter le nom des témoins. Le socle garde
+`test/fixtures/clients/` dans chaque boutique, chaque témoin y réclame son slug
+et tous les noms qui en dérivent, et la porte du manifeste refuse deux boutiques
+pour un nom : une boutique `pilot-fr` échouerait à sa propre CI aussi longtemps
+qu'elle vivrait. Constaté le 2026-10-11 en répétant l'étape 2 ; `shopctl new`
+refuse désormais un tel slug avant de cloner.
 
 ### 2.2 Les comptes
 
@@ -59,8 +66,8 @@ La campagne l'éprouve tel quel, donc il faut **deux** comptes Cloudflare :
 
 | Compte | Rôle | Environnements |
 |---|---|---|
-| Cloudflare **A** — agence | construction et preview privée | `pilot-fr` staging, `canary-minimal` staging |
-| Cloudflare **B** — « client » | saisie et mise en ligne | `pilot-fr` production, cible de la restauration |
+| Cloudflare **A** — agence | construction et preview privée | `pilote-certif` staging, `canari-certif` staging |
+| Cloudflare **B** — « client » | saisie et mise en ligne | `pilote-certif` production, cible de la restauration |
 | Stripe — mode test | tout le fonctionnel | staging |
 | Stripe — mode live | la commande réelle et son remboursement | production |
 | Resend | e-mails de commande et d'expédition | staging puis production |
@@ -122,8 +129,10 @@ Wrangler sur le bon compte. Deux possibilités :
   modifie ou détruit, pour que ce feu vert porte sur quelque chose de précis.
 - **Chaque ligne cochée porte sa preuve** : un rapport JSON de `shopctl`, une
   capture, un identifiant Stripe, une sortie de commande. Les preuves vont
-  dans `docs/certification/<boutique>/` du dépôt de la boutique, jamais une
-  valeur secrète ni une donnée personnelle réelle.
+  dans `client/certification/` du dépôt de la boutique, jamais une valeur
+  secrète ni une donnée personnelle réelle. `client/` plutôt que `docs/` :
+  `docs/` appartient au socle, et chaque preuve y serait une modification du
+  socle à étiqueter `core-change`.
 - **Une ligne qui échoue n'est pas cochée « avec réserve »** : elle est
   corrigée dans le socle, ou elle reçoit une dérogation écrite, datée, avec sa
   mesure compensatoire (critère de sortie du jalon 10).
@@ -192,11 +201,13 @@ sort à la fin : la campagne certifie une version publiée, pas `main`.
 - [x] publier `v0.3.0` : la version et sa note (`docs/migrations/v0.3.0.md`)
   sont posées ; le tag est sorti du workflow `Release` le 2026-10-06, sur
   `4c12bd8`, après la fusion de la pull request #39 ;
-- [ ] publier `v0.3.1`, la version dont part la campagne : deux trous trouvés
+- [x] publier `v0.3.1`, la version dont part la campagne : deux trous trouvés
   en préparant l'étape 1 (`docs/migrations/v0.3.1.md`). Le Worker de staging
   ne recevait pas les valeurs de l'application Access, et `/admin/setup`
   aurait répondu 403 derrière elle ; le manifeste ne nommait qu'un compte pour
   les deux environnements, alors que staging vit sur A et la production sur B.
+  Le tag est sorti du workflow `Release` le 2026-10-06, sur `91a7994`, après la
+  fusion de la pull request #42.
 
 Fait avancer : jalon 8 (supervision, runbooks), jalon 10 (outillage de la
 campagne).
@@ -208,43 +219,91 @@ peut et nomme le reste. Le pas-à-pas — ordre, droits de chaque jeton, valeurs
 à relever et moment où naît chaque secret — est dans
 [`comptes-et-acces.md`](comptes-et-acces.md).
 
-- [ ] compte Cloudflare A et compte B, R2 activé sur les deux ;
-- [ ] un domaine réel dans une zone du compte A pour la preview
+Les comptes sont cochés sur la déclaration de Damien du 2026-10-08 ; les
+étapes 2 et 3 les relisent par leurs propres commandes.
+
+- [x] compte Cloudflare A et compte B, R2 activé sur les deux ;
+- [x] un domaine réel dans une zone du compte A pour la preview
   (`stagingDomain`), et un domaine pour la production rattaché au compte B ;
-- [ ] Zero Trust activé sur A, une application Access sur le nom d'hôte de
+- [x] Zero Trust activé sur A, une application Access sur le nom d'hôte de
   preview, son `AUD` relevé ;
-- [ ] un widget Turnstile ;
-- [ ] Stripe : compte en mode test ; activation du mode live (vérification
+- [x] un widget Turnstile ;
+- [x] Stripe : compte en mode test ; activation du mode live (vérification
   d'identité) lancée tôt, parce qu'elle prend des jours ;
-- [ ] Resend : domaine d'envoi vérifié (SPF, DKIM), une clé API ;
-- [ ] GitHub : Pro au minimum sur le compte qui porte les dépôts — sur un
-  dépôt privé, GitHub Free n'a pas de secrets d'environnement, et `Deploy`
-  comme `Nightly` les lisent là. Décider si l'approbation de production doit
-  être opposable : sur un dépôt privé, les relecteurs obligatoires demandent
-  GitHub Enterprise ; sans lui, `shopctl repo` le dit et la ligne §9
-  « approbation humaine » devient une dérogation ;
+- [x] Resend : domaine d'envoi vérifié (SPF, DKIM), une clé API ;
+- [x] GitHub : décidé le 2026-10-08, le compte reste en Free et les dépôts de
+  boutique du pilote sont **publics**. Sur un dépôt privé, Free n'a pas de
+  secrets d'environnement (`Deploy` et `Nightly` les lisent là) et ne donne
+  que 2 000 minutes d'Actions par mois ; sur un dépôt public, il a les secrets
+  d'environnement, les relecteurs obligatoires et des minutes sans limite. En
+  contrepartie, une boutique est un clone du socle avec son historique : le
+  socle jusqu'au tag cloné, les adresses e-mail des auteurs de commits, le
+  manifeste, les journaux et les rapports de la CI deviennent publics. Avant
+  tout dépôt public, l'historique de `v0.3.1` a été passé blob par blob aux
+  règles de `scripts/check-secrets.mjs` : rien. Une vraie boutique reste
+  privée et demande alors GitHub Pro au minimum (§6) ;
 - [ ] jetons API Cloudflare, un par dépôt et par environnement, avec les droits
   du guide — créés au moment où `shopctl repo` les pose (staging à l'étape 2,
-  production à l'étape 9) plutôt que conservés d'ici là ;
-- [ ] `shopctl doctor` vert sur la machine de l'opérateur.
+  production à l'étape 9) plutôt que conservés d'ici là. Ceux de staging sont
+  posés (2026-10-11) ;
+- [x] `shopctl doctor` vert sur la machine de l'opérateur.
 
 Fait avancer : jalon 6 (prérequis humains), jalon 10.
 
 ### Étape 2 — Forge réelle
 
-Crée : deux dépôts GitHub privés, leurs environnements et leurs secrets.
+Crée : deux dépôts GitHub publics (étape 1), `<login>/shop-pilote-certif` et
+`<login>/shop-canari-certif`, leurs environnements, les secrets de `staging`, et
+un jeton API sur A par boutique. Aucune commande ne touche un compte
+Cloudflare : le jeton ne sert qu'à partir de l'étape 3. L'environnement
+`production` n'a encore ni jeton ni compte ni clé : `shopctl repo` les pose
+quand il est relancé avec le jeton de production, à l'étape 9.
 
-- [ ] `shopctl new pilot-fr --core v0.3.1 --account <A> --create-repo` ;
-- [ ] manifeste rempli de valeurs réelles, `npm run shopctl -- config validate`
+Répétée le 2026-10-11 contre la doublure de `gh`, jusqu'au second
+`shopctl repo` : c'est ce passage qui a trouvé les noms des témoins (§2.1).
+
+Passée en réel le 2026-10-11 : `DamienGR/shop-pilote-certif` et
+`DamienGR/shop-canari-certif`, preuves dans `client/certification/etape-2/` de
+chacun. Le premier `shopctl repo` a créé le dépôt puis échoué au push :
+`gh auth login` range `git_protocol` sous l'hôte, `shopctl` lisait la clé
+globale (`https`) et posait un remote HTTPS sur un poste qui n'a que SSH.
+Contourné en remettant `origin` en SSH, la commande étant rejouable ; corrigé
+dans le socle après `v0.3.1`, avec son test.
+
+- [x] `shopctl new pilote-certif --core v0.3.1 --account <A> --domain <domaine
+  de production> --name <nom> --from-theme atelier --dir ../shop-pilote-certif`,
+  sans `--create-repo` : cette option crée un dépôt privé, et `shopctl repo` ne
+  change jamais la visibilité d'un dépôt qui existe. `--dir`, parce que
+  `npm run` exécute dans le dépôt du socle et que la boutique s'y créerait ;
+- [x] manifeste rempli de valeurs réelles, `npm run shopctl -- config validate`
   vert : dont `stagingDomain`, `stagingAccessTeam` et `stagingAccessAud`
-  relevés à l'étape 1, et `productionAccountId` pour le compte B ;
-- [ ] `shopctl backup keygen` dans l'arbre de la boutique : sans cette clé,
+  relevés à l'étape 1, et `productionAccountId` pour le compte B. **Commité** :
+  `shopctl repo` pousse la branche, pas l'arbre de travail ;
+- [x] `npm run shopctl -- doctor` vert dans l'arbre de la boutique (étape 1) ;
+- [x] `shopctl backup keygen` dans l'arbre de la boutique : sans cette clé,
   `shopctl repo` ne pose pas `SHOPCTL_BACKUP_KEY`, et la sauvegarde du
   nocturne de l'étape 3 échoue ;
-- [ ] `shopctl repo` relancé : rien ne change, les secrets sont réécrits, la
-  clé de sauvegarde est posée ;
-- [ ] une pull request de la boutique fait tourner sa CI — §7.2 ;
-- [ ] idem pour `canary-minimal`, sans `accountId` déclaré.
+- [x] `shopctl repo --public --reviewer <login>` dans l'arbre de la
+  boutique, avec le jeton de staging dans `CLOUDFLARE_API_TOKEN_STAGING` et
+  **sans** `CLOUDFLARE_API_TOKEN` dans le shell, que `shopctl repo` poserait
+  aussi dans `production` : dépôt public créé, branche poussée, `staging` et
+  `production` créés, un relecteur obligatoire sur `production`, secrets de
+  `staging` posés ;
+- [x] la même commande relancée, `--reviewer` compris : rien ne change, les
+  secrets sont réécrits, la clé de sauvegarde est conservée ;
+- [x] workflow `Nightly` désactivé dans le dépôt de la boutique jusqu'à
+  l'étape 3 : sans base de staging, son job de staging échouerait chaque nuit ;
+- [ ] une pull request de la boutique fait tourner sa CI — §7.2 : celle qui
+  verse les rapports `--json` de cette étape dans `client/certification/`.
+  Rouge au premier passage, pour deux défauts du socle qu'aucune doublure ne
+  voyait (remote `core` absent d'un checkout de CI, pas de signature de design
+  pour le thème de la boutique) : corrigés en `v0.3.2`, que chaque boutique
+  prend par `shopctl core upgrade --to v0.3.2 --open-pr` avant cette ligne ;
+- [x] idem pour `canari-certif` (`--from-theme market`, domaine laissé au
+  placeholder : elle n'a pas de production), sans `accountId` déclaré :
+  `CLOUDFLARE_ACCOUNT_ID` absent du shell au `shopctl new`, qui l'écrirait dans
+  le manifeste, et exporté pour le seul `shopctl repo`, qui en a besoin pour
+  les deux environnements.
 
 Fait avancer : jalon 6 (forge), §7.2.
 
@@ -265,8 +324,8 @@ secrets internes ; données de catalogue.
   plan vide ;
 - [ ] clés Stripe test, Resend et Turnstile saisies dans l'administration ;
 - [ ] secrets et variables du nocturne posés dans l'environnement `staging`
-  du dépôt (§2.3), puis le workflow `Nightly` lancé à la main : vert, ou
-  chaque contrôle sauté nommé dans son avertissement.
+  du dépôt (§2.3), puis le workflow `Nightly` réactivé et lancé à la main :
+  vert, ou chaque contrôle sauté nommé dans son avertissement.
 
 Fait avancer : jalon 6 (« provisioning dans un compte de test »), jalon 4
 (import réel), §8.4 en partie.
@@ -331,13 +390,13 @@ Produit : le **rapport de performance**.
 
 ### Étape 7 — Isolation de deux boutiques déployées
 
-Crée : la boutique `canary-minimal` en staging sur A.
+Crée : la boutique `canari-certif` en staging sur A.
 
 - [ ] deux Workers répondant sur deux origines, deux bases, six buckets ;
 - [ ] un produit créé dans l'une n'apparaît pas dans l'autre ;
 - [ ] `catalog import` lancé depuis l'arbre de l'une vers l'autre : refus ;
-- [ ] `shopctl destroy --env staging --confirm canary-minimal` : tout part,
-  et rien de `pilot-fr` ; si le bucket `-backups` porte des archives, R2 le
+- [ ] `shopctl destroy --env staging --confirm canari-certif` : tout part,
+  et rien de `pilote-certif` ; si le bucket `-backups` porte des archives, R2 le
   refuse et la base reste — c'est le comportement attendu, à constater.
 
 Fait avancer : §8.3 (lignes déployées), jalon 6 (`destroy` réel).
@@ -357,8 +416,10 @@ Crée : des archives de sauvegarde ; une restauration sur le compte B.
   bien échouer le run ;
 - [ ] média R2 supprimé à la main : la page dégrade sans erreur ;
 - [ ] rollback Worker vers la version précédente, puis retour — jalon 9 ;
-- [ ] montée de version réelle : un tag `v0.3.2` proposé par
-  `shopctl core upgrade --open-pr`, fusionné, déployé en staging ;
+- [ ] montée de version réelle : un tag `v0.3.3` proposé par
+  `shopctl core upgrade --open-pr`, fusionné, déployé en staging. `v0.3.2` est
+  déjà passée par ce chemin à l'étape 2, mais avant tout déploiement : la
+  ligne demande une montée sur une boutique qui tourne ;
 - [ ] rotation de `AUTH_SECRET` : les sessions tombent, rien d'autre ;
 - [ ] mot de passe admin perdu : procédure exécutée telle que le runbook la
   décrit ;
@@ -372,7 +433,7 @@ Fait avancer : jalon 8 (critère de sortie, supervision, runbooks), jalon 9
 
 ### Étape 9 — Bascule sur le compte « client »
 
-Crée : la production de `pilot-fr` sur B. Détruit : le staging sur A.
+Crée : la production de `pilote-certif` sur B. Détruit : le staging sur A.
 
 - [ ] `provision --env production` sur B, que le manifeste nomme
   (`cloudflare.productionAccountId`) ;
@@ -432,9 +493,11 @@ Fait avancer : jalon 7 (critère de sortie), §8.8.
   graduels de Cloudflare ; compensé par le smoke test public qui échoue et
   nomme la version de retour ;
 - **approbation de production opposable** — sur un dépôt privé, les
-  relecteurs obligatoires demandent GitHub Enterprise (Pro et Team ne les
-  offrent que sur un dépôt public) ; compensé par le fait que seul Damien a
-  les droits d'écriture, et que `deploy --env production` exige `--yes` ;
+  relecteurs obligatoires demandent GitHub Enterprise (Free, Pro et Team ne
+  les offrent que sur un dépôt public) ; compensé par le fait que seul Damien
+  a les droits d'écriture, et que `deploy --env production` exige `--yes`.
+  Le pilote n'en a pas besoin : ses dépôts sont publics (étape 1), et
+  `shopctl repo --reviewer` pose le relecteur que l'étape 9 attend ;
 - **CSP, `script-src` et `style-src`** (écrite le 2026-10-06) — la boutique
   envoie `object-src 'none'; base-uri 'self'; frame-ancestors 'none'` sur toute
   réponse, Worker et actifs statiques, et la porte de sécurité le vérifie.

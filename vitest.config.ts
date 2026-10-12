@@ -29,6 +29,14 @@ export default getViteConfig(
   {
     test: {
       environment: 'node',
+      // One worker per core. Vitest's own default is one per core MINUS one,
+      // which is a single worker on the two-vCPU runners GitHub gives a private
+      // repository: the 110 files then run one after another, and the shopctl
+      // suites alone are four minutes of that. Measured on two cores: 303 s with
+      // one worker, 167 s with two, 157 s with four — the suites spend their
+      // time in child processes (git, the CLI, the wrangler double) that each
+      // want a core, so a worker per core is the knee, not more.
+      maxWorkers: '100%',
       include: [
         'src/**/*.test.ts',
         'test/storefront/**/*.test.{ts,mjs}',
