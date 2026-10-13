@@ -19,7 +19,8 @@
  *  7. the upload;
  *  8. the internal secrets that provisioning could not set before the Worker
  *     existed;
- *  9. the smoke test, against the URL wrangler says it deployed to.
+ *  9. the smoke test, against the domain the configuration routes, or the
+ *     workers.dev URL wrangler says it deployed to.
  *
  * Migrations BEFORE the upload, not after, and that is the additive-migration
  * rule doing its work (ADR 0006): between the two there is a window in which
@@ -60,7 +61,7 @@ import { captureBackup, uploadArchive } from './backup.mjs';
 import { repositoryPath } from '../backup/archive.mjs';
 import { keyId, loadKey } from '../backup/crypto.mjs';
 import { originFromDeployOutput, runSmoke } from '../smoke.mjs';
-import { resourceNames } from '../../../scripts/manifest.mjs';
+import { environmentHost, resourceNames } from '../../../scripts/manifest.mjs';
 
 export const DEPLOY_OPTIONS = {
   '--env': 'environnement',
@@ -101,8 +102,8 @@ En production, une sauvegarde chiffrée est prise avant les migrations ; si elle
  * with the shop: a shop on an older core is verified by the gates that core
  * shipped, which is the only reading that makes a deployment reproducible.
  */
-export function runVerification(root) {
-  run('npm', ['run', 'verify'], { cwd: root });
+export function runVerification(root, { stdio = 'inherit' } = {}) {
+  run('npm', ['run', 'verify'], { cwd: root, stdio });
 }
 
 /**
@@ -141,6 +142,11 @@ export async function runDeploy(args, reporter) {
   const { manifest, root } = shop;
   const names = resourceNames(manifest, { env });
   const jurisdiction = manifest.cloudflare.jurisdiction;
+  // Under --json, stdout is the one report (report.mjs) — and the Deploy
+  // workflow parses it for the origin. The verification suite and the build
+  // stream to the terminal, so they write to stderr there, as `shopctl new`'s
+  // installs do.
+  const childStdio = json ? ['inherit', 2, 'inherit'] : 'inherit';
 
   // Production is never a default and never an accident. `--yes` is eight
   // characters and is the difference between deploying to staging and
@@ -239,7 +245,7 @@ export async function runDeploy(args, reporter) {
   } else if (dryRun) {
     reporter.todo('`npm run verify` serait exécuté.');
   } else {
-    runVerification(root);
+    runVerification(root, { stdio: childStdio });
     reporter.ok('npm run verify');
   }
 
@@ -295,12 +301,17 @@ export async function runDeploy(args, reporter) {
     }
     reporter.ok('build existant réutilisé (--skip-build)');
   } else {
-    run('npm', ['run', 'build'], { cwd: root });
+    run('npm', ['run', 'build'], { cwd: root, stdio: childStdio });
     reporter.ok('npm run build');
   }
 
   const uploaded = wrangler(['deploy'], { cwd: root });
-  const origin = args.values['--url'] ?? originFromDeployOutput(`${uploaded.stdout}\n${uploaded.stderr}`);
+  // The custom domain first: it is the route this command just rendered, and
+  // wrangler lists it bare — "preview.example.fr (custom domain)" — with no
+  // workers.dev URL beside it once that door is shut. Read from the output,
+  // the origin of a gated staging or of any production would be nothing at all.
+  const host = environmentHost(manifest, env);
+  const origin = args.values['--url'] ?? (host ? `https://${host}` : originFromDeployOutput(`${uploaded.stdout}\n${uploaded.stderr}`));
   reporter.ok(`${names.worker} déployé${origin ? ` — ${origin}` : ''}`);
 
   // ── The secrets provisioning could not set ────────────────────────────────

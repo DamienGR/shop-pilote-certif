@@ -238,13 +238,26 @@ export function renderCodeowners(rules = OWNERSHIP_RULES, owners = CORE_OWNERS) 
  * every change is a core change; a gate that fires on all of them would only
  * teach people to wave it through.
  *
- * @param {{ paths: string[], isShop: boolean, approval: {by: string}|null }} input
- * @returns {{ ok: boolean, enforced: boolean, core: string[], changed: Array<{path: string, owner: string|null}> }}
+ * `carried` are the changed paths whose content is exactly a core release's,
+ * merged in by `shopctl core upgrade`: an upgrade, not a divergence. They are
+ * reported, never gated — without them every upgrade pull request needed an
+ * approval, and an approval asked on every upgrade is one nobody reads.
+ *
+ * @param {{ paths: string[], isShop: boolean, approval: {by: string}|null, carried?: string[] }} input
+ * @returns {{ ok: boolean, enforced: boolean, core: string[], carried: string[], changed: Array<{path: string, owner: string|null}> }}
  */
-export function coreChangeGate({ paths, isShop, approval = null }) {
+export function coreChangeGate({ paths, isShop, approval = null, carried = [] }) {
   const changed = paths.map((path) => ({ path, owner: classifyPath(path)?.owner ?? null }));
+  const fromCore = new Set(carried);
   // An unclassified path counts as core: the fail-closed reading is the only
   // one that cannot be exploited by adding a file the rules do not cover.
-  const core = changed.filter((entry) => entry.owner !== 'client').map((entry) => entry.path);
-  return { ok: !isShop || core.length === 0 || approval !== null, enforced: isShop, core, changed };
+  const notClient = changed.filter((entry) => entry.owner !== 'client').map((entry) => entry.path);
+  const core = notClient.filter((path) => !fromCore.has(path));
+  return {
+    ok: !isShop || core.length === 0 || approval !== null,
+    enforced: isShop,
+    core,
+    carried: notClient.filter((path) => fromCore.has(path)),
+    changed,
+  };
 }

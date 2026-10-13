@@ -5,6 +5,17 @@ export interface CachePurger {
   purge(options: CachePurgeOptions): Promise<CachePurgeResult>;
 }
 
+/**
+ * A Worker deployed with `cache.enabled: false` — every fresh instance, and
+ * every staging preview — gets a `cache` export WITHOUT a `purge` method.
+ * Nothing is cached there, so nothing can be stale: invalidation is done.
+ * Treating the missing method as a failed purge turned every admin save into
+ * a 500 after its D1 write (certification, étape 3, 2026-10-13).
+ */
+function cacheless(purger: Partial<CachePurger> | undefined): boolean {
+  return typeof purger?.purge !== 'function';
+}
+
 function purgeFailure(
   mode: 'tags' | 'stock-tags' | 'everything',
   errors: CachePurgeError[] | unknown,
@@ -28,7 +39,7 @@ export async function purgeCacheTags(
   purger: CachePurger = cache,
 ): Promise<void> {
   const normalized = normalizeCacheTags(tags);
-  if (normalized.length === 0) return;
+  if (normalized.length === 0 || cacheless(purger)) return;
 
   try {
     const result = await purger.purge({ tags: normalized });
@@ -60,6 +71,7 @@ export function purgeProductCache(
 export async function purgeEntireCache(
   purger: CachePurger = cache,
 ): Promise<void> {
+  if (cacheless(purger)) return;
   try {
     const result = await purger.purge({ purgeEverything: true });
     if (result.success) return;
@@ -80,7 +92,7 @@ export async function purgeStockProductCache(
   purger: CachePurger = cache,
 ): Promise<void> {
   const tags = productCacheTags(productPublicIds);
-  if (tags.length === 0) return;
+  if (tags.length === 0 || cacheless(purger)) return;
 
   try {
     const result = await purger.purge({ tags });

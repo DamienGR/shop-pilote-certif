@@ -21,6 +21,7 @@
  *
  *   accounts        [{ id, name }]           what `whoami` reports
  *   authenticated   boolean                  false makes `whoami --json` exit 1
+ *                                            (plain `whoami` still exits 0)
  *   d1              [{ name, uuid, jurisdiction }]
  *   r2              [{ name, jurisdiction, devUrl, domains }]
  *   workers         [{ name, secrets: [] }]
@@ -118,7 +119,11 @@ const uuid = (name) => {
 const jurisdictionOf = () => flag('-J', '--jurisdiction');
 
 if (positionals[0] === 'whoami') {
-  if (state.authenticated === false) fail('You are not authenticated.');
+  // Wrangler 4.149, verbatim: without --json, a missing session is a message
+  // on stdout and exit 0; only --json turns it into a failure. Anything that
+  // reads the exit status of the plain form believes nobody is logged out.
+  if (state.authenticated === false && argv.includes('--json')) done(JSON.stringify({ loggedIn: false }), 1);
+  if (state.authenticated === false) done('You are not authenticated. Please run `wrangler login`.');
   done(JSON.stringify({
     loggedIn: true,
     authType: 'OAuth Token',
@@ -126,6 +131,31 @@ if (positionals[0] === 'whoami') {
     accounts: state.accounts ?? [],
     tokenPermissions: null,
   }));
+}
+
+// Which account a command reaches, decided the way wrangler decides it:
+// CLOUDFLARE_ACCOUNT_ID, else the session's only account, else the one cached
+// the last time somebody picked one interactively in this tree. With none of
+// those wrangler would ask — and a child whose stdin is not a terminal cannot
+// be asked, so it refuses. That refusal is what a session invited onto a
+// client's account (ADR 0015) meets on every call shopctl does not pin, and
+// `account` on each recorded call is how the suite proves where a write went.
+const reachesAccount =
+  !argv.includes('--local') && !argv.includes('--version') && !(positionals[0] === 'deploy' && argv.includes('--dry-run'));
+if (reachesAccount) {
+  const accounts = state.accounts ?? [];
+  const account = process.env.CLOUDFLARE_ACCOUNT_ID || (accounts.length === 1 ? accounts[0].id : (state.cachedAccount ?? null));
+  if (!account && accounts.length > 1) {
+    fail(
+      [
+        'More than one account available but unable to select one in non-interactive mode.',
+        'Please set the appropriate `account_id` in your Wrangler configuration file or assign it to the `CLOUDFLARE_ACCOUNT_ID` environment variable.',
+        'Available accounts are (`<name>`: `<account_id>`):',
+        ...accounts.map(({ id, name }) => `  \`${name}\`: \`${id}\``),
+      ].join('\n'),
+    );
+  }
+  state.calls[state.calls.length - 1].account = account;
 }
 
 if (command === 'd1 list') {
@@ -512,8 +542,24 @@ if (positionals[0] === 'deploy') {
   }
   worker.versions = [{ id: `v${(worker.versions?.length ?? 0) + 1}`, number: (worker.versions?.length ?? 0) + 1 }, ...(worker.versions ?? [])];
   state.deploys = [...(state.deploys ?? []), name];
-  const url = state.deployUrl ?? `https://${name}.example.workers.dev`;
-  done(`Total Upload: 512.00 KiB / gzip: 128.00 KiB\nUploaded ${name} (2.11 sec)\nDeployed ${name} triggers (0.42 sec)\n  ${url}\nCurrent Version ID: 00000000-0000-0000-0000-000000000002`);
+  // The targets, listed as wrangler lists them: the workers.dev URL only while
+  // that door is open, and a custom domain BARE, with no scheme. A double that
+  // printed a workers.dev URL with that door shut is how `deploy` came to read
+  // its origin from a line the real output never carries.
+  const domains = [...config.matchAll(/\{"pattern":"([^"]+)","custom_domain":true\}/g)].map((match) => match[1]);
+  const targets = [
+    ...(/"workers_dev"\s*:\s*false/.test(config) ? [] : [state.deployUrl ?? `https://${name}.example.workers.dev`]),
+    ...domains.map((domain) => `${domain} (custom domain)`),
+    'schedule: */5 * * * *',
+  ];
+  // A documentation link first, the way wrangler's warnings carry them: an
+  // https URL in the output that is not where the shop is.
+  done(
+    `▲ [WARNING] See https://developers.cloudflare.com/workers/configuration/routing/\n` +
+      `Total Upload: 512.00 KiB / gzip: 128.00 KiB\nUploaded ${name} (2.11 sec)\nDeployed ${name} triggers (0.42 sec)\n` +
+      targets.map((target) => `  ${target}`).join('\n') +
+      `\nCurrent Version ID: 00000000-0000-0000-0000-000000000002`,
+  );
 }
 
 if (command.startsWith('d1 time-travel')) {

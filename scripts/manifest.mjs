@@ -253,12 +253,7 @@ export function wranglerSubstitutions(manifest, { databaseId = '00000000-0000-00
   // environment a client previews before launch is therefore gated only if it
   // has a hostname AND workers.dev is shut. Without `stagingDomain`, staging
   // keeps workers.dev, because that is then the only way to reach it at all.
-  const host =
-    env === 'production'
-      ? manifest.cloudflare.productionDomain
-      : env === 'staging'
-        ? (manifest.cloudflare.stagingDomain ?? null)
-        : null;
+  const host = environmentHost(manifest, env);
   const routes = host ? [{ pattern: host, custom_domain: true }] : [];
   const imagesDomain = manifest.cloudflare.imagesDomain ?? null;
   // The Access application in front of the staging hostname. Behind it, every
@@ -287,6 +282,19 @@ export function wranglerSubstitutions(manifest, { databaseId = '00000000-0000-00
     __ACCESS_TEAM_DOMAIN__: access.stagingAccessTeam ? `https://${access.stagingAccessTeam}.cloudflareaccess.com` : '',
     __ACCESS_AUD__: access.stagingAccessAud ?? '',
   };
+}
+
+/**
+ * The custom domain one environment is served on, or null when it is reached
+ * through workers.dev. One answer for the route `wranglerSubstitutions()`
+ * renders and for the origin `shopctl deploy` smoke-tests: wrangler lists a
+ * custom domain without a scheme and announces no workers.dev URL once that
+ * door is shut, so the deployed origin cannot be read back from its output.
+ */
+export function environmentHost(manifest, env) {
+  if (env === 'production') return manifest.cloudflare.productionDomain;
+  if (env === 'staging') return manifest.cloudflare.stagingDomain ?? null;
+  return null;
 }
 
 /** Resolve a shop by slug among the manifests of this tree. */

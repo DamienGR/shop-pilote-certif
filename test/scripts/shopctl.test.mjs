@@ -29,6 +29,7 @@ import { WITNESS_CLIENTS_DIR, discoverManifests } from '../../scripts/manifest.m
 // The core fixture and the git identity live in a helper: the fleet suite
 // (jalon 9) creates the same "core at a tag" and a second copy would drift.
 import { CORE_TAG, CORE_VERSION, GIT_ENV, createCoreRepository, git } from '../helpers/core-repository.mjs';
+import { ACCOUNT, OTHER_ACCOUNT, shop } from '../helpers/provisioned-shop.mjs';
 
 const CORE = new URL('../../', import.meta.url).pathname;
 const BIN = resolve(CORE, 'shopctl/bin/shopctl.mjs');
@@ -902,6 +903,27 @@ describe('shopctl doctor', () => {
     // No origin was given, and that is a warning rather than a failure: the
     // shop exists before its repository does.
     expect(report.checks.some((entry) => /remote "origin"/.test(entry.message) && entry.status === 'warn')).toBe(true);
+  });
+
+  // Plain `wrangler whoami` exits 0 with nobody logged in, and doctor read its
+  // exit status: the operator's machine was reported ready from étape 1 to
+  // étape 3 of the certification without a session.
+  it('warns when wrangler has no session, as provision would refuse', () => {
+    const target = shop();
+    target.account({ authenticated: false });
+    expect(target.wrangler(['whoami']).status).toBe(0);
+    const { report } = target.json(['doctor']);
+    const session = report.checks.find((entry) => /wrangler n'est pas authentifié|session Cloudflare/.test(entry.message));
+    expect(session.status).toBe('warn');
+    expect(session.message).toMatch(/n'est pas authentifié/);
+  });
+
+  it('reports the session and the accounts it sees', () => {
+    const target = shop();
+    target.account({ accounts: [ACCOUNT, OTHER_ACCOUNT] });
+    const { report } = target.json(['doctor']);
+    const session = report.checks.find((entry) => /session Cloudflare/.test(entry.message));
+    expect(session).toMatchObject({ status: 'ok', message: expect.stringMatching(/2 comptes/) });
   });
 });
 

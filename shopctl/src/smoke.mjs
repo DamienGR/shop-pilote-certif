@@ -197,18 +197,22 @@ export async function runSmoke(origin, { gated = false, checks = gated ? GATED_C
 /**
  * The origin a deployment ended up on, from wrangler's own output.
  *
- * Read rather than derived: a Worker's public URL depends on the account's
- * workers.dev subdomain and on which routes the configuration claims, neither
- * of which is in the manifest. Guessing it would smoke-test a URL that may
- * belong to nothing, and report a green deploy for a site nobody can reach.
+ * Read rather than derived for workers.dev: that URL depends on the account's
+ * subdomain, which is not in the manifest. Guessing it would smoke-test a URL
+ * that may belong to nothing, and report a green deploy for a site nobody can
+ * reach. (`shopctl deploy` takes a custom domain from the manifest instead,
+ * which rendered it; this reads one only as a fallback.)
+ *
+ * Only the two shapes wrangler gives a deployment target count. Any other
+ * https URL in the output — a documentation link in a warning — is not where
+ * the shop is, and smoke-testing developers.cloudflare.com would fail a gated
+ * preview for being public.
  */
 export function originFromDeployOutput(output) {
-  const urls = [...String(output).matchAll(/https:\/\/[a-z0-9.-]+(?:\.workers\.dev|\.[a-z]{2,})(?:\/\S*)?/gi)].map((match) => match[0]);
-  const chosen = urls.find((url) => url.includes('.workers.dev')) ?? urls[0] ?? null;
-  if (!chosen) return null;
-  try {
-    return new URL(chosen).origin;
-  } catch {
-    return null;
-  }
+  const text = String(output);
+  const workersDev = text.match(/https:\/\/[a-z0-9.-]+\.workers\.dev\b/i)?.[0];
+  if (workersDev) return new URL(workersDev).origin;
+  // Listed bare, without a scheme: "  shop.example.fr (custom domain)".
+  const custom = text.match(/^\s*([a-z0-9-]+(?:\.[a-z0-9-]+)+) \(custom domain\b/im)?.[1];
+  return custom ? `https://${custom.toLowerCase()}` : null;
 }
