@@ -24,11 +24,12 @@ import { buildCatalogue } from '../catalog/contract.mjs';
 import { oversizedForDelivery, resolveCatalogueImages, DELIVERY_MAX_WIDTH } from '../catalog/media.mjs';
 import { planImport } from '../catalog/plan.mjs';
 import { applyStatements, assertWranglerNamesShop, imagesBucket, jurisdictionFlags, putObject, readCatalogue } from '../catalog/store.mjs';
+import { expectedAccount, resolveAccount, whoami } from '../cloudflare.mjs';
 import { inputError, usageError, verificationError } from '../errors.mjs';
 import { ENVIRONMENTS } from '../../../scripts/manifest.mjs';
 import { resolveShop } from '../shop.mjs';
 
-export const CATALOG_OPTIONS = { '--shop': 'slug', '--env': 'environnement' };
+export const CATALOG_OPTIONS = { '--shop': 'slug', '--env': 'environnement', '--account': 'id' };
 
 export { resolveShop };
 
@@ -42,6 +43,7 @@ Options:
   --dry-run                 Calculer et afficher le plan sans rien écrire (import)
   --remote                  Viser la base déployée. Par défaut : la base locale.
   --env <staging|production>  Environnement déployé visé. Obligatoire avec --remote.
+  --account <id>            Compte Cloudflare attendu avec --remote, si le manifeste ne le déclare pas.
   --create-categories       Créer les catégories que le fichier nomme et que la boutique n'a pas
   --allow-slug-change       Autoriser le déplacement d'une URL de produit
   --allow-remove-variants   Autoriser la désactivation des unités vendues absentes du fichier
@@ -82,6 +84,21 @@ export function resolveEnvironment(value, remote) {
     );
   }
   return value;
+}
+
+/**
+ * The account a remote read or write goes to: the same answer, and the same
+ * refusals, as `provision` and `deploy` give for this environment.
+ *
+ * `wrangler.jsonc` names the database but not the account, so without this
+ * wrangler picks one itself — and with a session that sees the agency's
+ * account and the client's (ADR 0015) it picks none, or the one it cached.
+ * A local import reaches no account and asks nothing.
+ */
+function connectRemote({ shop, env, values, reporter }) {
+  const account = resolveAccount(expectedAccount(shop.manifest, env, values), whoami({ cwd: shop.root }));
+  reporter.step(`Compte Cloudflare : ${account.name} (${account.id})`);
+  return account;
 }
 
 /** Read the file and turn it into a catalogue, or into the list of what is wrong. */
@@ -127,7 +144,7 @@ export function runCatalog(args, reporter) {
 
   if (subcommand === 'report') {
     if (rest.length > 0) throw usageError(`catalog report takes no argument; got "${rest.join('", "')}".`);
-    return runReport({ shop, remote, env, json }, reporter);
+    return runReport({ shop, remote, env, json, values: args.values }, reporter);
   }
 
   const [file, ...extra] = rest;
@@ -186,6 +203,7 @@ export function runCatalog(args, reporter) {
   // shop's database produces a plan that looks plausible and is about someone
   // else's catalogue.
   assertWranglerNamesShop(shop.root, bucket);
+  if (remote) connectRemote({ shop, env, values: args.values, reporter });
 
   reporter.step(`Lecture du catalogue de la boutique (${remote ? 'distant' : 'local'})…`);
   const store = readCatalogue({ cwd: shop.root, remote });
@@ -291,8 +309,9 @@ function printPlan(reporter, plan, { file, dryRun, remote, oversized }) {
   }
 }
 
-function runReport({ shop, remote, env, json }, reporter) {
+function runReport({ shop, remote, env, json, values }, reporter) {
   assertWranglerNamesShop(shop.root, imagesBucket(shop.manifest, { env }));
+  if (remote) connectRemote({ shop, env, values, reporter });
   const store = readCatalogue({ cwd: shop.root, remote });
   const withSku = store.products.filter((product) => product.sku);
   const activeVariants = store.variants.filter((variant) => variant.active === 1);

@@ -208,7 +208,10 @@ pour `--env production` quand il est déclaré), par `--account` ou par
 sources qui divergent arrêtent l'exécution ; aucune source du tout l'arrête
 aussi, même si le jeton n'atteint qu'un compte. Provisionner dans le mauvais
 compte ne se défait pas en supprimant des ressources : les données d'un client
-ont existé là où elles n'auraient jamais dû (ADR 0002).
+ont existé là où elles n'auraient jamais dû (ADR 0002). Le compte retenu est
+ensuite passé à chaque wrangler que la commande lance : laissé à lui-même,
+wrangler refuse de choisir quand la session en voit deux, ou prend celui qu'il
+a mis en cache. `catalog import --remote` suit la même règle.
 
 **Il n'y a pas de fichier d'état, et c'est ce qui rend `provision` rejouable.**
 Chaque étape interroge le compte puis décide. Un second passage ne crée rien ;
@@ -222,7 +225,10 @@ en juridiction `eu` et absent de la juridiction par défaut. Pour D1, quand l'AP
 ne publie pas le champ, le rapport dit « non vérifié » plutôt que « conforme ».
 
 **Le test de fumée peut faire échouer le déploiement**, et une requête qui
-n'aboutit pas est un échec, jamais un succès. Il nomme la version vers laquelle
+n'aboutit pas est un échec, jamais un succès. Il interroge `--url` quand il est
+donné, sinon le domaine que le manifeste donne à l'environnement
+(`productionDomain`, `stagingDomain`), sinon l'URL `workers.dev` que wrangler
+annonce. Il nomme la version vers laquelle
 revenir plutôt que de revenir tout seul : un rollback automatique se
 déclencherait aussi sur un contrôle qui a échoué parce que le réseau n'atteignait
 pas le site.

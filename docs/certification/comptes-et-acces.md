@@ -148,6 +148,21 @@ autre jeton, sur B : Account Analytics et D1 en lecture, rien d'autre (plan
 - Le jeton de service et sa politique « Service Auth » viennent à l'étape 3 :
   son secret ne s'affiche qu'une fois et va droit dans l'environnement
   `staging` du dépôt, qui n'existe qu'après l'étape 2.
+- **Le chemin du webhook, et lui seul, contourne Access** — à l'étape 3, avec
+  l'endpoint Stripe test. Stripe ne passe pas une page de connexion : sans
+  cette exception, chaque événement de paiement reçoit la redirection
+  d'Access, aucune commande n'est écrite et le contrôle Stripe du nocturne
+  attend en vain son webhook. Une seconde application Self-hosted sur le même
+  nom d'hôte, avec deux chemins, `api/webhook` et `api/webhook/*` (le second
+  ne couvre pas le premier), et une seule politique, d'action **Bypass**, sur
+  « Everyone ». Le chemin le plus précis l'emporte sur l'application de la
+  preview. Ce qui protège ce chemin est la signature que le Worker vérifie à
+  chaque requête. Contrôle : un POST non signé y reçoit le 400 du Worker
+  (« Webhook verification failed »), pas une redirection vers
+  `<équipe>.cloudflareaccess.com`.
+- Les e-mails de commande renvoient à la preview : les adresses qui passent
+  les commandes de test de l'étape 4 doivent figurer dans la politique
+  « Allow ».
 
 ## 6. Turnstile
 
@@ -156,6 +171,15 @@ autre jeton, sur B : Account Analytics et D1 en lecture, rien d'autre (plan
   contenus et réglages de la production sont saisis sur B (ADR 0015).
 - Relever la clé de site. La clé secrète reste lisible dans le tableau de bord ;
   les deux vont dans Admin → Réglages → Protection à l'étape 3.
+- **Le staging porte les clés de test de Cloudflare**, pas celles du widget
+  de A (décision de l'étape 3) : clé de site `1x00000000000000000000AA`, clé
+  secrète `1x0000000000000000000000000000000AA`. Turnstile garde la connexion
+  de l'administration, et le contrôle d'e-mail du nocturne s'y connecte avec
+  le mot de passe : avec un widget réel, aucun script ne passe et ce contrôle
+  est sauté chaque nuit ; avec les clés de test, le widget s'affiche et passe
+  toujours, et le script envoie le jeton factice que seule une clé secrète de
+  test accepte. Derrière Access, le staging n'a pas de robot à arrêter. Le
+  widget réel est éprouvé sur B, en production.
 
 ## 7. GitHub : le plan
 

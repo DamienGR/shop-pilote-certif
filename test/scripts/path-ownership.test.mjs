@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 // .mjs for the same reason as its neighbours: tsconfig pins `types` to the
 // Cloudflare types, so node builtins have no declarations in a .ts file here.
-import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
@@ -133,6 +134,29 @@ describe('the core-change gate', () => {
     expect(shop(['migrations/0007_tax.sql']).ok).toBe(false);
   });
 
+  // An upgrade, not a divergence: without this every upgrade pull request
+  // needed an approval, and one asked every time is one nobody reads.
+  it('passes the core paths a merged core release carries, and reports them', () => {
+    const result = coreChangeGate({
+      paths: ['client/client.yaml', 'scripts/themes.mjs', 'src/features/payments/stripe.ts'],
+      isShop: true,
+      carried: ['scripts/themes.mjs', 'src/features/payments/stripe.ts'],
+    });
+    expect(result.ok).toBe(true);
+    expect(result.core).toEqual([]);
+    expect(result.carried).toEqual(['scripts/themes.mjs', 'src/features/payments/stripe.ts']);
+  });
+
+  it('still refuses a core edit that rides along with an upgrade', () => {
+    const result = coreChangeGate({
+      paths: ['scripts/themes.mjs', 'src/features/payments/stripe.ts'],
+      isShop: true,
+      carried: ['scripts/themes.mjs'],
+    });
+    expect(result.ok).toBe(false);
+    expect(result.core).toEqual(['src/features/payments/stripe.ts']);
+  });
+
   // In the core repository every pull request touches the core. A gate firing
   // on all of them would only teach people to wave it through.
   it('does not fire in the core repository', () => {
@@ -211,5 +235,74 @@ describe('check:paths', () => {
     expect(report.repository).toBe(existsSync(join(root, 'client/client.yaml')) ? 'shop' : 'core');
     expect(report.unclassified).toEqual([]);
     expect(report.codeowners.ok).toBe(true);
+  });
+
+  // The real history of an upgrade: a shop on one core release merges the
+  // next. Every upgrade pull request of every shop was red here until a
+  // `core-change` label (étape 2 de la certification, v0.3.2).
+  describe('on an upgrade pull request', () => {
+    const run = (argv, cwd) => execFileSync('git', argv, { cwd, encoding: 'utf8', stdio: 'pipe' });
+    const put = (dir, path, text) => {
+      mkdirSync(join(dir, path, '..'), { recursive: true });
+      writeFileSync(join(dir, path), text);
+    };
+    const commit = (dir, message) => {
+      run(['add', '-A'], dir);
+      run(['-c', 'user.name=t', '-c', 'user.email=t@example.com', 'commit', '-q', '-m', message], dir);
+    };
+    const gate = (dir) => {
+      const result = spawnSync('node', [join(root, 'scripts/check-paths.mjs'), '--changed', '--base', 'main', '--json'], {
+        cwd: dir,
+        encoding: 'utf8',
+      });
+      return JSON.parse(result.stdout).gate;
+    };
+
+    /** A shop on core "1", with core "2" merged on an upgrade branch. */
+    const upgradedShop = () => {
+      const dir = mkdtempSync(join(tmpdir(), 'paths-upgrade-'));
+      run(['init', '-q', '-b', 'core'], dir);
+      put(dir, 'scripts/tool.mjs', 'one\n');
+      put(dir, 'src/features/payments/stripe.ts', 'one\n');
+      commit(dir, 'core 1');
+      run(['checkout', '-q', '-b', 'main'], dir);
+      put(dir, 'client/client.yaml', 'slug: port\n');
+      commit(dir, 'shop');
+      run(['checkout', '-q', 'core'], dir);
+      put(dir, 'scripts/tool.mjs', 'two\n');
+      run(['rm', '-q', 'src/features/payments/stripe.ts'], dir);
+      commit(dir, 'core 2');
+      run(['checkout', '-q', '-b', 'upgrade', 'main'], dir);
+      run(['-c', 'user.name=t', '-c', 'user.email=t@example.com', 'merge', '-q', '--no-edit', 'core'], dir);
+      return dir;
+    };
+
+    it('passes the files the release brought, deletions included', () => {
+      const result = gate(upgradedShop());
+      expect(result.ok).toBe(true);
+      expect(result.core).toEqual([]);
+      expect(result.carried).toEqual(['scripts/tool.mjs', 'src/features/payments/stripe.ts']);
+    });
+
+    it('still refuses a core edit slipped into the upgrade', () => {
+      const dir = upgradedShop();
+      put(dir, 'scripts/tool.mjs', 'two, and mine\n');
+      commit(dir, 'slipped in');
+      const result = gate(dir);
+      expect(result.ok).toBe(false);
+      expect(result.core).toEqual(['scripts/tool.mjs']);
+    });
+
+    // A merge from another shop branch is no release: its side carries the
+    // client manifest.
+    it('does not take a merge of the shop’s own branch for a release', () => {
+      const dir = upgradedShop();
+      run(['checkout', '-q', '-b', 'side', 'main'], dir);
+      put(dir, 'src/features/payments/stripe.ts', 'edited by the shop\n');
+      commit(dir, 'shop edit');
+      run(['checkout', '-q', '-b', 'merges-side', 'main'], dir);
+      run(['-c', 'user.name=t', '-c', 'user.email=t@example.com', 'merge', '-q', '--no-ff', '--no-edit', 'side'], dir);
+      expect(gate(dir).core).toEqual(['src/features/payments/stripe.ts']);
+    });
   });
 });

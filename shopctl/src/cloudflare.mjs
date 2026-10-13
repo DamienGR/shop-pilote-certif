@@ -47,9 +47,27 @@ export function wranglerCommand(cwd = process.cwd()) {
   return existsSync(local) ? { command: local, prefix: [] } : { command: 'npx', prefix: ['--no-install', 'wrangler'] };
 }
 
+/**
+ * The account `resolveAccount()` settled on, handed to every wrangler started
+ * after it.
+ *
+ * Resolving the account is not enough: wrangler picks its own. With
+ * `CLOUDFLARE_ACCOUNT_ID` unset and a session that sees two accounts — which
+ * is exactly what an agency user invited onto the client's account has
+ * (ADR 0015) — a wrangler whose stdin is not a terminal refuses with "More than
+ * one account available", and one that once ran interactively in this tree
+ * uses the account it cached in `node_modules/.cache/wrangler` instead, whatever
+ * this command just checked. The first stops the run; the second creates the
+ * shop's resources on the other account while the report names the right one.
+ * Pinning the variable on the child is the one setting wrangler ranks above
+ * its cache and below nothing this CLI renders.
+ */
+let pinnedAccount = null;
+
 export function wrangler(args, { cwd = process.cwd(), input, allowFailure = false, env = process.env, maxBuffer } = {}) {
   const { command, prefix } = wranglerCommand(cwd);
-  return capture(command, [...prefix, ...args], { cwd, input, allowFailure, env, maxBuffer });
+  const childEnv = pinnedAccount ? { ...env, CLOUDFLARE_ACCOUNT_ID: pinnedAccount } : env;
+  return capture(command, [...prefix, ...args], { cwd, input, allowFailure, env: childEnv, maxBuffer });
 }
 
 /**
@@ -143,6 +161,10 @@ export function expectedAccount(manifest, environment, values = {}) {
  * production may live on another account than staging (ADR 0015), and the
  * refusal names the field that answered.
  *
+ * The account it returns is also the one every later `wrangler()` of this
+ * process talks to (see `pinnedAccount`): the check and the calls cannot
+ * disagree.
+ *
  * @param {{ manifest: string|null, field?: string, environment?: string|null, flag: string|null, env: string|null }} expected
  * @param {{ accounts: Array<{ id: string, name: string }> }} identity
  */
@@ -186,6 +208,7 @@ export function resolveAccount(expected, identity) {
       `Comptes accessibles : ${list}. Reconnectez-vous sur le bon compte (ADR 0002 : le compte appartient à l'agence) plutôt que de changer le manifeste.`,
     );
   }
+  pinnedAccount = match.id;
   return { id: match.id, name: match.name, sources: named.map(([where]) => where) };
 }
 
