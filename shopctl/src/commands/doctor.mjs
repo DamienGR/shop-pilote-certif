@@ -20,6 +20,7 @@ import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { CORE_ROOT } from '../paths.mjs';
+import { whoami } from '../cloudflare.mjs';
 import { ShopctlError } from '../errors.mjs';
 import { capture, isAvailable } from '../process.mjs';
 
@@ -150,13 +151,16 @@ export function runDoctor(args, reporter) {
     if (offline) {
       reporter.warn('compte Cloudflare non vérifié (--offline).');
     } else {
-      const whoami = capture(wranglerBin, ['whoami'], { cwd: tree.root, allowFailure: true });
-      if (whoami.status === 0) reporter.ok('session Cloudflare active (wrangler whoami)');
-      else {
-        reporter.warn(
-          'wrangler n\'est pas authentifié.',
-          'npx wrangler login — ou, sous WSL2 avec un navigateur Windows, node scripts/wrangler-login-wsl.mjs.',
-        );
+      // The same question provision asks, through the same function. Plain
+      // `wrangler whoami` exits 0 with nobody logged in; only `--json` fails.
+      // Found on the operator's machine at étape 3 of the certification, after
+      // doctor had reported this session active since étape 1.
+      try {
+        const { accounts } = whoami({ cwd: tree.root });
+        reporter.ok(`session Cloudflare active (wrangler whoami : ${accounts.length} compte${accounts.length > 1 ? 's' : ''})`);
+      } catch (error) {
+        if (!(error instanceof ShopctlError)) throw error;
+        reporter.warn(error.message, error.hint);
       }
     }
   } else {

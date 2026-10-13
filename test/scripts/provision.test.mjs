@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 // .mjs like its neighbours: tsconfig pins `types` to the Cloudflare types, so
 // node builtins have no declarations in a .ts file here.
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { cpSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 
 import { EXIT_CODES } from '../../shopctl/src/errors.mjs';
 import { expectedAccount, resolveAccount } from '../../shopctl/src/cloudflare.mjs';
@@ -74,6 +74,9 @@ describe('the account gate', () => {
   });
 });
 
+/** The account each recorded wrangler call reached; whoami reaches none. */
+const reached = (target) => target.read().calls.filter((call) => 'account' in call).map((call) => call.account);
+
 describe('shopctl provision', () => {
   it('refuses to run without --env', () => {
     const target = shop();
@@ -118,16 +121,57 @@ describe('shopctl provision', () => {
   });
 
   // One session that sees both accounts, the way an agency user invited onto
-  // the client's account does (ADR 0015): each environment goes to its own.
+  // the client's account does (ADR 0015): each environment goes to its own —
+  // in the report, and in every call that reaches the account.
   it('provisions each environment on the account the manifest names for it', () => {
     const target = shop({ cloudflare: { productionAccountId: OTHER_ACCOUNT.id } });
     target.account({ accounts: [ACCOUNT, OTHER_ACCOUNT] });
     const production = target.run(['provision', '--env', 'production', '--dry-run']);
     expect(production.status, production.stderr).toBe(EXIT_CODES.ok);
     expect(production.stdout).toContain(`${OTHER_ACCOUNT.name} (${OTHER_ACCOUNT.id})`);
+    expect(new Set(reached(target))).toEqual(new Set([OTHER_ACCOUNT.id]));
+
+    target.account({ calls: [] });
     const staging = target.run(['provision', '--env', 'staging', '--dry-run']);
     expect(staging.status, staging.stderr).toBe(EXIT_CODES.ok);
     expect(staging.stdout).toContain(`${ACCOUNT.name} (${ACCOUNT.id})`);
+    expect(new Set(reached(target))).toEqual(new Set([ACCOUNT.id]));
+  });
+
+  // wrangler ranks its own cache below CLOUDFLARE_ACCOUNT_ID and above nothing
+  // else shopctl controls: an account picked once, interactively, in this tree
+  // would otherwise receive the shop while the report named the right one.
+  // Provision, deploy and the catalogue import, the three writes of étape 3.
+  it('pins every write to the checked account, over the one wrangler cached', () => {
+    const target = shop({ migrations: true, built: true, cloudflare: { productionAccountId: OTHER_ACCOUNT.id } });
+    target.account({ accounts: [ACCOUNT, OTHER_ACCOUNT], cachedAccount: OTHER_ACCOUNT.id });
+
+    const provisioned = target.run(['provision', '--env', 'staging']);
+    expect(provisioned.status, provisioned.stderr).toBe(EXIT_CODES.ok);
+    const deployed = target.run(['deploy', '--env', 'staging', '--skip-verify', '--skip-build', '--skip-smoke']);
+    expect(deployed.status, deployed.stderr).toBe(EXIT_CODES.ok);
+    cpSync(resolve(import.meta.dirname, '../fixtures/clients/pilot-fr/catalogue'), join(target.root, 'catalogue'), { recursive: true });
+    const imported = target.run(['catalog', 'import', 'catalogue/catalog.csv', '--remote', '--env', 'staging', '--create-categories']);
+    expect(imported.status, imported.stderr).toBe(EXIT_CODES.ok);
+
+    const accounts = reached(target);
+    expect(accounts.length).toBeGreaterThan(20);
+    expect(new Set(accounts)).toEqual(new Set([ACCOUNT.id]));
+  });
+
+  // The other half of the same property: the import used to name no account
+  // at all, so it inherited whatever wrangler would pick.
+  it('refuses a remote import the manifest gives no account for', () => {
+    const target = shop({ accountId: null, migrations: true });
+    target.account({ accounts: [ACCOUNT, OTHER_ACCOUNT] });
+    expect(target.run(['provision', '--env', 'staging', '--account', ACCOUNT.id]).status).toBe(EXIT_CODES.ok);
+    cpSync(resolve(import.meta.dirname, '../fixtures/clients/pilot-fr/catalogue'), join(target.root, 'catalogue'), { recursive: true });
+    const args = ['catalog', 'import', 'catalogue/catalog.csv', '--remote', '--env', 'staging', '--create-categories', '--dry-run'];
+    const result = target.run(args);
+    expect(result.status).toBe(EXIT_CODES.precondition);
+    expect(result.stderr).toMatch(/aucun compte Cloudflare attendu/);
+    const named = target.run([...args, '--account', ACCOUNT.id]);
+    expect(named.status, named.stderr).toBe(EXIT_CODES.ok);
   });
 
   describe('--dry-run', () => {

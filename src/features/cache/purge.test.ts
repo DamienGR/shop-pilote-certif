@@ -59,6 +59,17 @@ describe('Workers cache purge', () => {
     expect(purge).toHaveBeenCalledOnce();
   });
 
+  // What a Worker deployed with `cache.enabled: false` gets from
+  // `cloudflare:workers`: an object without `purge`. Nothing is cached, so
+  // every purge is already done — an admin save must not answer 500.
+  it('treats a Worker without a cache as already invalidated', async () => {
+    const cacheless = {} as CachePurger;
+    await expect(purgeCacheTags(['catalog', 'shell'], cacheless)).resolves.toBeUndefined();
+    await expect(purgeProductCache(['prod_a'], cacheless)).resolves.toBeUndefined();
+    await expect(purgeStockProductCache(['prod_a'], cacheless)).resolves.toBeUndefined();
+    await expect(purgeEntireCache(cacheless)).resolves.toBeUndefined();
+  });
+
   it('does not turn a rate-limited stock transition into purge-everything', async () => {
     const purge = vi.fn(async () => result(false));
     await expect(purgeStockProductCache(['prod_a'], { purge })).resolves.toBeUndefined();

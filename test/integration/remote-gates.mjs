@@ -40,6 +40,7 @@ const SECRETS_KEK = 'remote-gates-suite-key-encryption-key';
 const PASSWORD = 'remote gate password';
 const WEBHOOK_SECRET = 'whsec_remote_gates_suite';
 const RECIPIENT = 'nuit@exemple-pilote.fr';
+const TURNSTILE_TEST_SECRET = '1x0000000000000000000000000000000AA'; // secret-scan:ignore — Cloudflare's published always-pass test key
 
 /**
  * One run of a remote script against `url`, captured. Asynchronous on
@@ -156,6 +157,13 @@ worker = await startBuiltWorker({
       emails.push(await request.json());
       return Response.json({ id: 'remote-gates-email' });
     }
+    // Turnstile's siteverify as documented for its test keys: the always-pass
+    // secret accepts the dummy token and nothing else.
+    if (url.hostname === 'challenges.cloudflare.com' && url.pathname === '/turnstile/v0/siteverify') {
+      const form = new URLSearchParams(await request.text());
+      const success = form.get('secret') === TURNSTILE_TEST_SECRET && form.get('response') === 'XXXX.DUMMY.TOKEN.XXXX';
+      return Response.json({ success });
+    }
     return new Response('unexpected outbound call', { status: 502 });
   },
 });
@@ -194,6 +202,23 @@ try {
   assert.deepEqual([emails[0].to].flat(), [RECIPIENT]);
   assert.ok(!email.output.includes(RECIPIENT), `e-mail: the recipient reached the log\n${show(email)}`);
   console.log('✓ e-mail: through the admin login to the provider, recipient kept out of the log');
+
+  // Turnstile on the login, as a staging carries it: Cloudflare's test keys
+  // let the check through with their dummy token; a real widget is a human
+  // check, and the script says it skipped rather than failing every night.
+  await setting(db, 'turnstile_enabled', '1');
+  await setting(db, 'turnstile_site_key', '1x00000000000000000000AA');
+  await setting(db, 'enc:turnstile_secret_key', await encryptSecret(SECRETS_KEK, TURNSTILE_TEST_SECRET));
+  const testKeys = await run('email.mjs', workerUrl, [], { NIGHTLY_EMAIL_TO: RECIPIENT, MINSHOP_ADMIN_PASSWORD: PASSWORD });
+  assert.equal(testKeys.status, 0, `e-mail behind Turnstile test keys: the check failed\n${show(testKeys)}`);
+  assert.equal(emails.length, 2, 'e-mail behind Turnstile test keys: the provider was never called');
+  await setting(db, 'turnstile_site_key', '0x4AAAAAAAremoteGatesReal');
+  const realWidget = await run('email.mjs', workerUrl, [], { NIGHTLY_EMAIL_TO: RECIPIENT, MINSHOP_ADMIN_PASSWORD: PASSWORD });
+  assert.equal(realWidget.status, 0, `e-mail behind a real Turnstile widget: should skip, exited ${realWidget.status}\n${show(realWidget)}`);
+  assert.match(realWidget.output, /::warning::e-mail de test sauté/, show(realWidget));
+  assert.equal(emails.length, 2, 'e-mail behind a real Turnstile widget: nothing should have been sent');
+  await setting(db, 'turnstile_enabled', '0');
+  console.log('✓ e-mail: through Turnstile test keys, and a named skip behind a real widget');
 
   const stripe = await run('stripe-webhook.mjs', workerUrl, ['--product', 'sample-mug', '--interval', '0.5', '--timeout', '20'], {
     STRIPE_TEST_SECRET_KEY: 'rk_test_remote_gates',

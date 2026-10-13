@@ -87,6 +87,43 @@ function changedPaths(merge) {
     .filter(Boolean);
 }
 
+/** Blob ids of a commit's tree, by path. */
+function treeBlobs(commit) {
+  const blobs = new Map();
+  for (const line of git('ls-tree', '-r', '-z', commit).split('\0').filter(Boolean)) {
+    const [meta, path] = line.split('\t');
+    blobs.set(path, meta.split(' ')[2]);
+  }
+  return blobs;
+}
+
+/**
+ * The changed paths a core upgrade brought in as they are.
+ *
+ * `shopctl core upgrade` merges a core release, so every file the release
+ * touched is in the diff. What makes such a file the core's rather than the
+ * shop's is its content: exactly that of the core commit merged in — or absent
+ * from both, when the release deleted it. A core commit is told from a shop's by
+ * carrying no client manifest. Content, not provenance: an edit slipped into an
+ * upgrade differs from the release and stays in the gate.
+ */
+function carriedFromCore(merge, paths) {
+  const cores = git('log', '--merges', '--format=%P', `${merge}..HEAD`)
+    .split('\n')
+    .filter(Boolean)
+    .flatMap((parents) => parents.split(' ').slice(1))
+    .map(treeBlobs)
+    .filter((blobs) => !blobs.has('client/client.yaml'));
+  if (cores.length === 0 || paths.length === 0) return [];
+
+  const present = paths.filter((path) => existsSync(resolve(root, path)));
+  const ids = present.length > 0
+    ? execFileSync('git', ['hash-object', '--stdin-paths'], { cwd: root, encoding: 'utf8', input: present.join('\n') }).trim().split('\n')
+    : [];
+  const ours = new Map(present.map((path, index) => [path, ids[index]]));
+  return paths.filter((path) => cores.some((blobs) => blobs.get(path) === ours.get(path)));
+}
+
 function approval(merge) {
   if (process.env.MINSHOP_CORE_CHANGE === 'approved') return { by: 'MINSHOP_CORE_CHANGE=approved' };
   const trailer = git('log', '--format=%(trailers:key=Approves-core-change,valueonly)', `${merge}..HEAD`)
@@ -105,7 +142,9 @@ let gate = null;
 if (changed) {
   const merge = mergeBase();
   const approved = approval(merge);
-  gate = { base, approved, ...coreChangeGate({ paths: changedPaths(merge), isShop: shop, approval: approved }) };
+  const paths = changedPaths(merge);
+  const carried = shop ? carriedFromCore(merge, paths) : [];
+  gate = { base, approved, ...coreChangeGate({ paths, isShop: shop, approval: approved, carried }) };
 }
 
 const ok = map.unclassified.length === 0 && codeowners.ok && (gate === null || gate.ok);
@@ -132,7 +171,8 @@ if (gate) {
   if (!gate.enforced) {
     console.log(`• core-change gate: not enforced here (this is the core repository, not a shop) — ${gate.core.length} core path(s) in ${gate.changed.length} changed since ${base}`);
   } else if (gate.core.length === 0) {
-    console.log(`✓ core-change gate: ${gate.changed.length} changed path(s) since ${base}, all client-owned`);
+    const fromCore = gate.carried.length > 0 ? `, ${gate.carried.length} core path(s) as a merged core release has them` : '';
+    console.log(`✓ core-change gate: ${gate.changed.length} changed path(s) since ${base}, none edited by the shop${fromCore}`);
   } else if (gate.approved) {
     console.log(`✓ core-change gate: ${gate.core.length} core path(s) changed, approved by ${gate.approved.by}`);
   } else {
