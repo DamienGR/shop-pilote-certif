@@ -220,7 +220,10 @@ function databaseFile(name) {
 }
 
 function openDatabase(binding) {
-  const name = databaseNameFor(binding);
+  // Like wrangler, a database's own name is accepted beside a binding, and on
+  // the account it is looked up there when the configuration does not carry it.
+  const onAccount = !LOCAL && (state.d1 ?? []).some((entry) => entry.name === binding);
+  const name = onAccount ? binding : databaseNameFor(binding);
   if (!LOCAL && !(state.d1 ?? []).some((entry) => entry.name === name)) fail(`Couldn't find DB with name '${name}'`);
   return { name, db: new DatabaseSync(databaseFile(name)) };
 }

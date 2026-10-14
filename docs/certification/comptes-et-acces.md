@@ -252,7 +252,7 @@ Relevés à l'étape 1 — des identifiants, pas des secrets :
 | adresse d'expédition | `email.from` | 2 |
 | nom d'équipe Access, AUD | `cloudflare.stagingAccessTeam` et `cloudflare.stagingAccessAud` | 2 |
 | clé de site Turnstile | Admin → Réglages → Protection | 3 |
-| adresse de l'e-mail de test | variable `NIGHTLY_EMAIL_TO` de l'environnement `staging` | 3 |
+| adresse de l'e-mail de test | secret `NIGHTLY_EMAIL_TO` de l'environnement `staging` (une variable s'afficherait en clair dans les journaux) | 3 |
 
 Secrets, créés au moment où leur destination existe :
 

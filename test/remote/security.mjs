@@ -13,22 +13,35 @@
  *   - path traversal answered with a refusal that leaks nothing;
  *   - the hardening headers on every class of response, static assets included;
  *   - a capability URL that does not exist answering 404 and keeping no-referrer;
- *   - an unhandled error answering a hardened, uncacheable 500.
+ *   - an unhandled error answering a hardened, uncacheable 500;
+ *   - the payment webhooks refusing an unsigned or forged event — sent WITHOUT
+ *     the service token, because Stripe has none: behind a private preview the
+ *     answer must still be the Worker's, through Access's bypass;
+ *   - no page of the shop's own asking for a card: the purchase is paid on the
+ *     provider's page, and no form field here is shaped to take a card.
  *
- * What stays local, and why: the log assertions (they read the Worker's stdout),
- * brute force (tripping the limiter on a real shop locks its owner out for a
- * minute), uploads and sessions (they need an admin session, which this gate
- * must never hold).
+ * With `--limiteurs`, it also trips the three rate limiters once each — search,
+ * checkout, login — and expects a 429 that says when to come back. Opt-in and
+ * never in the nightly run: the address that runs it waits a minute before it
+ * can log in or check out again, and on a real shop that is its owner.
  *
- * Run: BASE_URL=https://… npm run test:security:remote
+ * What stays local, and why: the log assertions (they read the Worker's stdout
+ * — `npm run test:logs:remote` reads a `wrangler tail` instead), uploads and
+ * sessions (they need an admin session, which this gate must never hold).
+ *
+ * Run: BASE_URL=https://… npm run test:security:remote [-- --limiteurs]
  * (plus CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET behind a private preview)
  *
  * It sends ONE request that makes the Worker throw on purpose (the 500 check),
  * so a run shows up as one error in `shopctl monitor` — never enough to judge.
  */
+import { createHmac } from 'node:crypto';
+import { parseArgs } from 'node:util';
 import { adminRoutes } from '../helpers/admin-routes.mjs';
 import { generateAccessToken } from '../../src/features/ids/token.ts';
 import { fetchAs, isAccessChallenge, remoteTarget } from './target.mjs';
+
+const { values: options } = parseArgs({ options: { limiteurs: { type: 'boolean', default: false } } });
 
 const FORM = 'application/x-www-form-urlencoded';
 const LEAK = /root:|"name": "minshop"|CREATE TABLE|sqlite|D1_ERROR|\bat .+\.(m?js|ts):\d+/i;
@@ -176,6 +189,84 @@ await check('huit formes de traversée refusées sans rien laisser voir', async 
   expect(wrong.length === 0, wrong.join(', '));
 });
 
+/* ------------------------------------------------------- payment webhooks */
+
+section('Les webhooks de paiement');
+
+// What the provider would send, signed by nobody — or by a secret that is not
+// the shop's. Neither may settle anything; both must be answered by the Worker
+// itself ("Webhook verification failed"), or by its 404 for a rail the shop
+// does not run. Anything else — a 2xx, a 5xx, Access's login — is the finding.
+const WEBHOOK_EVENT = JSON.stringify({
+  id: 'evt_porte_distante',
+  object: 'event',
+  type: 'checkout.session.completed',
+  data: { object: { id: 'cs_test_porte_distante', object: 'checkout.session', payment_status: 'paid', amount_total: 1, currency: 'eur', metadata: {} } },
+});
+const forgedSignature = () => {
+  const t = Math.floor(Date.now() / 1000);
+  return `t=${t},v1=${createHmac('sha256', 'cle-qui-n-est-pas-celle-de-la-boutique').update(`${t}.${WEBHOOK_EVENT}`).digest('hex')}`;
+};
+
+await check('un événement non signé ou mal signé est refusé par le Worker, sans jeton Access', async () => {
+  const wrong = [];
+  for (const path of ['/api/webhook', '/api/webhook/stripe']) {
+    for (const [label, headers] of [['sans signature', {}], ['signature forgée', { 'stripe-signature': forgedSignature() }]]) {
+      const response = await get(path, { access: false, method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: WEBHOOK_EVENT });
+      const body = await response.text();
+      const worker =
+        (response.status === 400 && body.startsWith('Webhook verification failed')) ||
+        (response.status === 404 && body.startsWith('Unknown or unconfigured payment method'));
+      if (isAccessChallenge(response)) wrong.push(`${path} ${label} → page de connexion d'Access : Stripe n'atteint pas la boutique`);
+      else if (!worker) wrong.push(`${path} ${label} → ${response.status}`);
+      else if (LEAK.test(body)) wrong.push(`${path} ${label} laisse fuiter un détail interne`);
+    }
+  }
+  expect(wrong.length === 0, wrong.join(', '));
+});
+
+if (target.behindAccess) {
+  await check('hors du webhook, la preview reste privée', async () => {
+    const wrong = [];
+    for (const path of ['/', '/admin', '/api/products?limit=1']) {
+      const response = await get(path, { access: false });
+      if (response.status === 200) wrong.push(`${path} → 200 sans jeton`);
+    }
+    expect(wrong.length === 0, `${wrong.join(', ')} : l'application Access ne couvre plus ce nom d'hôte`);
+  });
+}
+
+/* ------------------------------------------------------------- card data */
+
+section('Aucune donnée de carte');
+
+// The purchase is paid on the provider's page; no page of the shop's own may
+// carry a field shaped to take a card. The pages a buyer crosses before that
+// page: the catalogue, a product, the cart, and express checkout — both of
+// which post to /api/checkout, which answers with the provider's URL.
+const CARD_FIELD = /<input\b[^>]*(?:autocomplete\s*=\s*["']?cc-|name\s*=\s*["'][^"']*(?:card|cvc|cvv|cc-?num|cc-?exp|expiry)[^"']*["'])/i;
+
+await check('aucun champ de carte sur les pages de la boutique, du catalogue au paiement', async () => {
+  const list = await (await get('/api/products?limit=100')).json().catch(() => ({ products: [] }));
+  const product = (list.products ?? []).find((entry) => entry.in_stock && !entry.variant_label);
+  expect(product, 'aucun produit simple en stock : il n\'y a pas de checkout à examiner');
+  // A cart is a cookie: putting a product in it holds no stock.
+  const added = await get('/api/cart', {
+    method: 'POST',
+    headers: { origin: target.origin, 'content-type': FORM },
+    body: new URLSearchParams({ _action: 'add', product_id: product.id, qty: '1' }).toString(),
+  });
+  const cookie = added.headers.getSetCookie().map((line) => line.split(';')[0]).join('; ');
+  const wrong = [];
+  for (const path of ['/', `/products/${product.slug}`, '/cart', `/express?product_id=${product.id}`, '/express']) {
+    const response = await get(path, { headers: { cookie } });
+    const html = await response.text();
+    if (response.status !== 200) wrong.push(`${path} → ${response.status}`);
+    else if (CARD_FIELD.test(html)) wrong.push(`${path} porte un champ de carte`);
+  }
+  expect(wrong.length === 0, wrong.join(', '));
+});
+
 /* ---------------------------------------------------------------- headers */
 
 section('En-têtes de durcissement');
@@ -245,6 +336,44 @@ await check('un 500 est durci, non mis en cache, et ne montre pas sa pile', asyn
   const body = await response.text();
   expect(!LEAK.test(body), 'le corps montre une pile ou un détail interne');
 });
+
+/* ---------------------------------------------------------- rate limiters */
+
+if (options.limiteurs) {
+  section('Les limiteurs de débit (--limiteurs)');
+
+  // Last, so nothing above runs behind a tripped limiter. Fired in bursts, so
+  // a limit counted per minute is reached well inside its minute even across
+  // Access and an ocean. Three times the shipped limit is the ceiling: the
+  // platform's limiter is per location and permissive by design, and a few
+  // requests past the limit is the platform, not the shop.
+  async function trip(limit, send) {
+    for (let sent = 0; sent < limit * 3; sent += 10) {
+      const burst = await Promise.all(Array.from({ length: 10 }, (_, index) => send(sent + index)));
+      const refused = burst.find((response) => response.status === 429);
+      if (refused) return { sent: sent + 10, refused };
+    }
+    return null;
+  }
+  const limited = (label, limit, outcome) => {
+    expect(outcome, `aucun 429 en ${limit * 3} requêtes : le limiteur ${label} n'est pas actif sur ce déploiement`);
+    expect(outcome.refused.headers.get('retry-after'), `le 429 ${label} ne dit pas quand revenir`);
+  };
+
+  await check('la recherche répond 429 passé sa limite (60 par minute)', async () => {
+    const run = Date.now().toString(36);
+    limited('de recherche', 60, await trip(60, (index) => get(`/search?q=porte${run}${index}`)));
+  });
+
+  await check('le checkout répond 429 passé sa limite (20 par minute), sans rien réserver', async () => {
+    // An empty order: refused by the route, counted by the limiter before it.
+    limited('du checkout', 20, await trip(20, () => get('/api/checkout', { method: 'POST', headers: { origin: target.origin, 'content-type': 'application/json' }, body: '{}' })));
+  });
+
+  await check('la connexion répond 429 passé sa limite (10 par minute)', async () => {
+    limited('de connexion', 10, await trip(10, () => get('/admin/login', { method: 'POST', headers: { origin: target.origin, 'content-type': FORM }, body: 'password=porte-distante-limiteur' })));
+  });
+}
 
 /* ----------------------------------------------------------------- verdict */
 

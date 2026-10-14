@@ -1,7 +1,7 @@
 {
   "name": "minshop",
   "type": "module",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "private": true,
   "repository": {
     "type": "git",
@@ -32,6 +32,7 @@
     "test:tenant-isolation": "vitest run test/scripts/tenant-isolation.test.mjs",
     "test:security": "node --experimental-strip-types test/integration/security.mjs",
     "test:security:remote": "node --experimental-strip-types test/remote/security.mjs",
+    "test:logs:remote": "node test/remote/logs.mjs",
     "test:load:remote": "node test/remote/load.mjs",
     "test:last-unit:remote": "node test/remote/last-unit.mjs",
     "test:stripe:remote": "node test/remote/stripe-webhook.mjs",
@@ -44,6 +45,7 @@
     "check:deploy": "node scripts/check-deploy.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
     "check:secrets:artifacts": "node scripts/check-secrets.mjs --artifacts",
+    "check:secrets:history": "node scripts/check-secrets.mjs --history",
     "check:format": "node scripts/check-format.mjs",
     "config:validate": "node scripts/check-manifest.mjs",
     "check:paths": "node scripts/check-paths.mjs",
@@ -90,7 +92,8 @@
   },
   "overrides": {
     "miniflare": {
-      "undici": "^7.29.0"
+      "undici": "^7.29.0",
+      "sharp": "^0.35.5"
     }
   }
 }

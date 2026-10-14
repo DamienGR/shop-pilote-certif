@@ -431,6 +431,8 @@ générée.
 en relisant `dist/` : Vite fige `import.meta.env.*` à la construction, donc une
 valeur qui n'existe que dans un `.dev.vars` non suivi peut se retrouver compilée
 dans un bundle dont la moitié est servie aux navigateurs.
+`npm run check:secrets:history` relit tout l'historique que les refs atteignent
+encore : une clé supprimée de l'arbre reste dans chaque clone fait depuis.
 
 Une boutique ne pourra pas être déployée lorsque :
 

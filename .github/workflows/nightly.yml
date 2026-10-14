@@ -35,7 +35,9 @@
 #   STRIPE_TEST_SECRET_KEY        a TEST key, ideally restricted to
 #                                 "Checkout Sessions: write"
 #   MINSHOP_ADMIN_PASSWORD        the staging admin password (password mode)
-#   vars.NIGHTLY_EMAIL_TO         the operator address for the test e-mail
+#   NIGHTLY_EMAIL_TO              the operator address for the test e-mail; a
+#                                 secret so it is masked (a variable, still
+#                                 accepted, is printed in clear)
 #   vars.STAGING_URL              the staging origin, when the manifest
 #                                 declares no stagingDomain (a workers.dev URL)
 #
@@ -239,12 +241,19 @@ jobs:
         if: ${{ !cancelled() && steps.origin.outcome == 'success' }}
         env:
           BASE_URL: ${{ steps.origin.outputs.url }}
-          NIGHTLY_EMAIL_TO: ${{ vars.NIGHTLY_EMAIL_TO }}
+          # A secret, so the address is masked: a variable is printed in clear
+          # in the step header, and a pilot shop's logs are public. The
+          # variable stays accepted, with a warning, for shops set up before.
+          NIGHTLY_EMAIL_TO: ${{ secrets.NIGHTLY_EMAIL_TO || vars.NIGHTLY_EMAIL_TO }}
+          NIGHTLY_EMAIL_TO_IS_VARIABLE: ${{ secrets.NIGHTLY_EMAIL_TO == '' && vars.NIGHTLY_EMAIL_TO != '' }}
           MINSHOP_ADMIN_PASSWORD: ${{ secrets.MINSHOP_ADMIN_PASSWORD }}
         run: |
           if [ -z "$NIGHTLY_EMAIL_TO" ]; then
             echo "::warning::NIGHTLY_EMAIL_TO absent de l'environnement staging : e-mail de test sauté."
             exit 0
+          fi
+          if [ "$NIGHTLY_EMAIL_TO_IS_VARIABLE" = "true" ]; then
+            echo "::warning::NIGHTLY_EMAIL_TO est une variable, affichée en clair dans ce journal : posez-la en secret de l'environnement staging, puis supprimez la variable."
           fi
           npm run test:email:remote
 

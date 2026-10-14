@@ -1091,10 +1091,12 @@ const sections = [
           <div>
             <p class="font-medium">Demo checkout</p>
             <p class="text-xs text-gray-500">
-              Always available — reserves stock and places a real, demo-tagged order (no charge).
+              {pmMap.demo.installed
+                ? 'Reserves stock and places a real, demo-tagged order (no charge). Offered while no real payment method is live.'
+                : 'Withdrawn: a real payment method is live. Use its test mode to try a checkout.'}
             </p>
           </div>
-          <MethodToggle method="demo" enabled={pmMap.demo.enabled} label="Demo checkout" />
+          {pmMap.demo.installed && <MethodToggle method="demo" enabled={pmMap.demo.enabled} label="Demo checkout" />}
         </div>
       </div>
     </div>

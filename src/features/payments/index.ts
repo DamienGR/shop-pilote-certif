@@ -17,12 +17,15 @@ export {
 } from './provider';
 export { DEMO_CHECKOUT_TTL_SECONDS } from './demo';
 
-// 'demo' is a first-class method — a simulated checkout that's ALWAYS offered
-// (records a real, demo-tagged order). The real rails work only when configured.
+// 'demo' is a simulated checkout (records a real, demo-tagged order, charges
+// nothing) offered while no real rail is live, so a fresh store can be exercised
+// end to end. Once a real rail is live it is withdrawn, whatever the default
+// method says: beside a real rail, any visitor could place unpaid orders that
+// take stock. The real rails work only when configured.
 export type PaymentMethod = 'stripe' | 'lightning' | 'opennode' | 'demo';
 const ALL_METHODS: PaymentMethod[] = ['stripe', 'lightning', 'opennode'];
-// The buttons always presented at checkout. Each real rail works if configured,
-// else its button leads to setup instructions; demo always works.
+// The buttons presented at checkout. Each real rail works if configured, else its
+// button leads to setup instructions; demo while it is available.
 const OFFERED: PaymentMethod[] = ['stripe', 'lightning', 'demo'];
 
 export function isPaymentMethod(value: string): value is PaymentMethod {
@@ -34,7 +37,7 @@ export function isPaymentMethod(value: string): value is PaymentMethod {
  * keys (and Lightning its node URL) — all configured in the admin dashboard and
  * read from the runtime settings overlay (`Astro.locals.settings` /
  * getStoreSettings). Sync (no decryption) so it's cheap per render — the actual key
- * is only decrypted in getPaymentProvider. Demo always works.
+ * is only decrypted in getPaymentProvider. Demo works while no real rail does.
  */
 export function isMethodAvailable(
   method: PaymentMethod,
@@ -52,7 +55,7 @@ export function isMethodAvailable(
         ? !!settings.lnbitsUrl && has('lnbits_api_key')
         : !!settings.phoenixdUrl && has('phoenixd_password');
     case 'demo':
-      return true; // demo is always usable
+      return !hasRealMethod(settings, vault);
   }
 }
 
@@ -73,10 +76,11 @@ export function defaultMethod(settings: StoreSettings): PaymentMethod {
 
 /**
  * Methods a buyer/agent can actually pay with right now — the configured real
- * rails plus demo, minus any the admin has disabled at runtime. Used by the agent
- * checkout + discovery, so callers are never handed a method that isn't wired up
- * (or has been switched off). May be EMPTY (admin disabled everything) — callers
- * hide checkout rather than falling back to a method nobody enabled.
+ * rails plus demo while it is available, minus any the admin has disabled at
+ * runtime. Used by the agent checkout + discovery, so callers are never handed a
+ * method that isn't wired up (or has been switched off). May be EMPTY (admin
+ * disabled everything) — callers hide checkout rather than falling back to a
+ * method nobody enabled.
  */
 export function enabledMethods(
   settings: StoreSettings,
@@ -90,8 +94,21 @@ export function enabledMethods(
     .filter((m): m is Exclude<PaymentMethod, 'demo'> => m !== 'demo')
     .filter((m) => isMethodAvailable(m, settings, vault))
     .filter((m) => !off.has(m));
-  if (off.has('demo')) return real;
+  if (off.has('demo') || !isMethodAvailable('demo', settings, vault)) return real;
   return def === 'demo' ? ['demo', ...real] : [...real, 'demo'];
+}
+
+/**
+ * Whether a checkout may proceed with `method`: configured AND not switched off.
+ * Every entry that starts or settles a payment gates on this, not on
+ * isMethodAvailable — a rail the admin disabled must be closed, not just hidden.
+ */
+export function isMethodEnabled(
+  method: PaymentMethod,
+  settings: StoreSettings,
+  vault = vaultReady(),
+): boolean {
+  return enabledMethods(settings, vault).includes(method);
 }
 
 /**
@@ -109,7 +126,9 @@ export function offeredMethods(
   const extra = ALL_METHODS.filter(
     (m) => !OFFERED.includes(m) && isMethodAvailable(m, settings, vault),
   );
-  return (['stripe', 'lightning', ...extra, 'demo'] as PaymentMethod[]).filter((m) => !off.has(m));
+  return (['stripe', 'lightning', ...extra, 'demo'] as PaymentMethod[]).filter(
+    (m) => !off.has(m) && (m !== 'demo' || isMethodAvailable('demo', settings, vault)),
+  );
 }
 
 /**

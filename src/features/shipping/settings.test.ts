@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { ShippingConfig } from './calculator';
+import { FREE_SHIPPING_LABEL, type ShippingConfig } from './calculator';
 import { formatWeightValue } from './weight';
 import {
   SHIPPING_SCHEMA_VERSION,
@@ -260,7 +260,7 @@ describe('validateShippingDocument', () => {
         {
           ...doc().zones[0]!,
           freeOverCents: 5000,
-          rates: [{ label: 'Free shipping', pricing: { type: 'flat', amountCents: 0 } }],
+          rates: [{ label: FREE_SHIPPING_LABEL, pricing: { type: 'flat', amountCents: 0 } }],
         },
       ],
     });

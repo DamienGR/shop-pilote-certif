@@ -36,6 +36,14 @@
  * check the tracked tree cannot have: the literal values in the local
  * `.dev.vars`, which are real credentials by definition, must appear nowhere
  * in `dist/`.
+ *
+ * `--history` scans every blob any ref still reaches — every branch, every tag,
+ * and the pull request heads when they were fetched — because the tree is not
+ * what a clone hands over. A credential committed, then deleted the next day,
+ * is in the history of every clone made since; on a shop repository that is
+ * public (the certification pilot's), it is published. The rules are the same;
+ * only the reading changes. A shallow clone is refused rather than scanned: it
+ * would pass on the history it does not have.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -90,6 +98,7 @@ const RULES = [
 ];
 
 const scanArtifacts = process.argv.includes('--artifacts');
+const scanHistory = process.argv.includes('--history');
 
 /** A bundle is one file where the sources were many, so it gets its own bound. */
 const ARTIFACT_MAX_BYTES = 20_000_000;
@@ -146,6 +155,11 @@ function scanContent(file, { ignoreMarkers = true, maxBytes = 2_000_000 } = {}) 
   } catch {
     return;
   }
+  scanText(file, source, { ignoreMarkers });
+}
+
+/** The content rules over one text, wherever it was read from. */
+function scanText(file, source, { ignoreMarkers = true } = {}) {
   if (source.includes('\0')) return; // Binary without a known extension.
 
   const lines = source.split('\n');
@@ -223,6 +237,71 @@ if (scanArtifacts) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// 5. The history (--history).
+
+// Text out for the listings; bytes out for anything fed on stdin, which is
+// where the blobs come back and where an offset has to count bytes.
+const git = (args, input) =>
+  input === undefined
+    ? execFileSync('git', args, { cwd: root, maxBuffer: 1 << 30, encoding: 'utf8' })
+    : execFileSync('git', args, { cwd: root, maxBuffer: 1 << 30, input: Buffer.from(input) });
+
+let history = null;
+if (scanHistory) {
+  if (git(['rev-parse', '--is-shallow-repository']).trim() === 'true') {
+    console.error(
+      '✗ secret scan: --history asked for the history and this clone is shallow.\n' +
+        '  `git fetch --unshallow` first: a scan of the commits a clone does not have proves nothing.',
+    );
+    process.exit(1);
+  }
+  const refs = git(['for-each-ref', '--format=%(refname)']).split('\n').filter(Boolean);
+  const commits = Number(git(['rev-list', '--all', '--count']).trim());
+
+  // Every path any commit ever added: the forbidden-file rules apply to the
+  // past too, and a `.dev.vars` committed once is the finding even if its
+  // content matches no rule.
+  const everTracked = new Set(git(['log', '--all', '--format=', '--name-only', '--diff-filter=ACMR']).split('\n').filter(Boolean));
+  const seen = new Set(findings.map(({ file, rule }) => `${rule}\0${file}`));
+  for (const file of everTracked) {
+    for (const { pattern, why, allow } of FORBIDDEN_PATHS) {
+      if (!pattern.test(file) || allow?.some((exception) => exception.test(file))) continue;
+      const rule = `once-tracked file (${why})`;
+      if (seen.has(`tracked file (${why})\0${file}`)) continue;
+      findings.push({ file: `${file} (history)`, line: 0, rule, excerpt: file });
+    }
+  }
+
+  // Every blob a ref reaches, once, with the first path it was seen under. The
+  // ones the index holds were read above from the working tree.
+  const current = new Set(
+    git(['ls-files', '-s']).split('\n').filter(Boolean).map((line) => line.split(/\s+/)[1]),
+  );
+  const objects = git(['rev-list', '--objects', '--all'])
+    .split('\n')
+    .filter((line) => line.includes(' '))
+    .map((line) => ({ sha: line.slice(0, line.indexOf(' ')), path: line.slice(line.indexOf(' ') + 1) }));
+  const kinds = git(['cat-file', '--batch-check=%(objecttype) %(objectsize)'], objects.map(({ sha }) => sha).join('\n') + '\n')
+    .toString('utf8')
+    .split('\n');
+  const blobs = objects.filter(({ sha, path }, index) => {
+    const [kind, size] = (kinds[index] ?? '').split(' ');
+    return kind === 'blob' && !current.has(sha) && Number(size) <= 2_000_000 && !SKIP_CONTENT.some((pattern) => pattern.test(path));
+  });
+
+  // One `cat-file --batch` for all of them: "<sha> blob <size>\n<bytes>\n" each.
+  const stream = blobs.length ? git(['cat-file', '--batch'], blobs.map(({ sha }) => sha).join('\n') + '\n') : Buffer.alloc(0);
+  let offset = 0;
+  for (const { sha, path } of blobs) {
+    const headerEnd = stream.indexOf(0x0a, offset);
+    const size = Number(stream.toString('utf8', offset, headerEnd).split(' ')[2]);
+    scanText(`${path} (history, blob ${sha.slice(0, 10)})`, stream.toString('utf8', headerEnd + 1, headerEnd + 1 + size));
+    offset = headerEnd + 1 + size + 1;
+  }
+  history = { refs: refs.length, commits, blobs: blobs.length };
+}
+
 if (findings.length) {
   console.error(`✗ secret scan: ${findings.length} finding(s)\n`);
   for (const { file, line, rule, excerpt } of findings) {
@@ -230,7 +309,8 @@ if (findings.length) {
   }
   console.error(
     '\nA real credential must be ROTATED, not just removed — it is already in the history.\n' +
-      `A false positive is silenced with a \`${IGNORE_MARKER}\` comment on the line.`,
+      `A false positive is silenced with a \`${IGNORE_MARKER}\` comment on the line.` +
+      (history ? '\nA finding in the history names its blob: `git log --all --find-object=<blob>` lists the commits that carry it.' : ''),
   );
   process.exit(1);
 }
@@ -238,5 +318,6 @@ if (findings.length) {
 console.log(
   `✓ secret scan: ${tracked.length} tracked files` +
     (scanArtifacts ? ` + ${artifacts.length} build artifacts` : '') +
+    (history ? ` + ${history.blobs} blobs of history (${history.commits} commits, ${history.refs} refs)` : '') +
     ', no credential found',
 );

@@ -20,7 +20,7 @@ ne transite par une conversation ni par un argument de commande.
 | Zero Trust (A) | une application Access de contournement sur le seul chemin `/api/webhook` ; un jeton de service et une politique « Service Auth » sur l'application de preview |
 | Stripe, mode test | deux clés restreintes (boutique, nocturne) ; un endpoint de webhook vers la preview ; des sessions de checkout test que le nocturne crée puis expire |
 | Resend | une clé API (envoi seul) ; des e-mails de test vers votre adresse |
-| GitHub `shop-pilote-certif` | dans `staging` : secrets `STRIPE_TEST_SECRET_KEY`, `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET`, `MINSHOP_ADMIN_PASSWORD`, variable `NIGHTLY_EMAIL_TO` ; `Nightly` réactivé ; une pull request de preuves |
+| GitHub `shop-pilote-certif` | dans `staging` : secrets `STRIPE_TEST_SECRET_KEY`, `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET`, `MINSHOP_ADMIN_PASSWORD`, `NIGHTLY_EMAIL_TO` ; `Nightly` réactivé ; une pull request de preuves |
 | Cloudflare B, `canari-certif`, Stripe live | rien |
 
 Tout tient dans les offres gratuites. Le cron du Worker (toutes les cinq
@@ -193,7 +193,7 @@ Une clé Stripe restreinte « nocturne », mode test, Checkout Sessions en
 
 ```sh
 gh secret set STRIPE_TEST_SECRET_KEY --env staging --repo DamienGR/shop-pilote-certif
-gh variable set NIGHTLY_EMAIL_TO --env staging --repo DamienGR/shop-pilote-certif --body "<adresse de test>"
+gh secret set NIGHTLY_EMAIL_TO --env staging --repo DamienGR/shop-pilote-certif        # l'adresse de test, à l'invite
 gh workflow enable Nightly --repo DamienGR/shop-pilote-certif
 gh workflow run Nightly --repo DamienGR/shop-pilote-certif
 gh run watch --repo DamienGR/shop-pilote-certif
@@ -202,8 +202,10 @@ gh run watch --repo DamienGR/shop-pilote-certif
 Attendu : `Staging (pilote-certif)` vert (sauvegarde, restauration locale,
 portes distantes, supervision, Stripe, e-mail). `Production error rate and
 quotas` est vert avec un avertissement : son jeton n'arrive qu'à l'étape 9.
-Le dépôt est public, ses journaux aussi : l'adresse de test y est masquée,
-mais une adresse dédiée vaut mieux.
+Le dépôt est public, ses journaux aussi : l'adresse de test y est masquée
+parce qu'elle est un secret. Posée en variable, comme la première version de
+cette fiche le disait, elle s'affiche en clair dans l'en-tête de l'étape
+(constaté le 2026-10-13) ; le nocturne le signale depuis `v0.3.4`.
 
 ## 8. Les preuves
 

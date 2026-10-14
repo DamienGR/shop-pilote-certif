@@ -174,81 +174,80 @@ const methodRows = methods.map((m, i) => ({ m, primary: i === 0, copy: paymentMe
       <span class="text-lg tabular-nums">{formatPrice(totalCents)}</span>
     </div>
 
-    {/* One button per enabled method (first = the store's default → primary). Each
-        re-sends the same source to /api/checkout with its method. */}
-    <div class="mt-6 space-y-2">
+    {/* One form, one terms checkbox, one submit per enabled method (first = the
+        store's default → primary), like the cart: a form per method drew the
+        checkbox once per method. The button carries method=<rail>. */}
+    <form method="POST" action="/api/checkout" class="mt-6 space-y-2">
+      {carry.map((c) => (
+        <input type="hidden" name={c.name} value={c.value} />
+      ))}
+      {/* Stripe prices its static rate list from this choice; the other rails
+          collect the address on /checkout. A single remaining country still
+          submits, or the server would fall back to the raw first zone — possibly
+          the very country the Stripe filter removed. */}
+      {destination.showSelect && (
+        <label class="mb-2 flex items-center justify-between gap-2 text-xs uppercase tracking-widest text-muted">
+          {t('cart.shipTo')}
+          <select
+            name="country"
+            class="rounded-md border border-line px-2 py-1.5 text-sm normal-case tracking-normal text-ink"
+          >
+            {destination.countries.map((c) => (
+              <option value={c} selected={c === destination.defaultCountry}>
+                {destination.label(c)}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {destination.hiddenOnly && (
+        <input type="hidden" name="country" value={destination.countries[0]} />
+      )}
+      {
+        terms.required && (
+          <label class="mb-2 flex items-start gap-2 text-left text-xs normal-case tracking-normal text-muted">
+            <input
+              type="checkbox"
+              name="accept_terms"
+              value="on"
+              required
+              class="mt-0.5 accent-brand"
+            />
+            <span>
+              {t('terms.accept')}{' '}
+              <a href={terms.href} class="underline hover:text-brand">
+                {t('terms.linkLabel')}
+              </a>{' '}
+              ({t('terms.version', { version: terms.version })}).
+            </span>
+          </label>
+        )
+      }
       {
         methodRows.map(({ m, primary, copy }) => (
-          <form method="POST" action="/api/checkout">
-            {carry.map((c) => (
-              <input type="hidden" name={c.name} value={c.value} />
-            ))}
-            <input type="hidden" name="method" value={m} />
-            {/* Stripe prices its static rate list from this choice; the other
-                rails collect the address on /checkout. A single remaining country
-                still submits, or the server would fall back to the raw first
-                zone — possibly the very country the Stripe filter removed. */}
-            {m === 'stripe' && destination.showSelect && (
-              <label class="mb-2 flex items-center justify-between gap-2 text-xs uppercase tracking-widest text-muted">
-                {t('cart.shipTo')}
-                <select
-                  name="country"
-                  class="rounded-md border border-line px-2 py-1.5 text-sm normal-case tracking-normal text-ink"
-                >
-                  {destination.countries.map((c) => (
-                    <option value={c} selected={c === destination.defaultCountry}>
-                      {destination.label(c)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            {m === 'stripe' && destination.hiddenOnly && (
-              <input type="hidden" name="country" value={destination.countries[0]} />
-            )}
-            {
-              terms.required && (
-                <label class="mb-2 flex items-start gap-2 text-left text-xs normal-case tracking-normal text-muted">
-                  <input
-                    type="checkbox"
-                    name="accept_terms"
-                    value="on"
-                    required
-                    class="mt-0.5 accent-brand"
-                  />
-                  <span>
-                    {t('terms.accept')}{' '}
-                    <a href={terms.href} class="underline hover:text-brand">
-                      {t('terms.linkLabel')}
-                    </a>{' '}
-                    ({t('terms.version', { version: terms.version })}).
-                  </span>
-                </label>
-              )
-              }
-            <button
-              type="submit"
-              class={`flex w-full items-center justify-between gap-3 rounded-lg px-5 py-3 text-left transition ${
-                primary
-                  ? 'bg-brand text-on-brand hover:bg-brand-hover'
-                  : 'border border-line text-muted hover:border-brand'
-              }`}
-            >
-              <span>
-                <span class="block text-sm font-medium">{copy.label}</span>
-                <span class={`block text-xs ${primary ? 'text-on-brand/70' : 'text-muted'}`}>
-                  {copy.hint}
-                </span>
+          <button
+            type="submit"
+            name="method"
+            value={m}
+            class={`flex w-full items-center justify-between gap-3 rounded-lg px-5 py-3 text-left transition ${
+              primary
+                ? 'bg-brand text-on-brand hover:bg-brand-hover'
+                : 'border border-line text-muted hover:border-brand'
+            }`}
+          >
+            <span>
+              <span class="block text-sm font-medium">{copy.label}</span>
+              <span class={`block text-xs ${primary ? 'text-on-brand/70' : 'text-muted'}`}>
+                {copy.hint}
               </span>
-              <span aria-hidden="true" class={primary ? 'text-on-brand/80' : 'text-faint'}>
-                &rarr;
-              </span>
-            </button>
-          </form>
+            </span>
+            <span aria-hidden="true" class={primary ? 'text-on-brand/80' : 'text-faint'}>
+              &rarr;
+            </span>
+          </button>
         ))
       }
-    </div>
-
+    </form>
     <a
       href={backHref}
       class="mt-6 inline-block text-xs uppercase tracking-widest text-faint hover:text-brand"

@@ -14,6 +14,7 @@ import {
   settleDemoCheckout,
   settleLightningOnLoad,
 } from '../../features/payments/checkout/settle';
+import { isMethodEnabled } from '../../features/payments';
 import { t } from '../../features/i18n';
 
 // Single "complete your payment" entry point for the self-rendered rails. The
@@ -57,6 +58,11 @@ if (!isDemo && !isLightning) return Astro.redirect(`/order/${guestParam}`, 303);
 const payExpired =
   pending.status === 'expired' ||
   (pending.expires_at != null && Date.parse(pending.expires_at) <= Date.now());
+// A demo checkout minted before the rail closed (a real rail went live, or the
+// admin switched demo off) must not settle into an unpaid order. Lightning is not
+// gated here: its invoice may already be paid.
+const demoClosed =
+  isDemo && !(Astro.locals.settings && isMethodEnabled('demo', Astro.locals.settings));
 
 // The execution context lets the confirmation emails finish after the redirect
 // — settlement commits the outbox rows with the order, delivery follows behind.
@@ -64,7 +70,7 @@ const ctx = Astro.locals.cfContext;
 const waitUntil = ctx ? ctx.waitUntil.bind(ctx) : undefined;
 
 let declined: string | null = null;
-if (isDemo && Astro.request.method === 'POST' && !payExpired) {
+if (isDemo && Astro.request.method === 'POST' && !payExpired && !demoClosed) {
   // Middleware already loaded the settings overlay for this document — hand it
   // down so settlement doesn't re-read it (and the three keys it derives).
   const result = await settleDemoCheckout(
@@ -100,12 +106,18 @@ const description = isDemo
 ---
 
 <Layout title={title} description={description}>
-  {isDemo && payExpired && (
+  {isDemo && demoClosed && (
+    <Fragment>
+      <h1 class="mb-2 font-serif text-3xl tracking-tight sm:text-4xl">{t('pay.demo.closed.title')}</h1>
+      <p class="text-muted">{t('pay.demo.closed.body')}</p>
+    </Fragment>
+  )}
+  {isDemo && !demoClosed && payExpired && (
     <Fragment>
       <h1 class="mb-2 font-serif text-3xl tracking-tight sm:text-4xl">{t('pay.demo.expired.title')}</h1>
       <p class="text-muted">{t('pay.demo.expired.body')}</p>
     </Fragment>
   )}
-  {isDemo && !payExpired && <DemoCheckout pending={pending} declined={declined} />}
+  {isDemo && !demoClosed && !payExpired && <DemoCheckout pending={pending} declined={declined} />}
   {isLightning && <LightningPay pending={pending} expired={lightningExpired} />}
 </Layout>
