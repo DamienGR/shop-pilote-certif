@@ -1,0 +1,48 @@
+[
+  {
+    "results": [
+      {
+        "sku": "BAU-LEV",
+        "stock": 25
+      },
+      {
+        "sku": "BOU-CIR",
+        "stock": 7
+      },
+      {
+        "sku": "CAR-A5",
+        "stock": 4
+      },
+      {
+        "sku": "ECH-LAI",
+        "stock": 6
+      },
+      {
+        "sku": "TEE-M",
+        "stock": 3
+      },
+      {
+        "sku": "TOR-LIN",
+        "stock": 22
+      }
+    ],
+    "success": true,
+    "meta": {
+      "served_by": "v3-prod",
+      "served_by_region": "EEUR",
+      "served_by_colo": "MXP",
+      "served_by_primary": true,
+      "timings": {
+        "sql_duration_ms": 1.3798
+      },
+      "duration": 1.3798,
+      "changes": 0,
+      "last_row_id": 0,
+      "changed_db": false,
+      "size_after": 413696,
+      "rows_read": 19,
+      "rows_written": 0,
+      "total_attempts": 1
+    }
+  }
+]

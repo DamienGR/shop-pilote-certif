@@ -1,0 +1,13 @@
+ok products (20 rows)
+ok product_variants (9 rows)
+ok product_extras (0 rows)
+ok categories (4 rows)
+ok pages (4 rows)
+ok media (8 rows)
+ok product_images (10 rows)
+ok menu_items (0 rows)
+ok orders (0 rows)
+ok refunds (0 rows)
+ok order_items (0 rows)
+ok order_reference_aliases
+ok order_item_ids
