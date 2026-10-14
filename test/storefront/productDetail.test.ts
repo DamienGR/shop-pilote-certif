@@ -245,6 +245,7 @@ describe('the product gallery', () => {
     expect(html).toContain('id="pi-pimg_one"');
     expect(html).toContain('href="#pi-pimg_one"');
     expect(html).toContain('data-hero-track');
+    expect(html).toContain('data-product-hero');
   });
 
   it('falls back to a single hero when there is nothing to scroll', async () => {
@@ -255,6 +256,7 @@ describe('the product gallery', () => {
     });
 
     expect(html).not.toContain('data-hero-track');
+    expect(html).toContain('data-product-hero');
     expect(html).toContain('/images/tee.jpg');
   });
 

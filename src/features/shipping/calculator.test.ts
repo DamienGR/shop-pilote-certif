@@ -81,6 +81,11 @@ describe('computeShipping (legacy wrapper)', () => {
     expect(opts[0]).toEqual({ label: FREE_SHIPPING_LABEL, amountCents: 0 });
     expect(opts).toHaveLength(3);
   });
+  it('names the free option in the storefront language', () => {
+    // Stripe's hosted page shows it beside the merchant's own French rates, and
+    // the order keeps it: an English label here reached French buyers (étape 4).
+    expect(FREE_SHIPPING_LABEL).toBe('Livraison offerte');
+  });
   it('does not offer free below the threshold', () => {
     expect(computeShipping(4999, 'US', cfg).some((o) => o.amountCents === 0)).toBe(false);
   });

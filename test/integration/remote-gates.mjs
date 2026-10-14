@@ -11,8 +11,9 @@
  *   - security.mjs on a shop still in bootstrap, wizard open: it must go RED.
  *     A remote gate that passes on the one state where anyone can take the
  *     admin is asserting on nothing;
- *   - security.mjs once a password is set (green, password mode), and on a
- *     shop whose admin is behind Access (green, Access mode);
+ *   - security.mjs once a password is set (green, password mode), again with
+ *     `--limiteurs` (each limiter answers 429), and on a shop whose admin is
+ *     behind Access (green, Access mode);
  *   - on a configured shop — catalogue, e-mail, Stripe in test mode:
  *     last-unit.mjs (one session, four refusals, then a held unit refused
  *     before firing), load.mjs (no error), email.mjs (through the admin
@@ -84,11 +85,23 @@ try {
 
   await setting(worker.db, 'admin_password_hash', await hashPassword(PASSWORD));
   await setting(worker.db, 'setup_complete', '1');
+  // A catalogue, so the card check has a cart and a checkout to read.
+  await seed(worker.db, 'seed.sql');
 
   const password = await run('security.mjs', url);
   assert.equal(password.status, 0, `password shop: the remote gate failed\n${show(password)}`);
   assert.match(password.output, /mode password/, show(password));
+  assert.match(password.output, /✓ un événement non signé ou mal signé est refusé par le Worker/, show(password));
+  assert.match(password.output, /✓ aucun champ de carte/, show(password));
+  assert.doesNotMatch(password.output, /limiteurs/, show(password));
   console.log('✓ remote security: green on a password-guarded shop');
+
+  const limiters = await run('security.mjs', url, ['--limiteurs']);
+  assert.equal(limiters.status, 0, `password shop, --limiteurs: the remote gate failed\n${show(limiters)}`);
+  for (const limiter of ['la recherche', 'le checkout', 'la connexion']) {
+    assert.match(limiters.output, new RegExp(`✓ ${limiter} répond 429`), show(limiters));
+  }
+  console.log('✓ remote security: --limiteurs trips search, checkout and login, each with a retry-after');
 } finally {
   await worker.dispose();
 }
@@ -100,6 +113,7 @@ worker = await startBuiltWorker({
 });
 try {
   await setting(worker.db, 'setup_complete', '1');
+  await seed(worker.db, 'seed.sql');
   const access = await run('security.mjs', String(await worker.mf.ready));
   assert.equal(access.status, 0, `Access shop: the remote gate failed\n${show(access)}`);
   assert.match(access.output, /mode access/, show(access));

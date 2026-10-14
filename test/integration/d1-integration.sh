@@ -96,6 +96,17 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 npx wrangler d1 migrations apply DB --local --persist-to "$state_dir" >/dev/null
+# Rows a migration inserts reach a real store as they are: nothing there runs
+# seed.sql's normalization below, nor scripts/backfill-public-ids.mjs. The legal
+# pages of 0040 arrived without a public_id, and the admin linked each one to
+# /admin/pages/null/edit — found on a real store. Checked before the seed hides it.
+migrated_without_id="$(npx wrangler d1 execute DB --local --persist-to "$state_dir" --json \
+  --command "SELECT (SELECT COUNT(*) FROM products WHERE public_id IS NULL) + (SELECT COUNT(*) FROM product_variants WHERE public_id IS NULL) + (SELECT COUNT(*) FROM product_extras WHERE public_id IS NULL) + (SELECT COUNT(*) FROM categories WHERE public_id IS NULL) + (SELECT COUNT(*) FROM pages WHERE public_id IS NULL) + (SELECT COUNT(*) FROM media WHERE public_id IS NULL) + (SELECT COUNT(*) FROM product_images WHERE public_id IS NULL) + (SELECT COUNT(*) FROM menu_items WHERE public_id IS NULL) AS n;" |
+  node -e 'let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s)[0].results[0].n)))')"
+if [[ "$migrated_without_id" != "0" ]]; then
+  echo "D1 integration failed: migrations left $migrated_without_id row(s) without a public_id" >&2
+  exit 1
+fi
 npx wrangler d1 execute DB --local --persist-to "$state_dir" --file ./seed.sql >/dev/null
 npx wrangler d1 execute DB --local --persist-to "$state_dir" \
   --command "INSERT INTO settings (key, value) VALUES ('setup_complete', '1');" >/dev/null
@@ -848,6 +859,68 @@ if [[ "$bare_status" != "404" ]]; then
   echo "D1 integration failed: bare order public id granted access (HTTP $bare_status)" >&2
   exit 1
 fi
+
+# A rail the admin switched off is closed on every entry, not only missing from
+# the buttons. /checkout, the in-app step of the address-taking rails, gated on
+# the rail being configured — always true for demo — so a crafted POST still held
+# stock and minted a demo checkout, and /pay settled one minted before the switch:
+# an unpaid order on a store that had turned demo off. Found on a real store.
+closed_checkout="$(curl --max-time 30 --fail --silent --show-error \
+  -H 'content-type: application/json' \
+  -H "origin: http://127.0.0.1:$test_port" \
+  --data '{"items":[{"slug":"sample-tee","quantity":1}],"method":"demo","ship_to":{"email":"integration@example.com","name":"Integration Test","line1":"1 Test St","city":"Villeneuve","postal":"75000","country":"FR"}}' \
+  "http://127.0.0.1:$test_port/api/checkout")"
+closed_pay_path="$(node -e 'const b=JSON.parse(process.argv[1]); process.stdout.write(new URL(b.checkout_url).pathname)' "$closed_checkout")"
+closed_order_id="$(node -e 'process.stdout.write(JSON.parse(process.argv[1]).order_public_id)' "$closed_checkout")"
+npx wrangler d1 execute DB --local --persist-to "$state_dir" \
+  --command "INSERT OR REPLACE INTO settings (key, value) VALUES ('payment_methods_disabled', 'demo')" >/dev/null
+sample_tee_id="$(npx wrangler d1 execute DB --local --persist-to "$state_dir" --json \
+  --command "SELECT public_id FROM products WHERE slug = 'sample-tee';" |
+  node -e 'let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s)[0].results[0].public_id))')"
+stock_before_closed="$(npx wrangler d1 execute DB --local --persist-to "$state_dir" --json \
+  --command "SELECT stock FROM products WHERE slug = 'sample-tee';" |
+  node -e 'let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s)[0].results[0].stock)))')"
+closed_headers="$state_dir/closed-checkout-headers.txt"
+closed_status="$(curl --max-time 30 --silent --output /dev/null --dump-header "$closed_headers" --write-out '%{http_code}' \
+  -H 'content-type: application/x-www-form-urlencoded' \
+  -H "origin: http://127.0.0.1:$test_port" \
+  --data "method=demo&product_id=$sample_tee_id&email=integration%40example.com&name=Integration+Test&line1=1+Test+St&city=Villeneuve&postal=75000&country=FR" \
+  "http://127.0.0.1:$test_port/checkout")"
+closed_location="$(tr -d '\r' <"$closed_headers" | awk 'tolower($1) == "location:" { print $2 }')"
+if [[ "$closed_status" != "303" || "$closed_location" != */cart ]]; then
+  echo "D1 integration failed: /checkout took a disabled demo rail (HTTP $closed_status → $closed_location)" >&2
+  exit 1
+fi
+closed_settle_status="$(curl --max-time 30 --silent --output /dev/null --write-out '%{http_code}' \
+  -H 'content-type: application/x-www-form-urlencoded' \
+  -H "origin: http://127.0.0.1:$test_port" \
+  --data 'outcome=approve&email=integration%40example.com' \
+  "http://127.0.0.1:$test_port$closed_pay_path")"
+closed_orders="$(npx wrangler d1 execute DB --local --persist-to "$state_dir" --json \
+  --command "SELECT COUNT(*) AS n FROM orders WHERE public_id = '$closed_order_id';" |
+  node -e 'let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s)[0].results[0].n)))')"
+if [[ "$closed_settle_status" == "303" || "$closed_orders" != "0" ]]; then
+  echo "D1 integration failed: /pay settled a demo checkout after demo was disabled (HTTP $closed_settle_status)" >&2
+  exit 1
+fi
+closed_api_status="$(curl --max-time 30 --silent --output /dev/null --write-out '%{http_code}' \
+  -H 'content-type: application/json' \
+  -H "origin: http://127.0.0.1:$test_port" \
+  --data '{"items":[{"slug":"sample-tee","quantity":1}],"method":"demo","ship_to":{"email":"integration@example.com","name":"Integration Test","line1":"1 Test St","city":"Villeneuve","postal":"75000","country":"FR"}}' \
+  "http://127.0.0.1:$test_port/api/checkout")"
+if [[ "$closed_api_status" != "503" ]]; then
+  echo "D1 integration failed: the checkout API took a disabled demo rail (HTTP $closed_api_status)" >&2
+  exit 1
+fi
+stock_after_closed="$(npx wrangler d1 execute DB --local --persist-to "$state_dir" --json \
+  --command "SELECT stock FROM products WHERE slug = 'sample-tee';" |
+  node -e 'let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s)[0].results[0].stock)))')"
+if [[ "$stock_after_closed" -ne "$stock_before_closed" ]]; then
+  echo "D1 integration failed: a disabled rail moved stock ($stock_before_closed → $stock_after_closed)" >&2
+  exit 1
+fi
+npx wrangler d1 execute DB --local --persist-to "$state_dir" \
+  --command "DELETE FROM settings WHERE key = 'payment_methods_disabled'" >/dev/null
 
 # The cron handler only exists because wrangler `main` points at src/worker.ts
 # and the Astro adapter bundles it. If an adapter upgrade stops honouring that,

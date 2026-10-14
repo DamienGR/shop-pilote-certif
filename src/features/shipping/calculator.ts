@@ -11,9 +11,13 @@
  * (EasyPost/Shippo) later without touching callers.
  */
 
+import { t } from '../i18n/index.ts';
+
 /** The synthesized free-shipping option's label. Shared with Admin validation so a
- *  configured rate can neither collide with it nor drift away from it. */
-export const FREE_SHIPPING_LABEL = 'Free shipping';
+ *  configured rate can neither collide with it nor drift away from it. It is the one
+ *  option name the core writes rather than the merchant, and the buyer reads it on
+ *  Stripe's hosted page and on the order, so it comes from the storefront catalog. */
+export const FREE_SHIPPING_LABEL = t('checkout.shippingFreeOption');
 
 export interface ShippingOption {
   label: string;
@@ -74,7 +78,7 @@ export interface ShippingZone {
   /** ISO 3166-1 alpha-2 codes this zone serves, or ['*'] as a catch-all. */
   countries: string[];
   rates: ConfiguredRate[];
-  /** Add a $0 "Free shipping" option once the subtotal reaches this (null = never). */
+  /** Add a 0-cost free-shipping option once the subtotal reaches this (null = never). */
   freeOverCents: number | null;
 }
 

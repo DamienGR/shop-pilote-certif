@@ -7,6 +7,10 @@ import { t } from '../../i18n';
  * The product hero: a snap-scrolling gallery when there is more than one image,
  * a single image otherwise.
  *
+ * `data-product-hero` marks the hero in BOTH forms; `data-hero-track` exists
+ * only in the gallery. A check that looked for the track missed every product
+ * with one image — on a real catalogue, most of them.
+ *
  * Owns the anchor ids the thumbnails and the variant selector scroll to, and
  * the LCP treatment on the first frame — eager and high priority, with every
  * later frame lazy. Both are easy to lose when restyling and invisible when
@@ -36,7 +40,7 @@ const hasGallery = images.length > 1;
 
 {
   hasGallery ? (
-    <div class={className}>
+    <div class={className} data-product-hero>
       {/* `tabindex="0"` is not decoration: the track scrolls horizontally, and a
           region that scrolls but cannot take focus is unreachable to anyone
           driving the page from the keyboard — the images past the first simply
@@ -103,7 +107,7 @@ const hasGallery = images.length > 1;
       </div>
     </div>
   ) : (
-    <div class={`${className} relative overflow-hidden rounded-lg bg-surface`.trim()}>
+    <div class={`${className} relative overflow-hidden rounded-lg bg-surface`.trim()} data-product-hero>
       <StoreImage
         image={hero}
         fade

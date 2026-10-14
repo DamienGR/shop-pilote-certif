@@ -26,6 +26,9 @@ whitespace, no tab indentation — a floor rather than a formatter, because a
 reformatted core lands as a merge conflict in every shop),
 `npm run check:secrets:artifacts` (the same rules over `dist/`, plus the local
 `.dev.vars` values, which Vite can freeze into the bundle — needs a build),
+`npm run check:secrets:history` (the same rules over every blob any ref still
+reaches, and every forbidden path ever tracked: a key deleted from the tree is
+in every clone made since — refuses a shallow clone, which has no past to read),
 `npm run test:security` (the security gate below, needs a build),
 `npm run config:validate` (client manifests, fleet identifiers, core
 neutrality), `npm run check:paths` (file-ownership map + CODEOWNERS drift),
@@ -638,7 +641,19 @@ from an argument: `BASE_URL`, and behind a private preview
   response including static assets, capability URLs, an unhandled error.
   Behind Access the service token rides on every request, so "anonymous" means
   anonymous to the Worker's own gate — and an admin guarded by Access alone,
-  which a service token would open, fails it.
+  which a service token would open, fails it. It also posts unsigned and
+  forged events to every webhook (Access lets them through on a bypass, the
+  Worker must refuse them), and checks that no page asks for a card number.
+  `-- --limiteurs` adds the rate limiters last, tripped to a 429 each: it
+  costs a minute of the operator's own IP on search, checkout and login, so it
+  is opt-in.
+- `npm run test:logs:remote -- tail.json` — reads a `wrangler tail --format
+  json` capture taken while someone buys on the shop, for e-mail addresses,
+  guest tokens, credentials and the values in `PII_NEEDLES` (what the tester
+  typed; a street address has no shape). Found in a log line, an exception or
+  a URL, it fails; in a header or the `cf` metadata — the browser's and the
+  edge's, Access's identity included — it is reported, not judged. The report
+  names findings and never reproduces one, because it is a committed proof.
 - `npm run test:browser:remote` — the browser gate against `BASE_URL`.
   `test/browser/remote-routes.mjs` finds the kinds of page the specs need in
   the merchant's catalogue (once per run, through `MINSHOP_REMOTE_FIXTURE`),
@@ -878,8 +893,9 @@ total, never per line.
   `catalog/plan.mjs` — the generated `imports/README.md` and its gate derive from
   that list.
 - **A content page:** nothing to add — merchants create them at `/admin/pages`.
-  Published pages appear at `/pages/<slug>`, in the footer, sitemap, and
-  `llms.txt` automatically.
+  Published pages appear at `/pages/<slug>`, in the sitemap and `llms.txt`
+  automatically. The footer is a menu (migration 0028): a page reaches it only
+  through Admin → Navigation, the four legal pages of migration 0040 included.
 - **A page layout preset:** add ONE entry to `PAGE_LAYOUTS` in
   `features/pages/layouts.ts`. The editor dropdown, validation, the storefront,
   and the admin preview all derive from it, and `measure`/`titleAlign` are

@@ -69,16 +69,24 @@ test.describe('sans JavaScript', () => {
     await expect(page.locator('body')).toContainText(FIXTURE.simple.name);
   });
 
-  test('la fiche produit montre son image principale', async ({ page }) => {
-    test.skip(!FIXTURE.gallery, 'aucun produit en stock dans ce catalogue');
-    await page.goto(`/products/${FIXTURE.gallery.slug}`);
-    await settle(page);
+  // Both forms of the hero: a gallery, and a single image — the form most
+  // products of a real catalogue take, which a gallery-only locator missed
+  // against the first deployed shop (certification, étape 3).
+  for (const [kind, why] of [
+    ['gallery', 'aucun produit en stock dans ce catalogue'],
+    ['simple', 'aucun produit simple dans ce catalogue'],
+  ]) {
+    test(`la fiche produit montre son image principale (${kind})`, async ({ page }) => {
+      test.skip(!FIXTURE[kind], why);
+      await page.goto(`/products/${FIXTURE[kind].slug}`);
+      await settle(page);
 
-    const hero = page.locator('[data-hero-track] img').first();
-    await expect(hero).toBeVisible();
-    expect(
-      await hero.evaluate((el) => el.complete && el.naturalWidth > 0),
-      'l’image principale ne s’est pas chargée',
-    ).toBe(true);
-  });
+      const hero = page.locator('[data-product-hero] img').first();
+      await expect(hero).toBeVisible();
+      expect(
+        await hero.evaluate((el) => el.complete && el.naturalWidth > 0),
+        'l’image principale ne s’est pas chargée',
+      ).toBe(true);
+    });
+  }
 });

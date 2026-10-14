@@ -113,6 +113,11 @@ describe('carrierCodeFor', () => {
     expect(carrierCodeFor('UPS')).toBe('ups');
     expect(carrierCodeFor('FedEx')).toBe('fedex');
     expect(carrierCodeFor('DHL Express')).toBe('dhl');
+    expect(carrierCodeFor('Colissimo')).toBe('colissimo');
+    expect(carrierCodeFor('Chronopost')).toBe('chronopost');
+    expect(carrierCodeFor('Mondial Relay')).toBe('mondialrelay');
+    expect(carrierCodeFor('DPD France')).toBe('dpd');
+    expect(carrierCodeFor('GLS')).toBe('gls');
     expect(carrierCodeFor('Canada Post')).toBe('other');
   });
 });

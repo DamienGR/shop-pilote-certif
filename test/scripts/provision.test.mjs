@@ -138,6 +138,21 @@ describe('shopctl provision', () => {
     expect(new Set(reached(target))).toEqual(new Set([ACCOUNT.id]));
   });
 
+  // Cloudflare names an account after its owner's address until somebody
+  // renames it. The report goes to a CI artifact and the prose to a CI log,
+  // both public on a pilot shop's repository (certification, étape 5): the
+  // account is named by its id, and its label keeps its shape without the
+  // address.
+  it('keeps the owner’s address out of the account it reports', () => {
+    const address = 'jeanne.operatrice@exemple-agence.fr';
+    const target = shop();
+    target.account({ accounts: [{ id: ACCOUNT.id, name: `${address}'s Account` }] });
+    const result = target.json(['provision', '--env', 'staging', '--dry-run']);
+    expect(result.status, result.stderr).toBe(EXIT_CODES.ok);
+    expect(result.report.account).toEqual({ id: ACCOUNT.id, name: "<email>'s Account" });
+    expect(`${result.stdout}${result.stderr}`).not.toContain(address);
+  });
+
   // wrangler ranks its own cache below CLOUDFLARE_ACCOUNT_ID and above nothing
   // else shopctl controls: an account picked once, interactively, in this tree
   // would otherwise receive the shop while the report named the right one.

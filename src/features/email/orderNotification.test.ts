@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Order } from '../orders/db';
-import { orderNotificationEmail } from './orderConfirmation';
+import { orderConfirmationEmail, orderNotificationEmail } from './orderConfirmation';
 
 const order = (overrides: Partial<Order> = {}): Order =>
   ({
@@ -70,5 +70,34 @@ describe('orderNotificationEmail', () => {
     expect(message.subject).toBe('Nouvelle commande Minshop n°105');
     expect(message.text).toContain('Identifiant public\u202f: \u2014');
     expect(message.html).not.toContain('null');
+  });
+});
+
+describe('the plain-text part', () => {
+  // A paid TTC order: 42,40 € of goods, 10 % off, 5,90 € shipping.
+  const paid = order({
+    currency: 'eur',
+    amount_total_cents: 4406,
+    shipping_cents: 590,
+    discount_cents: 424,
+    vat_rate_bps: 2000,
+    vat_amount_cents: 734,
+  });
+
+  it('carries every total the HTML part shows, the VAT breakdown included', () => {
+    const messages = [
+      orderConfirmationEmail(paid, [], 'https://demo.minshop.dev', 'Minshop'),
+      orderNotificationEmail(paid, [], 'owner@example.com', 'https://demo.minshop.dev', 'Minshop'),
+    ];
+    for (const message of messages) {
+      const lines = message.text.split('\n');
+      const at = (label: string) => lines.findIndex((line) => line.startsWith(label));
+      expect(lines[at('Livraison')]).toMatch(/5,90/);
+      expect(lines[at('Remise')]).toMatch(/: -4,24/);
+      expect(lines[at('dont TVA (20')]).toMatch(/7,34/);
+      // A breakdown of the total, so it follows it, as in the HTML.
+      expect(at('dont TVA')).toBe(at('Total') + 1);
+      expect(message.text).not.toContain('&minus;');
+    }
   });
 });

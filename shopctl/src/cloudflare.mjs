@@ -97,12 +97,32 @@ export function extractJson(output, what) {
   }
 }
 
+/** An e-mail address, as `logSafe()` recognises one in the Worker. */
+const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+
+/**
+ * An account's name, as every report and every line of this CLI shows it.
+ *
+ * Cloudflare names an account after its owner's address until somebody
+ * renames it — "jeanne@example.fr's Account" — and that name used to travel
+ * verbatim into the `--json` reports, the backup manifest, and the CI log of
+ * every nightly run: a public log, on a pilot shop's public repository
+ * (certification, étape 5). The id is what identifies the account; the name
+ * is a label for a human, and it keeps its shape without the address.
+ */
+export function accountLabel(name) {
+  return String(name ?? '').replace(EMAIL, '<email>');
+}
+
 /**
  * Who wrangler is, and which accounts it can write to.
  *
  * `--json` exits non-zero when unauthenticated, which is the distinction that
  * matters: "not logged in" is a precondition the operator fixes in a minute,
  * where a failed API call is a different conversation.
+ *
+ * The account names come back masked (`accountLabel`): nothing downstream
+ * compares them, and everything downstream prints them.
  *
  * @returns {{ email: string|null, authType: string|null, accounts: Array<{ id: string, name: string }> }}
  */
@@ -118,7 +138,7 @@ export function whoami({ cwd } = {}) {
   return {
     email: document.email ?? null,
     authType: document.authType ?? null,
-    accounts: (document.accounts ?? []).map(({ id, name }) => ({ id, name })),
+    accounts: (document.accounts ?? []).map(({ id, name }) => ({ id, name: accountLabel(name) })),
   };
 }
 

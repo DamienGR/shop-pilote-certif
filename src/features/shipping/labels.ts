@@ -207,8 +207,8 @@ export function parseRates(shipment: ShippoShipment): LabelRate[] {
 /** Map Shippo's provider name onto our tracking carrier codes ('other' = no
  *  deep link, number still shown). */
 export function carrierCodeFor(provider: string): string {
-  const p = provider.toLowerCase();
-  for (const code of ['usps', 'ups', 'fedex', 'dhl']) {
+  const p = provider.toLowerCase().replace(/[^a-z]/g, '');
+  for (const code of ['colissimo', 'chronopost', 'mondialrelay', 'dpd', 'gls', 'usps', 'ups', 'fedex', 'dhl']) {
     if (p.includes(code)) return code;
   }
   return 'other';
