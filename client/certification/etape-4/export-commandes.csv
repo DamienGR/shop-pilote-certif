@@ -1,0 +1,5 @@
+Order,Date,Email,Status,Fulfillment,Subtotal,Shipping,Discount,Tax,Total,Currency,Provider refunded,Externally refunded,Total refunded,Net,Refund state,Refund review,VAT rate,VAT included,Net of VAT,Terms version,Terms accepted at,Carrier,Tracking
+t9n590hkaf,2026-10-14 12:00:24,masquee,paid,unfulfilled,7.50,5.90,0.00,0.00,13.40,EUR,0.00,0.00,0.00,13.40,none,,20,2.23,11.17,1,2026-10-14 11:59:41,,
+dwj27r6xzr,2026-10-14 10:13:03,masquee,paid,unfulfilled,63.00,0.00,0.00,0.00,63.00,EUR,0.00,0.00,0.00,63.00,none,,20,10.50,52.50,1,2026-10-14 10:11:32,,
+hpxcw4mvpf,2026-10-14 10:09:32,masquee,paid,fulfilled,42.40,5.90,4.24,0.00,44.06,EUR,0.00,0.00,0.00,44.06,none,,20,7.34,36.72,1,2026-10-14 10:08:05,other,6A000000000000
+698h2df82g,2026-10-14 10:06:44,masquee,refunded,unfulfilled,18.00,5.90,0.00,0.00,23.90,EUR,23.90,0.00,23.90,0.00,full,,20,3.98,19.92,1,2026-10-14 10:05:37,,

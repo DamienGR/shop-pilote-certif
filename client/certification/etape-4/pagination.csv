@@ -1,0 +1,6 @@
+sku;product;name;slug;description;variant_group;variant;price;stock;weight_grams;requires_shipping;active;categories;images
+PAG-01;;Produit de pagination 1;;Produit de test de l'étape 4, désactivé ensuite.;;;1,00;5;50;oui;non;papeterie;
+PAG-02;;Produit de pagination 2;;Produit de test de l'étape 4, désactivé ensuite.;;;1,00;5;50;oui;non;papeterie;
+PAG-03;;Produit de pagination 3;;Produit de test de l'étape 4, désactivé ensuite.;;;1,00;5;50;oui;non;papeterie;
+PAG-04;;Produit de pagination 4;;Produit de test de l'étape 4, désactivé ensuite.;;;1,00;5;50;oui;non;papeterie;
+PAG-05;;Produit de pagination 5;;Produit de test de l'étape 4, désactivé ensuite.;;;1,00;5;50;oui;non;papeterie;

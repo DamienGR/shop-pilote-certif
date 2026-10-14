@@ -1,0 +1,36 @@
+[
+  {
+    "results": [
+      {
+        "provider_session_id": "cs_test_b18G1fU5toD8f0ADjNJJLYQLCutKwTh0fQ2YYathVElbR0egP95R5TSkKu",
+        "n": 1
+      },
+      {
+        "provider_session_id": "cs_test_b1GCrydAJVaKpxu4d5INJG8uirpZdFtDjyG6nGOzHIvNtk1IIH22ikVwUh",
+        "n": 1
+      },
+      {
+        "provider_session_id": "cs_test_b1dKMewzJ1N34jAIf037fcRBbGnVH7t8NjKaAyvwwuPrawv97JIDNjg01f",
+        "n": 1
+      }
+    ],
+    "success": true,
+    "meta": {
+      "served_by": "v3-prod",
+      "served_by_region": "EEUR",
+      "served_by_colo": "MXP",
+      "served_by_primary": true,
+      "timings": {
+        "sql_duration_ms": 0.21
+      },
+      "duration": 0.21,
+      "changes": 0,
+      "last_row_id": 0,
+      "changed_db": false,
+      "size_after": 413696,
+      "rows_read": 3,
+      "rows_written": 0,
+      "total_attempts": 1
+    }
+  }
+]

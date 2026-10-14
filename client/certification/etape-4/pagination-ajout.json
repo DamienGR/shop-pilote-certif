@@ -1,0 +1,176 @@
+{
+  "ok": true,
+  "file": "client/certification/etape-4/pagination.csv",
+  "target": "remote",
+  "env": "staging",
+  "dryRun": false,
+  "applied": true,
+  "summary": {
+    "productsCreated": 5,
+    "productsUpdated": 0,
+    "productsUnchanged": 0,
+    "variantsCreated": 0,
+    "variantsUpdated": 0,
+    "variantsDeactivated": 0,
+    "categoriesCreated": 0,
+    "mediaUploaded": 0,
+    "mediaReused": 0
+  },
+  "changes": [
+    {
+      "kind": "product.create",
+      "subject": "PAG-01",
+      "detail": "Produit de pagination 1"
+    },
+    {
+      "kind": "categories.set",
+      "subject": "PAG-01",
+      "detail": "papeterie"
+    },
+    {
+      "kind": "product.create",
+      "subject": "PAG-02",
+      "detail": "Produit de pagination 2"
+    },
+    {
+      "kind": "categories.set",
+      "subject": "PAG-02",
+      "detail": "papeterie"
+    },
+    {
+      "kind": "product.create",
+      "subject": "PAG-03",
+      "detail": "Produit de pagination 3"
+    },
+    {
+      "kind": "categories.set",
+      "subject": "PAG-03",
+      "detail": "papeterie"
+    },
+    {
+      "kind": "product.create",
+      "subject": "PAG-04",
+      "detail": "Produit de pagination 4"
+    },
+    {
+      "kind": "categories.set",
+      "subject": "PAG-04",
+      "detail": "papeterie"
+    },
+    {
+      "kind": "product.create",
+      "subject": "PAG-05",
+      "detail": "Produit de pagination 5"
+    },
+    {
+      "kind": "categories.set",
+      "subject": "PAG-05",
+      "detail": "papeterie"
+    }
+  ],
+  "refusals": [],
+  "warnings": [],
+  "untouched": [
+    {
+      "sku": "CAB-LIN",
+      "slug": "cabas-en-lin-lave",
+      "name": "Cabas en lin lavé"
+    },
+    {
+      "sku": "CAR-A5",
+      "slug": "carnet-recycle-a5",
+      "name": "Carnet recyclé A5"
+    },
+    {
+      "sku": "CAR-A6",
+      "slug": "carnet-recycle-a6",
+      "name": "Carnet recyclé A6"
+    },
+    {
+      "sku": "MUG-GRE",
+      "slug": "mug-en-gres-emaille",
+      "name": "Mug en grès émaillé"
+    },
+    {
+      "sku": "SAV-MAR",
+      "slug": "savon-de-marseille-300-g",
+      "name": "Savon de Marseille 300 g"
+    },
+    {
+      "sku": "TEE",
+      "slug": "tee-shirt-en-coton-bio",
+      "name": "Tee-shirt en coton bio"
+    },
+    {
+      "sku": "BOU-CIR",
+      "slug": "bougie-de-cire-dabeille",
+      "name": "Bougie de cire d'abeille"
+    },
+    {
+      "sku": "TOR-LIN",
+      "slug": "torchon-en-lin",
+      "name": "Torchon en lin"
+    },
+    {
+      "sku": "PLA-HET",
+      "slug": "planche-a-decouper-en-hetre",
+      "name": "Planche à découper en hêtre"
+    },
+    {
+      "sku": "STY-BOI",
+      "slug": "stylo-en-bois-de-frene",
+      "name": "Stylo en bois de frêne"
+    },
+    {
+      "sku": "CRA-12",
+      "slug": "boite-de-douze-crayons",
+      "name": "Boîte de douze crayons"
+    },
+    {
+      "sku": "ENV-KRA",
+      "slug": "enveloppes-kraft-lot-de-25",
+      "name": "Enveloppes kraft, lot de 25"
+    },
+    {
+      "sku": "BAU-LEV",
+      "slug": "baume-a-levres-calendula",
+      "name": "Baume à lèvres calendula"
+    },
+    {
+      "sku": "HUI-AMA",
+      "slug": "huile-damande-douce-100-ml",
+      "name": "Huile d'amande douce 100 ml"
+    },
+    {
+      "sku": "SHA",
+      "slug": "shampooing-solide",
+      "name": "Shampooing solide"
+    },
+    {
+      "sku": "ECH-LAI",
+      "slug": "echarpe-en-laine-merinos",
+      "name": "Écharpe en laine mérinos"
+    },
+    {
+      "sku": "CHA",
+      "slug": "chaussettes-en-coton",
+      "name": "Chaussettes en coton"
+    },
+    {
+      "sku": "NAP-LIN",
+      "slug": "nappe-en-lin-150-250",
+      "name": "Nappe en lin 150 × 250"
+    },
+    {
+      "sku": "POR-CLE",
+      "slug": "porte-cles-en-cuir",
+      "name": "Porte-clés en cuir"
+    },
+    {
+      "sku": "CAR-VOE",
+      "slug": "cartes-de-v-ux-lot-de-8",
+      "name": "Cartes de vœux, lot de 8"
+    }
+  ],
+  "statements": 15
+}

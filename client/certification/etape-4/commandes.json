@@ -1,0 +1,96 @@
+[
+  {
+    "results": [
+      {
+        "public_id": "ord_698h2df82g",
+        "provider_session_id": "cs_test_b1GCrydAJVaKpxu4d5INJG8uirpZdFtDjyG6nGOzHIvNtk1IIH22ikVwUh",
+        "provider_payment_id": "pi_3UQP53PDgQeHL5O71pALdWaI",
+        "status": "refunded",
+        "amount_total_cents": 2390,
+        "shipping_cents": 590,
+        "shipping_label": "Colissimo",
+        "discount_cents": 0,
+        "vat_rate_bps": 2000,
+        "vat_amount_cents": 398,
+        "refunded_cents": 2390,
+        "fulfillment_status": "unfulfilled",
+        "tracking_carrier": null,
+        "terms_version": "1",
+        "terms_accepted_at": "2026-10-14 10:05:37",
+        "created_at": "2026-10-14 10:06:44"
+      },
+      {
+        "public_id": "ord_hpxcw4mvpf",
+        "provider_session_id": "cs_test_b18G1fU5toD8f0ADjNJJLYQLCutKwTh0fQ2YYathVElbR0egP95R5TSkKu",
+        "provider_payment_id": "pi_3UQP7kPDgQeHL5O72Q4kltQa",
+        "status": "paid",
+        "amount_total_cents": 4406,
+        "shipping_cents": 590,
+        "shipping_label": "Colissimo",
+        "discount_cents": 424,
+        "vat_rate_bps": 2000,
+        "vat_amount_cents": 734,
+        "refunded_cents": 0,
+        "fulfillment_status": "fulfilled",
+        "tracking_carrier": "other",
+        "terms_version": "1",
+        "terms_accepted_at": "2026-10-14 10:08:05",
+        "created_at": "2026-10-14 10:09:32"
+      },
+      {
+        "public_id": "ord_dwj27r6xzr",
+        "provider_session_id": "cs_test_b1dKMewzJ1N34jAIf037fcRBbGnVH7t8NjKaAyvwwuPrawv97JIDNjg01f",
+        "provider_payment_id": "pi_3UQPB2PDgQeHL5O70EHxECmJ",
+        "status": "paid",
+        "amount_total_cents": 6300,
+        "shipping_cents": 0,
+        "shipping_label": "Free shipping",
+        "discount_cents": 0,
+        "vat_rate_bps": 2000,
+        "vat_amount_cents": 1050,
+        "refunded_cents": 0,
+        "fulfillment_status": "unfulfilled",
+        "tracking_carrier": null,
+        "terms_version": "1",
+        "terms_accepted_at": "2026-10-14 10:11:32",
+        "created_at": "2026-10-14 10:13:03"
+      },
+      {
+        "public_id": "ord_t9n590hkaf",
+        "provider_session_id": "cs_test_b1L3e00hqzpNIdkFaJ7UxqFKRBtoJxUdHxtqIMNAEPqv9KD4NlNBTTOuay",
+        "provider_payment_id": "pi_3UQQr2PDgQeHL5O70hR2plvk",
+        "status": "paid",
+        "amount_total_cents": 1340,
+        "shipping_cents": 590,
+        "shipping_label": "Colissimo",
+        "discount_cents": 0,
+        "vat_rate_bps": 2000,
+        "vat_amount_cents": 223,
+        "refunded_cents": 0,
+        "fulfillment_status": "unfulfilled",
+        "tracking_carrier": null,
+        "terms_version": "1",
+        "terms_accepted_at": "2026-10-14 11:59:41",
+        "created_at": "2026-10-14 12:00:24"
+      }
+    ],
+    "success": true,
+    "meta": {
+      "served_by": "v3-prod",
+      "served_by_region": "EEUR",
+      "served_by_colo": "MXP",
+      "served_by_primary": true,
+      "timings": {
+        "sql_duration_ms": 0.3349
+      },
+      "duration": 0.3349,
+      "changes": 0,
+      "last_row_id": 0,
+      "changed_db": false,
+      "size_after": 421888,
+      "rows_read": 4,
+      "rows_written": 0,
+      "total_attempts": 1
+    }
+  }
+]
