@@ -1,0 +1,8 @@
+✗ secret scan: 1 finding(s)
+
+  test/scripts/remote-logs.test.mjs (history, blob 1d72246df3):83  JSON Web Token
+    eyJhbGci…iJ9.
+
+A real credential must be ROTATED, not just removed — it is already in the history.
+A false positive is silenced with a `secret-scan:ignore` comment on the line.
+A finding in the history names its blob: `git log --all --find-object=<blob>` lists the commits that carry it.
