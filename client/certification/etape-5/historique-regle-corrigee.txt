@@ -1,0 +1,1 @@
+✓ secret scan: 763 tracked files + 1865 blobs of history (399 commits, 79 refs), no credential found

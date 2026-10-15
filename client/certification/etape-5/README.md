@@ -13,7 +13,7 @@ avec un jeton de service Access créé pour l'étape puis révoqué.
 | les neuf lignes du §8.4 contre le staging     | `porte-distante.txt`, `porte-distante-limiteurs.txt`, `diag-limiteur.txt`, `diag-limiteur-lourd.txt` | 15 contrôles sur 15 ; les trois limiteurs ne répondent pas 429 dans le budget de la porte : **ligne ouverte**, voir « Défauts » 1                                                     |
 | `wrangler tail` pendant l'achat et la porte   | `journaux.json`, la trace ci-dessous                                                       | 531 événements, sans échantillonnage : rien dans ce que la boutique écrit ni dans les URL                                                                                                    |
 | `npm audit` racine et `mcp/`                  | `audit-racine.json`, `audit-mcp.json`                                                      | zéro vulnérabilité, toutes sévérités, outils de développement compris                                                                                                                       |
-| scan de secrets, historique, artefacts, nocturne | `historique-v0.3.4.txt`, `nightly.txt`                                                   | arbre et build verts ; l'historique porte un faux positif du socle (« Défauts » 4) ; ni secret ni adresse dans les deux `Nightly` d'après la montée                                          |
+| scan de secrets, historique, artefacts, nocturne | `historique-v0.3.4.txt`, `historique-regle-corrigee.txt`, `nightly.txt`                  | arbre et build verts ; l'historique, rouge sur un faux positif du socle (« Défauts » 4), vert avec la règle corrigée ; ni secret ni adresse dans les deux `Nightly` d'après la montée      |
 
 ## La montée
 
@@ -96,6 +96,7 @@ sont masqués par ce commit ; l'historique les garde.
 | ------------------------------ | --------------------------------------------------------------------------- |
 | `deploy-v0.3.4.json`           | 1 — déploiement de la montée                                                |
 | `historique-v0.3.4.txt`        | 2 — `check:secrets:history`, le faux positif                                |
+| `historique-regle-corrigee.txt` | 2 — le même historique, scanner de la correction du socle : vert           |
 | `audit-racine.json`, `audit-mcp.json` | 3 — `npm audit` complet                                              |
 | `porte-distante-limiteurs.txt` | 5 — premier passage, `--limiteurs` : les trois limiteurs en échec           |
 | `diag-limiteur.txt`            | 5 — 232 recherches une par une en 70 s : aucune refusée                     |
