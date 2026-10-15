@@ -1,0 +1,15 @@
+[
+  {
+    "public_id": "ord_p316t3nf6h",
+    "provider_payment_id": "pi_3UQk6dPDgQeHL5O71fcUM5x0",
+    "amount_total_cents": 1340,
+    "shipping_cents": 590,
+    "vat_amount_cents": 223,
+    "provider_refunded_cents": 200,
+    "fulfillment_status": "fulfilled",
+    "tracking_carrier": "colissimo",
+    "tracking_number": "6A00000000001",
+    "created_at": "2026-10-15 08:33:46",
+    "fulfilled_at": "2026-10-15 08:36:42"
+  }
+]

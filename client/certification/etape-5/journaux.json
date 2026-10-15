@@ -1,0 +1,76 @@
+{
+  "ok": true,
+  "file": "certif-tail.json",
+  "ignoredLines": 0,
+  "events": 531,
+  "sampled": false,
+  "outcomes": {
+    "ok": 531
+  },
+  "counts": {
+    "application": 3,
+    "url": 526,
+    "platform": 0
+  },
+  "needles": 2,
+  "application": [],
+  "url": [],
+  "platform": [
+    {
+      "part": "platform",
+      "kind": "secret",
+      "label": "what looks like a hex-encoded secret",
+      "where": "event.request.cf.tlsExportedAuthenticator.clientHandshake",
+      "count": 298,
+      "events": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "part": "platform",
+      "kind": "secret",
+      "label": "what looks like a hex-encoded secret",
+      "where": "event.request.cf.tlsExportedAuthenticator.serverHandshake",
+      "count": 298,
+      "events": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "part": "platform",
+      "kind": "secret",
+      "label": "what looks like a hex-encoded secret",
+      "where": "event.request.cf.tlsExportedAuthenticator.clientFinished",
+      "count": 298,
+      "events": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    {
+      "part": "platform",
+      "kind": "secret",
+      "label": "what looks like a hex-encoded secret",
+      "where": "event.request.cf.tlsExportedAuthenticator.serverFinished",
+      "count": 298,
+      "events": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    }
+  ]
+}
