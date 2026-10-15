@@ -6,7 +6,7 @@
   "env": "staging",
   "account": {
     "id": "e11ea775b0317980f1f70960d1000d09",
-    "name": "Damien.gr34@gmail.com's Account"
+    "name": "<email>'s Account"
   },
   "resources": {
     "worker": "minshop-pilote-certif-staging",
