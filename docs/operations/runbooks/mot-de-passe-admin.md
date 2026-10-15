@@ -8,6 +8,26 @@ de réinitialisation est une porte de plus sur l'admin (invariant 5). La
 réinitialisation passe par l'accès au compte Cloudflare, que seul le
 propriétaire et ses opérateurs ont.
 
+## D'abord : bloqué n'est pas perdu
+
+Si la page de connexion répond « Too many failed attempts », le mot de passe
+n'est peut-être pas perdu : le réseau du commerçant a épuisé ses cinq essais du
+quart d'heure (`src/features/auth/loginThrottle.ts`, table
+`admin_login_attempts`). Le compteur est par réseau client, pas par mot de
+passe : une réinitialisation ne le remet pas à zéro, la fin du quart d'heure si.
+Attendre, puis essayer une seule fois, posément.
+
+S'il faut débloquer tout de suite, et seulement pour le commerçant dont
+l'identité a été vérifiée comme plus bas :
+
+```sh
+npx wrangler d1 execute minshop-<slug>-production-db --remote --command "DELETE FROM admin_login_attempts"
+```
+
+Un blocage qui revient alors que le commerçant n'essaie rien veut dire que
+quelqu'un essaie depuis le même réseau (une box partagée, l'adresse commune
+d'un opérateur mobile) : c'est un incident, pas une gêne.
+
 ## Ce que fait la réinitialisation, et le risque qu'elle ouvre
 
 `scripts/admin-reset.sh` supprime la ligne `admin_password_hash` : la boutique

@@ -20,10 +20,11 @@
  *   - no page of the shop's own asking for a card: the purchase is paid on the
  *     provider's page, and no form field here is shaped to take a card.
  *
- * With `--limiteurs`, it also trips the three rate limiters once each — search,
- * checkout, login — and expects a 429 that says when to come back. Opt-in and
- * never in the nightly run: the address that runs it waits a minute before it
- * can log in or check out again, and on a real shop that is its owner.
+ * With `--limiteurs`, it also trips the three rate limiters once each — search
+ * and checkout by a flood, the admin login by a patient guesser — and expects a
+ * 429 that says when to come back. Opt-in and never in the nightly run: the
+ * address that runs it waits a minute before it can check out again and a
+ * quarter of an hour before it can log in, and on a real shop that is its owner.
  *
  * What stays local, and why: the log assertions (they read the Worker's stdout
  * — `npm run test:logs:remote` reads a `wrangler tail` instead), uploads and
@@ -38,12 +39,15 @@
 import { createHmac } from 'node:crypto';
 import { parseArgs } from 'node:util';
 import { adminRoutes } from '../helpers/admin-routes.mjs';
+import { LOGIN_ATTEMPT_LIMIT, LOGIN_WINDOW_SECONDS } from '../../src/features/auth/loginThrottle.ts';
 import { generateAccessToken } from '../../src/features/ids/token.ts';
 import { fetchAs, isAccessChallenge, remoteTarget } from './target.mjs';
 
 const { values: options } = parseArgs({ options: { limiteurs: { type: 'boolean', default: false } } });
 
 const FORM = 'application/x-www-form-urlencoded';
+const FLOOD_WIDTH = 50;
+const FLOOD_FACTOR = 20;
 const LEAK = /root:|"name": "minshop"|CREATE TABLE|sqlite|D1_ERROR|\bat .+\.(m?js|ts):\d+/i;
 
 let target;
@@ -59,9 +63,10 @@ let passed = 0;
 const section = (title) => console.log(`\n▸ ${title}`);
 async function check(name, fn) {
   try {
-    await fn();
+    const detail = await fn();
     passed++;
     console.log(`  ✓ ${name}`);
+    if (typeof detail === 'string') console.log(`      ${detail}`);
   } catch (error) {
     failures.push({ name, reason: error.message });
     console.log(`  ✗ ${name}\n      ${error.message}`);
@@ -342,37 +347,62 @@ await check('un 500 est durci, non mis en cache, et ne montre pas sa pile', asyn
 if (options.limiteurs) {
   section('Les limiteurs de débit (--limiteurs)');
 
-  // Last, so nothing above runs behind a tripped limiter. Fired in bursts, so
-  // a limit counted per minute is reached well inside its minute even across
-  // Access and an ocean. Three times the shipped limit is the ceiling: the
-  // platform's limiter is per location and permissive by design, and a few
-  // requests past the limit is the platform, not the shop.
-  async function trip(limit, send) {
-    for (let sent = 0; sent < limit * 3; sent += 10) {
-      const burst = await Promise.all(Array.from({ length: 10 }, (_, index) => send(sent + index)));
+  // Last, so nothing above runs behind a tripped limiter.
+  //
+  // Search and checkout are held by Cloudflare's limiter, which counts per
+  // location and caches per machine: permissive by design. Certification step
+  // 5 measured it on a deployed shop — nothing refused at three times the
+  // limit, the first 429 after about 450 searches sent fifty at a time, for a
+  // limit of 60. What it guarantees is that a flood meets it, so that is what
+  // is asked: fifty at a time, up to twenty times the limit.
+  async function flood(limit, send) {
+    for (let sent = 0; sent < limit * FLOOD_FACTOR; sent += FLOOD_WIDTH) {
+      const burst = await Promise.all(Array.from({ length: FLOOD_WIDTH }, (_, index) => send(sent + index)));
       const refused = burst.find((response) => response.status === 429);
-      if (refused) return { sent: sent + 10, refused };
+      if (refused) return { sent: sent + FLOOD_WIDTH, refused };
     }
     return null;
   }
-  const limited = (label, limit, outcome) => {
-    expect(outcome, `aucun 429 en ${limit * 3} requêtes : le limiteur ${label} n'est pas actif sur ce déploiement`);
+  const flooded = (label, limit, outcome) => {
+    expect(outcome, `aucun 429 en ${limit * FLOOD_FACTOR} requêtes : le limiteur ${label} n'est pas actif sur ce déploiement`);
     expect(outcome.refused.headers.get('retry-after'), `le 429 ${label} ne dit pas quand revenir`);
+    return `premier refus dans les ${outcome.sent} premières requêtes`;
   };
 
-  await check('la recherche répond 429 passé sa limite (60 par minute)', async () => {
+  await check('la recherche répond 429 sous une inondation (limite de 60 par minute)', async () => {
     const run = Date.now().toString(36);
-    limited('de recherche', 60, await trip(60, (index) => get(`/search?q=porte${run}${index}`)));
+    return flooded('de recherche', 60, await flood(60, (index) => get(`/search?q=porte${run}${index}`)));
   });
 
-  await check('le checkout répond 429 passé sa limite (20 par minute), sans rien réserver', async () => {
+  await check('le checkout répond 429 sous une inondation (limite de 20 par minute), sans rien réserver', async () => {
     // An empty order: refused by the route, counted by the limiter before it.
-    limited('du checkout', 20, await trip(20, () => get('/api/checkout', { method: 'POST', headers: { origin: target.origin, 'content-type': 'application/json' }, body: '{}' })));
+    return flooded('du checkout', 20, await flood(20, () => get('/api/checkout', { method: 'POST', headers: { origin: target.origin, 'content-type': 'application/json' }, body: '{}' })));
   });
 
-  await check('la connexion répond 429 passé sa limite (10 par minute)', async () => {
-    limited('de connexion', 10, await trip(10, () => get('/admin/login', { method: 'POST', headers: { origin: target.origin, 'content-type': FORM }, body: 'password=porte-distante-limiteur' })));
-  });
+  // The admin login is counted exactly, in the shop's own database
+  // (features/auth/loginThrottle.ts), because a production admin has no Access
+  // in front of its password. One at a time, as a patient guesser would: the
+  // guess past the budget is refused — counting what this run already spent —
+  // for the rest of a quarter of an hour, which the edge limiter's minute
+  // cannot be mistaken for.
+  if (mode === 'password') {
+    await check(`la connexion répond 429 au plus tard à la ${LOGIN_ATTEMPT_LIMIT + 1}e tentative, pour un quart d'heure`, async () => {
+      for (let attempt = 1; attempt <= LOGIN_ATTEMPT_LIMIT + 1; attempt++) {
+        const response = await get('/admin/login', { method: 'POST', headers: { origin: target.origin, 'content-type': FORM }, body: 'password=porte-distante-limiteur' });
+        if (response.status === 429) {
+          const retryAfter = Number(response.headers.get('retry-after'));
+          expect(retryAfter > 60, `le 429 de la tentative ${attempt} est celui du limiteur de Cloudflare (Retry-After ${retryAfter}) : le compteur exact n'a pas répondu`);
+          expect(retryAfter <= LOGIN_WINDOW_SECONDS, `Retry-After ${retryAfter} au-delà de la fenêtre`);
+          expect(response.headers.get('set-cookie') === null, 'le refus pose un cookie');
+          return;
+        }
+        expect(response.status === 200, `tentative ${attempt} : statut ${response.status}`);
+      }
+      throw new Error(`${LOGIN_ATTEMPT_LIMIT + 1} mauvais mots de passe sans 429 : le compteur exact n'est pas actif sur ce déploiement`);
+    });
+  } else {
+    console.log('  · la connexion : pas de mot de passe à deviner sur cette administration, rien à compter');
+  }
 }
 
 /* ----------------------------------------------------------------- verdict */

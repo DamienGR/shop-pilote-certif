@@ -41,6 +41,12 @@ function createTemplateRepository(root) {
     join(repository, '.github', 'workflows', 'verify.yml'),
     readFileSync(new URL('../../.github/workflows/verify.yml', import.meta.url), 'utf8'),
   );
+  // The real line-ending rules too: without them the clone follows the
+  // developer's core.autocrlf, and store.txt comes back with a CRLF.
+  writeFileSync(
+    join(repository, '.gitattributes'),
+    readFileSync(new URL('../../.gitattributes', import.meta.url), 'utf8'),
+  );
   writeFileSync(
     join(repository, 'src', 'themes', 'default', 'ProductCard.astro'),
     '<li>card</li>\n',

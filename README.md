@@ -397,7 +397,7 @@ npm run verify
 contre le Worker construit les couvre toutes — parcours desktop et mobile, axe,
 navigation clavier, zoom, parcours sans JavaScript, et la régression visuelle
 sous forme de signature du design calculé plutôt que de comparaison de pixels
-(voir AGENTS.md → « The browser gate »). Elle n'est pas dans `npm run verify` :
+(voir docs/agents/browser-gate.md). Elle n'est pas dans `npm run verify` :
 c'est la seule porte qui demande un navigateur, et la CI lui donne son propre
 job par thème.
 

@@ -18,8 +18,10 @@ export const GET: APIRoute = async ({ params, request, locals }) => {
   if (!key) return new Response('Not found', { status: 404 });
 
   // Absent under `astro dev`; src/env.d.ts merges Cloudflare's `.default` onto
-  // the browser CacheStorage surface used by Astro's DOM types.
-  const cache = typeof caches !== 'undefined' ? caches.default : null;
+  // the browser CacheStorage surface used by Astro's DOM types. GET only: Astro
+  // answers HEAD with this handler too, and `cache.put` rejects a HEAD — an
+  // exception in the Worker's logs on every check, under a 200.
+  const cache = typeof caches !== 'undefined' && request.method === 'GET' ? caches.default : null;
   if (cache) {
     const hit = await cache.match(request);
     if (hit) return hit;
