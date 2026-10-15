@@ -1,16 +1,18 @@
 # Étape 5 — Sécurité sur la boutique déployée
 
 Passée les 2026-10-14 et 2026-10-15 sur le staging de `pilote-certif`
-(compte A), monté en `v0.3.4`, selon la fiche
+(compte A), monté en `v0.3.4`, puis en `v0.3.5` pour la ligne des limiteurs,
+selon la fiche
 `docs/certification/etape-5-commandes.md` du socle. Stripe en mode test,
 e-mails réels vers une boîte de test, requêtes hostiles vers la seule preview,
-avec un jeton de service Access créé pour l'étape puis révoqué.
+avec un jeton de service Access créé pour l'étape puis révoqué, et un second
+pour la porte de `v0.3.5`, révoqué aussi.
 
 ## Les lignes de l'étape
 
 | Ligne                                         | Preuve                                                                                     | Résultat                                                                                                                                                                                      |
 | --------------------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| les neuf lignes du §8.4 contre le staging     | `porte-distante.txt`, `porte-distante-limiteurs.txt`, `diag-limiteur.txt`, `diag-limiteur-lourd.txt` | 15 contrôles sur 15 ; les trois limiteurs ne répondent pas 429 dans le budget de la porte : **ligne ouverte**, voir « Défauts » 1                                                     |
+| les neuf lignes du §8.4 contre le staging     | `porte-distante.txt`, `porte-distante-limiteurs.txt`, `diag-limiteur.txt`, `diag-limiteur-lourd.txt`, `porte-distante-v0.3.5.txt` | en `v0.3.4`, 15 contrôles sur 15, mais les trois limiteurs sans 429 (« Défauts » 1) ; en `v0.3.5`, 18 sur 18, limiteurs compris : voir « Après `v0.3.5` »                          |
 | `wrangler tail` pendant l'achat et la porte   | `journaux.json`, la trace ci-dessous                                                       | 531 événements, sans échantillonnage : rien dans ce que la boutique écrit ni dans les URL                                                                                                    |
 | `npm audit` racine et `mcp/`                  | `audit-racine.json`, `audit-mcp.json`                                                      | zéro vulnérabilité, toutes sévérités, outils de développement compris                                                                                                                       |
 | scan de secrets, historique, artefacts, nocturne | `historique-v0.3.4.txt`, `historique-regle-corrigee.txt`, `nightly.txt`                  | arbre et build verts ; l'historique, rouge sur un faux positif du socle (« Défauts » 4), vert avec la règle corrigée ; ni secret ni adresse dans les deux `Nightly` d'après la montée      |
@@ -90,7 +92,33 @@ runs restent, avec la couleur de leurs jobs ; 38455159960, que l'étape 3 cite,
 est archivé hors du dépôt chez l'opérateur. Les cinq rapports de l'étape 3
 sont masqués par ce commit ; l'historique les garde.
 
-## Fichiers
+## Après `v0.3.5` : la ligne des limiteurs
+Le 2026-10-15, d'après la section « Après `v0.3.5` » de la fiche.
+`socle/v0.3.5` fusionnée par la pull request #12 (CI 20/20), puis
+`deploy-v0.3.5.json` : `ok`, le compte A sous le nom `<email>'s Account`, test
+de fumée vert, migration 0044 appliquée. Lancé **sans contournement**, avec
+`CLOUDFLARE_ACCOUNT_ID` exporté et `core.autocrlf=true` sur le poste : les
+« Défauts » 2 et 3 sont corrigés. La table du compteur était vide après le
+déploiement.
+`porte-distante-v0.3.5.txt`, avec `--limiteurs` et un nouveau jeton de service
+révoqué ensuite : 18 contrôles sur 18.
+- **La recherche** : premier 429 dans les 250 premières requêtes, 50 à la
+  fois, pour un plafond de 1 200 (vingt fois la limite de 60 par minute).
+- **Le checkout** : premier 429 dans les 100 premières, pour un plafond de
+  400.
+- **La connexion** : la tentative refusée est la sixième du passage. La porte poste
+  un mauvais mot de passe en début de passage, puis cinq dans sa section des
+  limiteurs : la dernière reçoit un 429, avec un `Retry-After` de plus d'une
+  minute (le compteur de la boutique, pas le limiteur de Cloudflare) et d'au
+  plus un quart d'heure, sans cookie. En base, une seule ligne, à six
+  tentatives, sous une empreinte du réseau.
+Juste après, l'opérateur est entré dans l'administration du staging depuis son
+navigateur : par Access pour la preview, puis par sa session d'administration
+du matin, encore valable. Aucun mot de passe envoyé, rien à compter. Le
+compteur bloque les nouvelles tentatives d'un réseau, pas les sessions déjà
+ouvertes. Et ce navigateur sort en IPv6, alors que le terminal WSL qui a lancé
+la porte ne sort qu'en IPv4 : pour le compteur, ce sont deux réseaux (une
+adresse IPv4, un /64 IPv6).
 
 | Fichier                        | Section de la fiche                                                         |
 | ------------------------------ | --------------------------------------------------------------------------- |
@@ -105,6 +133,8 @@ sont masqués par ce commit ; l'historique les garde.
 | `commande-e.json`              | 6 — la commande E en base                                                   |
 | `journaux.json`                | 7 — relevé de la capture                                                    |
 | `nightly.txt`                  | 8 — le `Nightly` d'après la montée                                          |
+| `deploy-v0.3.5.json`           | après `v0.3.5` — déploiement, sans contournement                            |
+| `porte-distante-v0.3.5.txt`    | après `v0.3.5` — la porte, `--limiteurs` : 18 sur 18                        |
 
 ## Défauts trouvés en réel
 
@@ -119,15 +149,16 @@ sont masqués par ce commit ; l'historique les garde.
    connexion à l'administration, sans Access en production, ne freine pas un
    essai patient. Décision : un compteur exact des échecs de connexion dans le
    socle, et la porte recalibrée, en `v0.3.5` ; la ligne reste ouverte jusque-là.
+   **Fermée en `v0.3.5`** : voir « Après `v0.3.5` ».
 2. **`deploy` rouge dans le shell de la fiche.** La fiche exporte
    `CLOUDFLARE_ACCOUNT_ID` ; le test de `shopctl new`, lancé par
    `npm run verify`, en hérite, et le manifeste qu'il compare porte alors un
    `accountId`. Contourné en lançant `deploy` sans la variable : `shopctl`
-   épingle le compte depuis le manifeste.
+   épingle le compte depuis le manifeste. Plus de contournement en `v0.3.5`.
 3. **Test du scaffold sensible à `core.autocrlf`.** Son dépôt témoin n'a pas
    de `.gitattributes` : avec `core.autocrlf=true` sur le poste, le clone rend
    un fichier en CRLF. Contourné par `GIT_CONFIG_*` pour le seul processus de
-   `deploy`.
+   `deploy`. Plus de contournement en `v0.3.5`.
 4. **Faux positif dans l'historique du socle.** Un JWT d'exemple d'un test du
    socle (blob `1d72246df3`, commit `cfada29`), retiré de l'arbre depuis :
    en-tête `{"alg":"RS256"}`, charge `{"sub":"operator"}`, signature « sig ».
