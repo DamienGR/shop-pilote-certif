@@ -506,20 +506,65 @@ l'historique Git (`npm run check:secrets:history`). L'étape se passe donc en
 `v0.3.4` : la fiche commence par la montée, ce qui coche d'avance la ligne de
 montée réelle de l'étape 8.
 
+Passée en réel les 2026-10-14 et 2026-10-15, en `v0.3.4`. La boutique a tenu,
+sauf ses limiteurs ; cinq défauts, dont quatre corrigés dans le socle par la
+même pull request que ce bilan.
+
+- **Les limiteurs de débit sont actifs mais très permissifs.** Les liaisons
+  sont sur la version déployée et le code passe par elles, sans erreur ; mais
+  la porte n'obtient aucun 429 en trois fois la limite, 232 recherches une par
+  une en 70 s passent toutes (limite : 60 par minute), et 1 000 recherches, 50
+  en parallèle, donnent un premier 429 après environ 450. Cloudflare documente
+  ce limiteur comme permissif, compté par localisation et mis en cache par
+  machine ; les doublures, qui comptent exactement, ne pouvaient pas le voir.
+  Il arrête une inondation de la recherche ou du checkout, pas un essai patient
+  de mots de passe sur une administration sans Access, ce qu'est la
+  production. Décidé : un compteur exact des échecs de connexion, et la porte
+  recalibrée, en `v0.3.5`.
+- **`deploy` s'arrêtait dans le shell de la fiche.** Elle exporte
+  `CLOUDFLARE_ACCOUNT_ID`, dont le test de `shopctl new` héritait par
+  `npm run verify` ; et le test du scaffold suivait le `core.autocrlf=true` du
+  poste. Les deux tests sont désormais indépendants de l'environnement de
+  l'opérateur.
+- **L'historique de chaque boutique en `v0.3.4` est rouge** sur un JWT
+  d'exemple signé « sig », commité par le socle (`cfada29`) puis retiré de
+  l'arbre. La règle exige désormais une signature de vraie longueur.
+- **Chaque `HEAD` sur une image levait une exception** dans les journaux :
+  Astro le confie au gestionnaire `GET`, qui le mettait en cache, ce que l'API
+  Cache refuse. La réponse restait un 200.
+
+La capture de `wrangler tail` a été échantillonnée (`overload`) pendant les
+rafales de `--limiteurs`, et elle a été refaite, la porte passée sans eux. Les
+en-têtes d'identité d'Access y arrivent déjà masqués par la plateforme.
+`NIGHTLY_EMAIL_TO`, encore une variable, a été posé en secret avant le
+`Nightly` d'après la montée, comme le demandent les notes de `v0.3.4`.
+
 - [ ] les neuf lignes du §8.4 contre l'URL de staging
   (`BASE_URL=… npm run test:security:remote -- --limiteurs`). Elle échoue si
   l'admin de staging est en mode Access seul : un jeton de service est une
-  identité Access valide, et il y entrerait — staging garde un mot de passe ;
-- [ ] `wrangler tail` pendant une commande, un remboursement, une expédition
+  identité Access valide, et il y entrerait — staging garde un mot de passe.
+  15 contrôles sur 15 ; les trois limiteurs en échec. Ouverte jusqu'à
+  `v0.3.5`, qui compte les tentatives de connexion exactement (migration
+  0044) et mesure la recherche et le checkout sous une inondation : la porte
+  se rejoue d'après la [fiche](etape-5-commandes.md#après-v035--fermer-la-ligne-des-limiteurs) ;
+- [x] `wrangler tail` pendant une commande, un remboursement, une expédition
   et la porte distante : aucune adresse e-mail ni postale, aucun jeton ni
-  secret dans ce que la boutique écrit ni dans les URL ;
-- [ ] `npm audit` racine et `mcp/`, outils de développement compris : aucune
-  vulnérabilité élevée ou critique non justifiée ;
-- [ ] scan de secrets sur l'arbre de la boutique, tout son historique et ses
+  secret dans ce que la boutique écrit ni dans les URL. 531 événements sans
+  échantillonnage ; la trace du webhook de la commande, dans Observability, ne
+  porte aucune donnée personnelle ;
+- [x] `npm audit` racine et `mcp/`, outils de développement compris : aucune
+  vulnérabilité élevée ou critique non justifiée. Aucune, toutes sévérités ;
+- [x] scan de secrets sur l'arbre de la boutique, tout son historique et ses
   artefacts de build ; ni secret ni adresse dans les journaux et artefacts
-  publics du `Nightly`.
+  publics du `Nightly`. L'historique, vert avec la règle corrigée ; les
+  journaux et artefacts des `Nightly` d'avant la montée supprimés, ceux
+  d'après relus.
 
-Produit : le **rapport de sécurité**.
+Preuves dans `client/certification/etape-5/` de `pilote-certif` (pull
+request #11).
+
+Produit : le **rapport de sécurité**, [`rapport-securite.md`](rapport-securite.md) :
+huit lignes du §8.4 sur neuf tenues, les limiteurs ouverts jusqu'à `v0.3.5`.
 
 Fait avancer : jalon 10 (§8.4, rapport de sécurité), jalon 8 (journaux et
 portes de sécurité sur un déploiement réel).
@@ -584,11 +629,14 @@ Crée : des archives de sauvegarde ; une restauration sur le compte B.
   bien échouer le run ;
 - [ ] média R2 supprimé à la main : la page dégrade sans erreur ;
 - [ ] rollback Worker vers la version précédente, puis retour — jalon 9 ;
-- [ ] montée de version réelle : un tag `v0.3.4` proposé par
+- [x] montée de version réelle : un tag `v0.3.4` proposé par
   `shopctl core upgrade --open-pr`, fusionné, déployé en staging. `v0.3.2` est
   déjà passée par ce chemin à l'étape 2, mais avant tout déploiement : la
-  ligne demande une montée sur une boutique qui tourne. Elle se fait en tête
-  de l'étape 5, qui demande `v0.3.4` ;
+  ligne demande une montée sur une boutique qui tourne. Faite en tête de
+  l'étape 5, le 2026-10-14 : pull request #10 de `pilote-certif`, CI verte,
+  fusionnée, déployée en staging avec la migration 0043. Les deux premiers
+  `deploy` se sont arrêtés à leur `npm run verify`, sans rien téléverser
+  (étape 5) ;
 - [ ] rotation de `AUTH_SECRET` : les sessions tombent, rien d'autre ;
 - [ ] mot de passe admin perdu : procédure exécutée telle que le runbook la
   décrit ;
@@ -646,7 +694,7 @@ Fait avancer : jalon 7 (critère de sortie), §8.8.
 | Livrable | Produit par |
 |---|---|
 | rapport de tests | étapes 3, 4, 6, 7 |
-| rapport de sécurité | étape 5 |
+| [rapport de sécurité](rapport-securite.md) | étape 5 |
 | rapport de performance | étape 6 |
 | preuve de restauration | étape 8 |
 | validation TVA/facturation | étape 11 |

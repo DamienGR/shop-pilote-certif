@@ -5,6 +5,7 @@ import Layout from '../../layouts/Layout.astro';
 import { verifyConfiguredTurnstile, TURNSTILE_FIELD } from '../../features/auth/turnstile';
 import { signSession, verifySession } from '../../features/auth/session';
 import { adminCredential } from '../../features/auth/admin';
+import { clearLoginAttempts, countLoginAttempt, loginThrottleKey } from '../../features/auth/loginThrottle';
 import { getSecret } from '../../features/secrets/store';
 import Turnstile from '../../features/auth/Turnstile.astro';
 
@@ -30,7 +31,20 @@ if (
 const SESSION_TTL = 7 * 24 * 3600; // 7 days
 let error = '';
 
-if (Astro.request.method === 'POST') {
+// Counted before anything is checked, so a refused attempt costs no PBKDF2 and
+// the right password is refused too once the budget is spent.
+const throttleKey =
+  Astro.request.method === 'POST'
+    ? await loginThrottleKey(signingKey, Astro.request.headers.get('CF-Connecting-IP'))
+    : null;
+const attempt = throttleKey ? await countLoginAttempt(env.DB, throttleKey, Math.floor(now)) : null;
+
+if (attempt && !attempt.allowed) {
+  Astro.response.status = 429;
+  Astro.response.headers.set('retry-after', String(attempt.retryAfter));
+  Astro.response.headers.set('cache-control', 'no-store');
+  error = `Too many failed attempts. Try again in ${Math.ceil(attempt.retryAfter / 60)} min.`;
+} else if (throttleKey) {
   const form = await Astro.request.formData();
   // Bot challenge (if enabled in Settings): verify with the vault secret.
   const turnstileEnabled = Astro.locals.settings?.turnstileEnabled === true;
@@ -50,6 +64,7 @@ if (Astro.request.method === 'POST') {
   } else if (!pwOk) {
     error = 'Incorrect password.';
   } else {
+    await clearLoginAttempts(env.DB, throttleKey);
     const token = await signSession(signingKey, cred.tagSource, SESSION_TTL, now);
     Astro.cookies.set('admin_session', token, {
       httpOnly: true,

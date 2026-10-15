@@ -24,6 +24,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { adminRoutes } from '../helpers/admin-routes.mjs';
 import { startBuiltWorker } from '../helpers/built-worker.mjs';
+import { LOGIN_ATTEMPT_LIMIT, LOGIN_WINDOW_SECONDS } from '../../src/features/auth/loginThrottle.ts';
 import { hashPassword } from '../../src/features/auth/password.ts';
 import { signSession } from '../../src/features/auth/session.ts';
 import { generateAccessToken } from '../../src/features/ids/token.ts';
@@ -443,40 +444,74 @@ try {
 
   section('Force brute');
   {
-    // The store's own limiter, at the configured budget, on the built Worker.
-    // Deliberately last among the login assertions: once it trips, the bucket
-    // stays spent for the rest of the period.
-    let firstRefusal = -1;
-    for (let attempt = 0; attempt < 25 && firstRefusal < 0; attempt++) {
-      const response = await fetch('/admin/login', {
+    // The exact counter (features/auth/loginThrottle.ts) on the real
+    // migrations. Each client below is its own address, so the edge limiter —
+    // ten a minute per address, and permissive on the platform — never answers
+    // first: every 429 here is the counter's, which says so with a Retry-After
+    // longer than the edge limiter's minute. Deliberately last among the login
+    // assertions: a refused client stays refused for the rest of its window.
+    const guess = (ip, password) =>
+      fetch('/admin/login', {
         method: 'POST',
-        headers: { origin: ORIGIN, 'content-type': FORM },
-        body: new URLSearchParams({ password: `guess-${attempt}` }).toString(),
+        headers: { origin: ORIGIN, 'content-type': FORM, 'cf-connecting-ip': ip },
+        body: new URLSearchParams({ password }).toString(),
       });
-      if (response.status === 429) {
-        firstRefusal = attempt;
-        assert.equal(response.headers.get('retry-after'), '60');
-        // The route says `no-store`; the cache allowlist tightens it to
-        // `private, no-store` on the way out. Either way it is never shared.
-        assert.equal(response.headers.get('cache-control'), 'private, no-store');
-      } else {
-        assert.equal(response.status, 200, 'a wrong password is answered by the form');
-      }
-    }
-    assert.ok(firstRefusal > 0, 'the login endpoint never refused a burst of guesses');
-    ok(`guessing is refused after ${firstRefusal} attempts, with Retry-After`);
+    const counted = (response, what) => {
+      assert.equal(response.status, 429, what);
+      const retryAfter = Number(response.headers.get('retry-after'));
+      assert.ok(retryAfter > 60 && retryAfter <= LOGIN_WINDOW_SECONDS, `${what}: Retry-After ${retryAfter}`);
+      // The route says `no-store`; the cache allowlist tightens it to
+      // `private, no-store` on the way out. Either way it is never shared.
+      assert.equal(response.headers.get('cache-control'), 'private, no-store');
+      assert.equal(response.headers.get('set-cookie'), null, `${what}: a session was issued`);
+      return retryAfter;
+    };
+
+    // Exact under concurrency: the attempt is counted before the slow password
+    // compare, in one statement, so a burst cannot slip between read and write.
+    const burst = await Promise.all(
+      Array.from({ length: LOGIN_ATTEMPT_LIMIT + 2 }, (_, index) => guess('198.51.100.20', `guess-${index}`)),
+    );
+    const answered = burst.filter((response) => response.status === 200).length;
+    const refused = burst.filter((response) => response.status === 429);
+    assert.equal(answered, LOGIN_ATTEMPT_LIMIT, `${answered} of ${burst.length} parallel guesses were answered`);
+    assert.equal(refused.length, 2);
+    const retryAfter = counted(refused[0], 'a guess past the budget');
+    ok(`${burst.length} parallel guesses: exactly ${LOGIN_ATTEMPT_LIMIT} answered, the rest refused for ${retryAfter} s`);
 
     // And the refusal is not a wrong-password message in disguise: the CORRECT
-    // password is refused too, so a limiter that fired cannot be walked past by
+    // password is refused too, so a counter that fired cannot be walked past by
     // the guess that happens to be right.
-    const correct = await fetch('/admin/login', {
-      method: 'POST',
-      headers: { origin: ORIGIN, 'content-type': FORM },
-      body: new URLSearchParams({ password: PASSWORD }).toString(),
-    });
-    assert.equal(correct.status, 429, 'the limiter let the right password through');
-    assert.equal(correct.headers.get('set-cookie'), null, 'a throttled login issued a session');
+    counted(await guess('198.51.100.20', PASSWORD), 'the right password, past the budget');
     ok('a throttled login refuses even the right password, and issues no session');
+
+    // An IPv6 subscriber holds a /64: walking it buys no new budget.
+    for (let index = 0; index < LOGIN_ATTEMPT_LIMIT; index++) {
+      assert.equal((await guess(`2001:db8:5:6::${index + 1}`, `guess-${index}`)).status, 200);
+    }
+    counted(await guess('2001:db8:5:6:ffff::1', 'guess-next'), 'another address of the same /64');
+    assert.equal((await guess('198.51.100.21', 'guess-elsewhere')).status, 200, 'a third client was refused');
+    ok('the budget is per client network: a /64 shares one, another client keeps its own');
+
+    // A successful login starts the client again from nothing.
+    for (let index = 0; index < LOGIN_ATTEMPT_LIMIT - 1; index++) {
+      assert.equal((await guess('198.51.100.22', `guess-${index}`)).status, 200);
+    }
+    assert.equal((await guess('198.51.100.22', PASSWORD)).status, 303, 'the last attempt of the budget did not log in');
+    assert.equal((await guess('198.51.100.22', 'guess-after')).status, 200, 'a login did not clear the failures before it');
+    ok('a successful login clears the failures that came before it');
+
+    // The window ends, and takes its rows with it.
+    await db.prepare('UPDATE admin_login_attempts SET window_started_at = window_started_at - ?').bind(LOGIN_WINDOW_SECONDS).run();
+    assert.equal((await guess('198.51.100.20', 'guess-later')).status, 200, 'a client stayed refused past its window');
+    const stale = await db
+      .prepare('SELECT COUNT(*) AS n FROM admin_login_attempts WHERE window_started_at <= ?')
+      .bind(Math.floor(Date.now() / 1000) - LOGIN_WINDOW_SECONDS)
+      .first();
+    assert.equal(stale.n, 0, 'rows older than their window were kept');
+    const keys = await db.prepare('SELECT client_key FROM admin_login_attempts').all();
+    assert.ok(keys.results.every(({ client_key }) => /^[0-9a-f]{32}$/.test(client_key)), 'a row is keyed by something else than a hash');
+    ok('after its window a client is answered again, and the table keeps no older row and no address');
   }
 
   /* ================================== 5. unauthorized download */
@@ -590,6 +625,17 @@ try {
     const after = (await (await fetch('/api/admin/media', { headers: { cookie } })).json()).total;
     assert.equal(after - before, 4, 'a refused upload still reached the library');
     ok('a refused upload leaves nothing behind in the library');
+
+    // Astro answers HEAD with the GET handler, and the Cache API stores GET
+    // only: the certification's step 5 found every HEAD on an image throwing
+    // in waitUntil — an exception in the real runtime's tail, under a 200.
+    // Miniflare does not surface a rejected waitUntil, so this holds the
+    // answer, not the exception.
+    const [{ imageKey }] = (await (await fetch('/api/admin/media', { headers: { cookie } })).json()).media;
+    const head = await fetch(`/images/${imageKey}`, { method: 'HEAD' });
+    assert.equal(head.status, 200);
+    assert.match(head.headers.get('content-type') ?? '', /^image\//);
+    ok('a stored image answers HEAD like GET');
 
     // A batch is validated before anything is stored, so one bad file in a
     // multi-select cannot leave half of it uploaded.

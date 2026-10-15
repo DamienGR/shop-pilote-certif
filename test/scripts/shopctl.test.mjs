@@ -561,7 +561,7 @@ describe('shopctl new', () => {
       cwd: work,
       encoding: 'utf8',
       // No config, and none of the GIT_AUTHOR_* variables GIT_ENV supplies.
-      env: { ...process.env, HOME: home, GIT_CONFIG_GLOBAL: join(home, '.gitconfig'), GIT_AUTHOR_NAME: '', GIT_AUTHOR_EMAIL: '', GIT_COMMITTER_NAME: '', GIT_COMMITTER_EMAIL: '' },
+      env: { ...GIT_ENV, HOME: home, GIT_CONFIG_GLOBAL: join(home, '.gitconfig'), GIT_AUTHOR_NAME: '', GIT_AUTHOR_EMAIL: '', GIT_COMMITTER_NAME: '', GIT_COMMITTER_EMAIL: '' },
     });
 
     expect(result.status).toBe(EXIT_CODES.precondition);

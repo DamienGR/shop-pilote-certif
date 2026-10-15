@@ -75,6 +75,29 @@ describe('check-secrets --history', () => {
     }
   });
 
+  // The certification of v0.3.4 found its own history red on a test's Access
+  // assertion signed "sig": no algorithm signs in three bytes.
+  it('finds a signed token, not a stand-in one', () => {
+    const repo = repository();
+    const token = (signature) => ['eyJhbGciOiJSUzI1NiJ9', 'eyJzdWIiOiJvcGVyYXRvciJ9', signature].join('.');
+    try {
+      writeFileSync(join(repo.root, 'fixture.js'), `export const assertion = '${token('c2ln')}';\n`);
+      repo.git('add', 'fixture.js');
+      repo.git('commit', '-qm', 'stand-in');
+      expect(repo.scan('--history').status).toBe(0);
+
+      writeFileSync(join(repo.root, 'fixture.js'), `export const assertion = '${token('Q'.repeat(43))}';\n`);
+      repo.git('commit', '-qam', 'signed');
+      repo.git('rm', '-q', 'fixture.js');
+      repo.git('commit', '-qm', 'gone');
+      const history = repo.scan('--history');
+      expect(history.status).toBe(1);
+      expect(history.stderr).toMatch(/fixture\.js \(history, blob [0-9a-f]{10}\):1 {2}JSON Web Token/);
+    } finally {
+      repo.dispose();
+    }
+  });
+
   it('passes a history with nothing in it, and says how much it read', () => {
     const repo = repository();
     try {

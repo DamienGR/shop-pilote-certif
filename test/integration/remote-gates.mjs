@@ -12,8 +12,9 @@
  *     A remote gate that passes on the one state where anyone can take the
  *     admin is asserting on nothing;
  *   - security.mjs once a password is set (green, password mode), again with
- *     `--limiteurs` (each limiter answers 429), and on a shop whose admin is
- *     behind Access (green, Access mode);
+ *     `--limiteurs` (search and checkout answer 429 under a flood, the login
+ *     on its exact counter), and on a shop whose admin is behind Access
+ *     (green, Access mode);
  *   - on a configured shop — catalogue, e-mail, Stripe in test mode:
  *     last-unit.mjs (one session, four refusals, then a held unit refused
  *     before firing), load.mjs (no error), email.mjs (through the admin
@@ -33,6 +34,7 @@ import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { startBuiltWorker } from '../helpers/built-worker.mjs';
 import { splitSql } from '../helpers/d1-schema.mjs';
+import { LOGIN_ATTEMPT_LIMIT } from '../../src/features/auth/loginThrottle.ts';
 import { hashPassword } from '../../src/features/auth/password.ts';
 import { encryptSecret } from '../../src/features/secrets/crypto.ts';
 
@@ -101,7 +103,14 @@ try {
   for (const limiter of ['la recherche', 'le checkout', 'la connexion']) {
     assert.match(limiters.output, new RegExp(`✓ ${limiter} répond 429`), show(limiters));
   }
-  console.log('✓ remote security: --limiteurs trips search, checkout and login, each with a retry-after');
+  // The login check counts from what the run before it spent: one wrong
+  // password, so the exact counter must answer at the budget, not after it.
+  assert.equal(
+    await worker.db.prepare('SELECT MAX(attempts) AS n FROM admin_login_attempts').first('n'),
+    LOGIN_ATTEMPT_LIMIT + 1,
+    show(limiters),
+  );
+  console.log('✓ remote security: --limiteurs floods search and checkout to a 429, and the login meets its exact counter');
 } finally {
   await worker.dispose();
 }
