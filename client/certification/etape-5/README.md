@@ -93,6 +93,7 @@ est archivé hors du dépôt chez l'opérateur. Les cinq rapports de l'étape 3
 sont masqués par ce commit ; l'historique les garde.
 
 ## Après `v0.3.5` : la ligne des limiteurs
+
 Le 2026-10-15, d'après la section « Après `v0.3.5` » de la fiche.
 `socle/v0.3.5` fusionnée par la pull request #12 (CI 20/20), puis
 `deploy-v0.3.5.json` : `ok`, le compte A sous le nom `<email>'s Account`, test
@@ -100,18 +101,21 @@ de fumée vert, migration 0044 appliquée. Lancé **sans contournement**, avec
 `CLOUDFLARE_ACCOUNT_ID` exporté et `core.autocrlf=true` sur le poste : les
 « Défauts » 2 et 3 sont corrigés. La table du compteur était vide après le
 déploiement.
+
 `porte-distante-v0.3.5.txt`, avec `--limiteurs` et un nouveau jeton de service
 révoqué ensuite : 18 contrôles sur 18.
+
 - **La recherche** : premier 429 dans les 250 premières requêtes, 50 à la
   fois, pour un plafond de 1 200 (vingt fois la limite de 60 par minute).
 - **Le checkout** : premier 429 dans les 100 premières, pour un plafond de
   400.
-- **La connexion** : la tentative refusée est la sixième du passage. La porte poste
-  un mauvais mot de passe en début de passage, puis cinq dans sa section des
-  limiteurs : la dernière reçoit un 429, avec un `Retry-After` de plus d'une
-  minute (le compteur de la boutique, pas le limiteur de Cloudflare) et d'au
-  plus un quart d'heure, sans cookie. En base, une seule ligne, à six
+- **La connexion** : la tentative refusée est la sixième du passage. La porte
+  poste un mauvais mot de passe en début de passage, puis cinq dans sa section
+  des limiteurs : la dernière reçoit un 429, avec un `Retry-After` de plus
+  d'une minute (le compteur de la boutique, pas le limiteur de Cloudflare) et
+  d'au plus un quart d'heure, sans cookie. En base, une seule ligne, à six
   tentatives, sous une empreinte du réseau.
+
 Juste après, l'opérateur est entré dans l'administration du staging depuis son
 navigateur : par Access pour la preview, puis par sa session d'administration
 du matin, encore valable. Aucun mot de passe envoyé, rien à compter. Le
@@ -119,6 +123,8 @@ compteur bloque les nouvelles tentatives d'un réseau, pas les sessions déjà
 ouvertes. Et ce navigateur sort en IPv6, alors que le terminal WSL qui a lancé
 la porte ne sort qu'en IPv4 : pour le compteur, ce sont deux réseaux (une
 adresse IPv4, un /64 IPv6).
+
+## Fichiers
 
 | Fichier                        | Section de la fiche                                                         |
 | ------------------------------ | --------------------------------------------------------------------------- |
