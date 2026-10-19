@@ -1,0 +1,88 @@
+{
+  "origin": "https://preview.studiomaestro.fr",
+  "users": 20,
+  "minutes": 15,
+  "finishedAt": "2026-10-19T16:47:42.319Z",
+  "total": 6528,
+  "errors": 0,
+  "limited": 0,
+  "rows": [
+    {
+      "step": "accueil",
+      "requests": 1847,
+      "p50": 110,
+      "p95": 156,
+      "p99": 245,
+      "statuses": {
+        "200": 1847
+      },
+      "failed": 0
+    },
+    {
+      "step": "catégorie",
+      "requests": 1159,
+      "p50": 141,
+      "p95": 181,
+      "p99": 281,
+      "statuses": {
+        "200": 1159
+      },
+      "failed": 0
+    },
+    {
+      "step": "fiche produit",
+      "requests": 1847,
+      "p50": 142,
+      "p95": 195,
+      "p99": 292,
+      "statuses": {
+        "200": 1847
+      },
+      "failed": 0
+    },
+    {
+      "step": "recherche",
+      "requests": 442,
+      "p50": 170,
+      "p95": 236,
+      "p99": 306,
+      "statuses": {
+        "200": 442
+      },
+      "failed": 0
+    },
+    {
+      "step": "ajout au panier",
+      "requests": 487,
+      "p50": 137,
+      "p95": 197,
+      "p99": 311,
+      "statuses": {
+        "204": 487
+      },
+      "failed": 0
+    },
+    {
+      "step": "panier",
+      "requests": 487,
+      "p50": 142,
+      "p95": 179,
+      "p99": 283,
+      "statuses": {
+        "200": 487
+      },
+      "failed": 0
+    },
+    {
+      "step": "catalogue JSON",
+      "requests": 259,
+      "p50": 137,
+      "p95": 192,
+      "p99": 293,
+      "statuses": {
+        "200": 259
+      },
+      "failed": 0
+    }
+  ]
+}

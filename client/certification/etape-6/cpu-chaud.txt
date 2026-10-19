@@ -1,0 +1,21 @@
+Relevé CPU — certif-chaud.json : 2767 événement(s), 2767 avec leur temps CPU
+  issues : ok 2767
+
+route                                        n  CPU ms 1re    p50    p90    p99    max  >10 ms   mur ms p50    p99
+GET /                                      786           7      6     11     32     45     81              74    147
+GET /cart                                  222           3      5      9     29     34     14             105    271
+GET /products/:slug                        786           7      6     10     27     45     53             106    170
+GET /search                                195          11      6      9     20     38     10             137    274
+POST /api/cart                             205           3      4      6     12     20      3             103    174
+GET /categories/:slug                      469           4      5      8     11     28     15             104    157
+GET /api/products                          100           3      3      5      7      8      0             100    131
+cron */5 * * * *                             3           7      4      7      7      7      0            1806   2435
+GET /sitemap.xml                             1           3      3      3      3      3      0             182    182
+
+▸ 1re : la première requête de la route dans la capture. Prise juste après un déploiement ou un temps mort,
+  c'est son coût à froid (le code de la route chargé) ; pendant la charge, les percentiles sont le chaud.
+▸ Au-delà de 10 ms — relevé, non jugé : le plan gratuit tolère un dépassement occasionnel par isolat (un démarrage à froid en est un).
+▸ Invocations arrêtées par Cloudflare (erreur 1102 pour le visiteur)
+  ✓ aucune
+
+✓ aucune invocation arrêtée.

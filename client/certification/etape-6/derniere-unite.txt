@@ -1,0 +1,11 @@
+Dernière unité — https://preview.studiomaestro.fr : 5 checkouts simultanés sur « Savon de Marseille 300 g » (stock 1).
+  200  session ouverte sur checkout.stripe.com
+  409  Some inventory just sold out. Refresh the catalog and retry.
+  409  Some inventory just sold out. Refresh the catalog and retry.
+  409  Some inventory just sold out. Refresh the catalog and retry.
+  409  Some inventory just sold out. Refresh the catalog and retry.
+
+stock après : 0
+
+✓ une seule session, quatre refus, aucune survente.
+  L'unité reste réservée jusqu'à l'expiration de la session (35 min pour Stripe).
