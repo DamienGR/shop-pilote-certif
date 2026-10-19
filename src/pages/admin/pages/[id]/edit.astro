@@ -8,11 +8,12 @@ import {
   normalizePageLayout,
 } from '../../../../features/pages/layouts';
 import { parsePublicId } from '../../../../features/ids/publicId';
+import { t } from '../../../../features/i18n';
 
 // The route param is the page_ public ID; numeric row ids are not accepted.
 const publicId = parsePublicId(Astro.params.id, 'page');
 const page = publicId ? await getPageByPublicId(env.DB, publicId) : null;
-if (!page) return new Response('Not found', { status: 404 });
+if (!page) return new Response(t('admin.pages.notFound'), { status: 404 });
 
 const error = Astro.url.searchParams.get('error');
 const warning = Astro.url.searchParams.get('warning');
@@ -22,42 +23,74 @@ const currentLayout = normalizePageLayout(page.layout);
 // Shown only while the body is empty. Doubles as the Markdown cheat sheet for a
 // merchant who has never written any — it covers exactly what the toolbar above
 // can insert, so the buttons and the hint teach the same syntax.
-const PLACEHOLDER = `## A section heading
-
-Write your page in Markdown. Blank lines separate paragraphs.
-
-**bold**  _italic_  \`code\`
-
-- a bulleted list
-- another item
-
-1. a numbered list
-2. another item
-
-> a quotation
-
-[a link](https://example.com)
-
-![describe the image](/images/media/photo.webp)`;
+// Built line by line: the catalog holds the words, this holds the syntax, so a
+// translation can never break the Markdown it is teaching.
+const PLACEHOLDER = [
+  `## ${t('admin.pages.editor.placeholder.heading')}`,
+  '',
+  t('admin.pages.editor.placeholder.intro'),
+  '',
+  `**${t('admin.pages.editor.placeholder.bold')}**  ` +
+    `_${t('admin.pages.editor.placeholder.italic')}_  \`code\``,
+  '',
+  `- ${t('admin.pages.editor.placeholder.bulletList')}`,
+  `- ${t('admin.pages.editor.placeholder.anotherItem')}`,
+  '',
+  `1. ${t('admin.pages.editor.placeholder.numberedList')}`,
+  `2. ${t('admin.pages.editor.placeholder.anotherItem')}`,
+  '',
+  `> ${t('admin.pages.editor.placeholder.quote')}`,
+  '',
+  `[${t('admin.pages.editor.placeholder.link')}](https://example.com)`,
+  '',
+  `![${t('admin.pages.editor.placeholder.imageAlt')}](/images/media/photo.webp)`,
+].join('\n');
 
 // Toolbar buttons are declarative: each carries the syntax to wrap or insert,
 // so the script stays one generic selection handler rather than nine.
 const tools = [
-  { action: 'prefix', value: '## ', label: 'H2', title: 'Heading' },
-  { action: 'wrap', value: '**', label: 'B', title: 'Bold' },
-  { action: 'wrap', value: '_', label: 'I', title: 'Italic' },
-  { action: 'link', value: '', label: 'Link', title: 'Link' },
-  { action: 'prefix', value: '- ', label: 'List', title: 'Bulleted list' },
-  { action: 'prefix', value: '1. ', label: '1.', title: 'Numbered list' },
-  { action: 'prefix', value: '> ', label: 'Quote', title: 'Blockquote' },
-  { action: 'wrap', value: '`', label: 'Code', title: 'Inline code' },
+  { action: 'prefix', value: '## ', label: 'H2', title: t('admin.pages.editor.tool.heading') },
+  {
+    action: 'wrap',
+    value: '**',
+    label: t('admin.pages.editor.tool.boldShort'),
+    title: t('admin.pages.editor.tool.bold'),
+  },
+  { action: 'wrap', value: '_', label: 'I', title: t('admin.pages.editor.tool.italic') },
+  {
+    action: 'link',
+    value: '',
+    label: t('admin.pages.editor.tool.link'),
+    title: t('admin.pages.editor.tool.link'),
+  },
+  {
+    action: 'prefix',
+    value: '- ',
+    label: t('admin.pages.editor.tool.listShort'),
+    title: t('admin.pages.editor.tool.list'),
+  },
+  { action: 'prefix', value: '1. ', label: '1.', title: t('admin.pages.editor.tool.numberedList') },
+  {
+    action: 'prefix',
+    value: '> ',
+    label: t('admin.pages.editor.tool.quote'),
+    title: t('admin.pages.editor.tool.quote'),
+  },
+  {
+    action: 'wrap',
+    value: '`',
+    label: t('admin.pages.editor.tool.codeShort'),
+    title: t('admin.pages.editor.tool.code'),
+  },
 ];
 ---
 
-<AdminLayout title={`Edit ${page.title}`} active="pages">
-  <a href="/admin/pages" class="text-sm text-gray-500 hover:text-brand">&larr; Back to pages</a>
+<AdminLayout title={t('admin.pages.edit.documentTitle', { titre: page.title })} active="pages">
+  <a href="/admin/pages" class="text-sm text-gray-500 hover:text-brand">
+    &larr; {t('admin.pages.backToList')}
+  </a>
   <div class="mt-4 mb-6 flex flex-wrap items-center justify-between gap-4">
-    <h1 class="font-serif text-3xl tracking-tight">Edit page</h1>
+    <h1 class="font-serif text-3xl tracking-tight">{t('admin.pages.edit.heading')}</h1>
     {
       page.published !== 0 && (
         <a
@@ -66,7 +99,7 @@ const tools = [
           rel="noopener"
           class="text-sm text-accent hover:underline"
         >
-          View on store ↗
+          {t('admin.pages.edit.viewOnStore')} ↗
         </a>
       )
     }
@@ -89,15 +122,26 @@ const tools = [
   {
     saved && !warning && (
       <p class="mb-6 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-        Saved.
+        {t('admin.common.saved')}
       </p>
     )
   }
 
-  <form method="POST" action={`/api/admin/pages/${page.public_id}`} data-page-form>
+  {/* The script's strings ride on data-* attributes: importing the catalog
+      into a bundled script would ship all of it to the browser. */}
+  <form
+    method="POST"
+    action={`/api/admin/pages/${page.public_id}`}
+    data-page-form
+    data-msg-rendering={t('admin.pages.editor.rendering')}
+    data-msg-preview-failed={t('admin.pages.editor.previewFailed')}
+    data-msg-preview-failed-status={t('admin.pages.editor.previewFailedStatus')}
+    data-msg-link-text={t('admin.pages.editor.linkText')}
+    data-msg-alt-prompt={t('admin.pages.editor.altPrompt')}
+  >
     <div class="flex flex-wrap gap-4">
       <label class="block flex-1 text-xs uppercase tracking-widest text-gray-400">
-        Title
+        {t('admin.pages.field.title')}
         <input
           type="text"
           name="title"
@@ -108,7 +152,7 @@ const tools = [
         />
       </label>
       <label class="block flex-1 text-xs uppercase tracking-widest text-gray-400">
-        Slug
+        {t('admin.pages.field.slug')}
         <input
           type="text"
           name="slug"
@@ -121,14 +165,14 @@ const tools = [
     {/* overflow-hidden so pane edges and inner scrollbars are clipped by the
         radius instead of painting over the border corners. */}
     <div class="mt-6 overflow-hidden rounded-md border border-line">
-      {/* Markdown / Split / Preview. Rendered hidden and revealed by the script,
+      {/* Markdown / Côte à côte / Aperçu. Rendered hidden and revealed by the script,
           because without JavaScript there is nothing to switch between — the
           textarea is the whole editor and the preview never populates. */}
       <div
         data-modes
         hidden
         role="group"
-        aria-label="Editor view"
+        aria-label={t('admin.pages.editor.viewLabel')}
         class="flex items-center gap-1 border-b border-line px-2 py-2"
       >
         <button
@@ -145,7 +189,7 @@ const tools = [
           class="rounded px-3 py-1.5 text-xs uppercase tracking-widest text-gray-500"
           aria-pressed="false"
         >
-          Split
+          {t('admin.pages.editor.mode.split')}
         </button>
         <button
           type="button"
@@ -153,7 +197,7 @@ const tools = [
           class="rounded px-3 py-1.5 text-xs uppercase tracking-widest text-gray-500"
           aria-pressed="false"
         >
-          Preview
+          {t('admin.common.preview')}
         </button>
       </div>
 
@@ -217,7 +261,10 @@ const tools = [
           <div
             class="flex h-11 items-center justify-between border-b border-line px-4 text-xs uppercase tracking-widest text-gray-400"
           >
-            <span>Preview <span class="normal-case tracking-normal">· click to find the source</span></span>
+            <span>
+              {t('admin.common.preview')}
+              <span class="normal-case tracking-normal">· {t('admin.pages.editor.previewHint')}</span>
+            </span>
             {/* Reserved space, so the row doesn't reflow each time it renders. */}
             <span data-preview-status class="text-gray-300"></span>
           </div>
@@ -232,7 +279,7 @@ const tools = [
     {/* Options are generated from features/pages/layouts.ts — adding a preset
         there adds it here with no change to this file. */}
     <label class="mt-6 block max-w-sm text-xs uppercase tracking-widest text-gray-400">
-      Layout
+      {t('admin.pages.field.layout')}
       <select
         name="layout"
         data-layout-select
@@ -258,17 +305,16 @@ const tools = [
     <div class="mt-6 flex flex-wrap items-center gap-4">
       <label class="flex items-center gap-2 text-sm text-gray-700">
         <input type="checkbox" name="published" checked={page.published !== 0} class="rounded" />
-        Published
+        {t('admin.pages.status.published')}
       </label>
       <button
         type="submit"
         class="rounded-md bg-brand px-4 py-2 text-xs font-medium uppercase tracking-wider text-white hover:bg-brand-hover"
       >
-        Save
+        {t('admin.common.save')}
       </button>
       <span class="text-xs text-gray-400">
-        Published pages appear in the footer and sitemap. Storefront caching means a change
-        can take up to a minute to appear.
+        {t('admin.pages.edit.publishHint')}
       </span>
     </div>
   </form>
@@ -279,6 +325,8 @@ const tools = [
   const editor = form?.querySelector<HTMLTextAreaElement>('[data-editor]');
   const preview = form?.querySelector<HTMLElement>('[data-preview]');
   if (form && editor && preview) {
+    // Server-rendered French strings (see the data-msg-* attributes on the form).
+    const msg = form.dataset;
     /** Replace the selection, then restore a sensible cursor/selection. */
     const replaceSelection = (text: string, selectFrom: number, selectTo: number) => {
       const { selectionStart: start, selectionEnd: end } = editor;
@@ -306,7 +354,7 @@ const tools = [
         const body = (text || '').split('\n').map((line) => `${value}${line}`).join('\n');
         replaceSelection(body, 0, body.length);
       } else if (kind === 'link') {
-        const label = text || 'link text';
+        const label = text || (msg.msgLinkText ?? '');
         const md = `[${label}](https://)`;
         // Put the caret in the URL, which is the part that still needs typing.
         replaceSelection(md, md.length - 1, md.length - 1);
@@ -318,7 +366,7 @@ const tools = [
     // and the filename is rarely a good description.
     document.addEventListener('media:selected', (event) => {
       const detail = (event as CustomEvent).detail as { imageKey: string; url: string };
-      const raw = window.prompt('Describe this image for screen readers:', '') ?? '';
+      const raw = window.prompt(msg.msgAltPrompt ?? '', '') ?? '';
       // Escape \ [ and ]. A lone ] closes the alt span early; a lone [ opens a
       // link, so "Photo of [blue shirt" turns the rest into a link instead of
       // an image. The backslash has to be escaped too or it eats the next char.
@@ -362,7 +410,7 @@ const tools = [
       inFlight?.abort();
       const controller = new AbortController();
       inFlight = controller;
-      if (status) status.textContent = 'Rendering…';
+      if (status) status.textContent = msg.msgRendering ?? '';
 
       const body = new FormData();
       body.append('body_markdown', markdown);
@@ -375,7 +423,11 @@ const tools = [
           body,
           signal: controller.signal,
         });
-        if (!res.ok) throw new Error(`Preview failed (${res.status})`);
+        if (!res.ok) {
+          throw new Error(
+            (msg.msgPreviewFailedStatus ?? '').replace('{statut}', () => String(res.status)),
+          );
+        }
         // Server-rendered by the same renderer the storefront uses, with raw
         // HTML disabled, so this is the storefront's own escaped output.
         preview.innerHTML = await res.text();
@@ -384,7 +436,7 @@ const tools = [
       } catch (err) {
         if (controller.signal.aborted) return; // superseded, not a failure
         if (status) status.textContent = '';
-        preview.textContent = err instanceof Error ? err.message : 'Preview failed.';
+        preview.textContent = err instanceof Error ? err.message : (msg.msgPreviewFailed ?? '');
       } finally {
         if (inFlight === controller) inFlight = null;
       }
@@ -648,7 +700,7 @@ const tools = [
       selectRange(lineStart, lineEnd === -1 ? editor.value.length : lineEnd);
     });
 
-    // Markdown / Split / Preview. The control only exists with JavaScript, so
+    // Markdown / Côte à côte / Aperçu. The control only exists with JavaScript, so
     // it is revealed here rather than rendered visible and then broken.
     const modeButtons = form.querySelectorAll<HTMLButtonElement>('[data-mode]');
     const setMode = (mode: string) => {

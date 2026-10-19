@@ -93,7 +93,7 @@ argument de commande. La colonne « où » dit où chacun est posé.
 | Session Wrangler de l'opérateur | secret | Damien (`wrangler login`) | la machine qui exécute `shopctl` |
 | `AUTH_SECRET`, `SECRETS_KEK` | secrets internes | `shopctl provision` | secrets du Worker, tirés par boutique et par environnement, jamais affichés |
 | `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD` | configuration, pas un secret | Damien (application Access) | `client.yaml` (`cloudflare.stagingAccessTeam`, `cloudflare.stagingAccessAud`), rendus dans les `vars` du seul Worker de staging |
-| Clé Turnstile (site + secret) | secret pour la seconde | Damien | Admin → Réglages → Protection |
+| Clé Turnstile (site + secret) | secret pour la seconde | Damien | Admin → Réglages → Protection anti-robots |
 | `stripe_secret_key` test puis live (clé restreinte de préférence) | secret | Damien | coffre chiffré, Admin → Réglages → Paiements |
 | `stripe_webhook_secret` test puis live | secret | Stripe, à la création de l'endpoint | coffre chiffré |
 | `resend_api_key` | secret | Damien | coffre chiffré |
@@ -520,7 +520,7 @@ même pull request que ce bilan.
   Il arrête une inondation de la recherche ou du checkout, pas un essai patient
   de mots de passe sur une administration sans Access, ce qu'est la
   production. Décidé : un compteur exact des échecs de connexion, et la porte
-  recalibrée, en `v0.3.5`.
+  recalibrée, en `v0.3.5`. Livrés, et rejoués contre le staging (ci-dessous).
 - **`deploy` s'arrêtait dans le shell de la fiche.** Elle exporte
   `CLOUDFLARE_ACCOUNT_ID`, dont le test de `shopctl new` héritait par
   `npm run verify` ; et le test du scaffold suivait le `core.autocrlf=true` du
@@ -539,14 +539,26 @@ en-têtes d'identité d'Access y arrivent déjà masqués par la plateforme.
 `NIGHTLY_EMAIL_TO`, encore une variable, a été posé en secret avant le
 `Nightly` d'après la montée, comme le demandent les notes de `v0.3.4`.
 
-- [ ] les neuf lignes du §8.4 contre l'URL de staging
+Le même jour, la ligne des limiteurs, d'après la
+[fiche](etape-5-commandes.md#après-v035--fermer-la-ligne-des-limiteurs) :
+`v0.3.5` montée (pull request #12 de la boutique) et déployée sans
+contournement, `CLOUDFLARE_ACCOUNT_ID` exporté et `core.autocrlf=true` sur le
+poste, migration 0044 appliquée ; la porte, `--limiteurs` compris, 18
+contrôles sur 18. Juste après, l'opérateur est entré dans l'administration :
+sa session du matin était encore valable, et son navigateur sort en IPv6, un
+autre réseau, pour le compteur, que le terminal WSL en IPv4. Le compteur
+refuse les nouvelles tentatives d'un réseau ; il ne ferme pas une session
+ouverte.
+
+- [x] les neuf lignes du §8.4 contre l'URL de staging
   (`BASE_URL=… npm run test:security:remote -- --limiteurs`). Elle échoue si
   l'admin de staging est en mode Access seul : un jeton de service est une
   identité Access valide, et il y entrerait — staging garde un mot de passe.
-  15 contrôles sur 15 ; les trois limiteurs en échec. Ouverte jusqu'à
-  `v0.3.5`, qui compte les tentatives de connexion exactement (migration
-  0044) et mesure la recherche et le checkout sous une inondation : la porte
-  se rejoue d'après la [fiche](etape-5-commandes.md#après-v035--fermer-la-ligne-des-limiteurs) ;
+  En `v0.3.4`, 15 contrôles sur 15 et les trois limiteurs en échec ; en
+  `v0.3.5`, 18 sur 18 : la recherche refuse dans ses 250 premières requêtes
+  et le checkout dans ses 100 premières, 50 à la fois ; la connexion refuse la
+  sixième tentative du passage, par le compteur exact (`Retry-After` au-delà
+  de la minute de Cloudflare) ;
 - [x] `wrangler tail` pendant une commande, un remboursement, une expédition
   et la porte distante : aucune adresse e-mail ni postale, aucun jeton ni
   secret dans ce que la boutique écrit ni dans les URL. 531 événements sans
@@ -561,10 +573,11 @@ en-têtes d'identité d'Access y arrivent déjà masqués par la plateforme.
   d'après relus.
 
 Preuves dans `client/certification/etape-5/` de `pilote-certif` (pull
-request #11).
+requests #11, puis #13 pour la ligne des limiteurs).
 
 Produit : le **rapport de sécurité**, [`rapport-securite.md`](rapport-securite.md) :
-huit lignes du §8.4 sur neuf tenues, les limiteurs ouverts jusqu'à `v0.3.5`.
+les neuf lignes du §8.4 tenues sur le staging, les limiteurs depuis `v0.3.5` ;
+la porte se rejoue contre la production à l'étape 9.
 
 Fait avancer : jalon 10 (§8.4, rapport de sécurité), jalon 8 (journaux et
 portes de sécurité sur un déploiement réel).
@@ -595,6 +608,16 @@ possible avant de choisir entre le plan Workers Paid et une dérogation. Le
 seuil de `shopctl monitor` juge aujourd'hui le p99 : le compte des
 invocations `exceededCpu`, qu'il regroupe déjà par statut, est le signal qui
 compte.
+
+Répétée en doublure le 2026-10-15 ; ce qu'elle a trouvé est corrigé dans
+`v0.3.6`, et la fiche de passage est [etape-6-commandes.md](etape-6-commandes.md).
+Le monitor y juge les invocations arrêtées et relève le p99 sans le juger ; la
+vitrine lit sa base en un appel par page (à chaud, la fiche produit passe de
+13 à 16 ms à 8 ms sur le Worker construit) ; `npm run test:cpu:remote` relève
+le CPU route par route d'une capture de `wrangler tail`, à froid après le
+déploiement et à chaud sous la charge. Le cache de Workers, désactivé sur
+toutes les boutiques, est la troisième issue à peser avec le plan payant et la
+dérogation.
 La charge déclenche les limiteurs de débit si elle vient d'une seule adresse :
 le scénario doit les contourner explicitement ou les compter comme attendus,
 pas les désactiver.
@@ -658,6 +681,10 @@ Crée : la production de `pilote-certif` sur B. Détruit : le staging sur A.
 - [ ] `deploy --env production` par le workflow `Deploy`, sauvegarde préalable
   verte, approbation GitHub ;
 - [ ] domaine de production, domaine d'images, smoke test public vert ;
+- [ ] la porte distante contre la production,
+  `npm run test:security:remote -- --limiteurs` : sans Access devant
+  l'administration, la connexion refuse au plus tard la sixième tentative
+  ([rapport de sécurité](rapport-securite.md)) ;
 - [ ] `shopctl destroy --env staging` sur A.
 
 Fait avancer : jalon 6 (production), §7.4, §9.

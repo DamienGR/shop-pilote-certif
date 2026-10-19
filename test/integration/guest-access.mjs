@@ -41,6 +41,7 @@ try {
        PRIMARY KEY (order_id, kind))`,
     `CREATE TABLE pending_payments (public_id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'pending', expires_at TEXT)`,
     `CREATE TABLE checkout_reservations (public_id TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'active', terminal_at TEXT, terms_version TEXT, terms_accepted_at TEXT, vat_rate_bps INTEGER)`,
+    `CREATE TABLE sweep_cursors (name TEXT PRIMARY KEY, after_at TEXT NOT NULL, after_id TEXT NOT NULL)`,
   ]) {
     await db.exec(sql.replace(/\n\s*/g, ' '));
   }
@@ -105,6 +106,34 @@ try {
   assert.equal(await getGuestAccess(db, orphan.publicId), null);
   assert.ok(await getGuestAccess(db, fresh.publicId), 'fresh unsettled row survives the sweep');
   assert.ok(await getGuestAccess(db, orderPublicId), 'settled row survives the sweep');
+  assert.equal(await sweepAbandonedGuestAccess(db), 0, 'a second sweep finds nothing new behind its cursor');
+
+  // More abandoned checkouts than one old LIMIT: every one is hidden. The sweep
+  // used to re-select the rows it had already hidden, so past the fifth it
+  // never reached a new one. Stamped later than the first terminal row, as the
+  // clock stamps them in production — a cursor trails the clock by days.
+  const many = [];
+  for (let i = 0; i < 7; i++) {
+    const claimed = await claimOrderIdentity(db);
+    await db
+      .prepare("INSERT INTO checkout_reservations (public_id, status, terminal_at) VALUES (?, 'failed', datetime('now', '-3 days', '-2 hours'))")
+      .bind(claimed.publicId)
+      .run();
+    many.push(claimed.publicId);
+  }
+  assert.equal(await sweepAbandonedGuestAccess(db), 7, 'all seven terminal credentials hidden in one pass');
+  for (const id of many) assert.ok((await getGuestAccess(db, id))?.hidden_at, `${id} hidden`);
+  assert.equal(await sweepAbandonedGuestAccess(db), 0, 'hidden rows are not hidden again');
+
+  // A reservation that turns terminal AFTER the cursor passed its age line is
+  // still reached: its terminal_at puts it back ahead of the cursor.
+  const late = await claimOrderIdentity(db);
+  await db
+    .prepare("INSERT INTO checkout_reservations (public_id, status, terminal_at) VALUES (?, 'expired', datetime('now', '-3 days', '-1 hour'))")
+    .bind(late.publicId)
+    .run();
+  assert.equal(await sweepAbandonedGuestAccess(db), 1, 'a newly terminal reservation behind the line is hidden');
+  assert.ok((await getGuestAccess(db, late.publicId))?.hidden_at);
 
   // Customer-email guest URLs: tokenized for ord_ orders, legacy passthrough,
   // and null (omit link) when a new order somehow has no registry row.

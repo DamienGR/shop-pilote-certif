@@ -298,7 +298,7 @@ await check('unavailable targets vanish from the storefront but stay listed for 
   assert.equal(visibleItems(menus.footer).length, 0, 'storefront renders none of them');
   assert.deepEqual(
     menus.footer.map((i) => unavailableReason(i)),
-    ['Draft — hidden on the storefront', 'Inactive — hidden on the storefront', 'Target no longer exists'],
+    ['Brouillon — invisible sur la vitrine', 'Inactif — invisible sur la vitrine', 'La cible n’existe plus'],
   );
 });
 
@@ -409,7 +409,7 @@ await check('a deleted target with a custom label is reported as deleted, not dr
   assert.equal(menus.footer[0].targetExists, false);
   assert.deepEqual(
     menus.footer.map((i) => unavailableReason(i)),
-    ['Target no longer exists', 'Target no longer exists'],
+    ['La cible n’existe plus', 'La cible n’existe plus'],
   );
   assert.equal(visibleItems(menus.footer).length, 0, 'still hidden on the storefront');
 });
@@ -421,7 +421,7 @@ await check('a draft target keeps its draft reason (not confused with deletion)'
   await db.prepare('UPDATE pages SET published = 0 WHERE id = 1').run();
   const item = (await getMenus(db, null)).footer[0];
   assert.equal(item.targetExists, true, 'the row is still there');
-  assert.equal(unavailableReason(item), 'Draft — hidden on the storefront');
+  assert.equal(unavailableReason(item), 'Brouillon — invisible sur la vitrine');
 });
 
 await check('a stale home-page setting does not raise a false catalog warning', async () => {

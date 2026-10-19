@@ -8,6 +8,7 @@ import { adminCredential } from '../../features/auth/admin';
 import { clearLoginAttempts, countLoginAttempt, loginThrottleKey } from '../../features/auth/loginThrottle';
 import { getSecret } from '../../features/secrets/store';
 import Turnstile from '../../features/auth/Turnstile.astro';
+import { t } from '../../features/i18n';
 
 // Credential = the PBKDF2 hash set in D1 by the setup wizard.
 const cred = await adminCredential(env.DB);
@@ -43,10 +44,10 @@ if (attempt && !attempt.allowed) {
   Astro.response.status = 429;
   Astro.response.headers.set('retry-after', String(attempt.retryAfter));
   Astro.response.headers.set('cache-control', 'no-store');
-  error = `Too many failed attempts. Try again in ${Math.ceil(attempt.retryAfter / 60)} min.`;
+  error = t('admin.login.error.throttled', { minutes: Math.ceil(attempt.retryAfter / 60) });
 } else if (throttleKey) {
   const form = await Astro.request.formData();
-  // Bot challenge (if enabled in Settings): verify with the vault secret.
+  // Bot challenge (if enabled in Réglages): verify with the vault secret.
   const turnstileEnabled = Astro.locals.settings?.turnstileEnabled === true;
   const tsSecret = turnstileEnabled
     ? await getSecret(env.DB, 'turnstile_secret_key')
@@ -60,9 +61,9 @@ if (attempt && !attempt.allowed) {
   const pwOk = await cred.verify(form.get('password')?.toString() ?? '');
 
   if (!tsOk) {
-    error = 'Verification failed — please try again.';
+    error = t('admin.login.error.verification');
   } else if (!pwOk) {
-    error = 'Incorrect password.';
+    error = t('admin.login.error.password');
   } else {
     await clearLoginAttempts(env.DB, throttleKey);
     const token = await signSession(signingKey, cred.tagSource, SESSION_TTL, now);
@@ -78,9 +79,9 @@ if (attempt && !attempt.allowed) {
 }
 ---
 
-<Layout title="Admin login">
+<Layout title={t('admin.login.title')}>
   <div class="mx-auto max-w-sm py-10">
-    <h1 class="mb-6 text-2xl font-bold">Admin sign in</h1>
+    <h1 class="mb-6 text-2xl font-bold">{t('admin.login.title')}</h1>
 
     {
       error && (
@@ -92,7 +93,7 @@ if (attempt && !attempt.allowed) {
 
     <form method="POST" action="/admin/login" class="space-y-4">
       <label class="block text-sm">
-        <span class="mb-1 block font-medium">Password</span>
+        <span class="mb-1 block font-medium">{t('admin.login.password')}</span>
         <input
           type="password"
           name="password"
@@ -111,7 +112,7 @@ if (attempt && !attempt.allowed) {
         type="submit"
         class="w-full rounded-md bg-brand px-4 py-2.5 font-medium text-white hover:bg-brand-hover"
       >
-        Sign in
+        {t('admin.login.submit')}
       </button>
     </form>
   </div>

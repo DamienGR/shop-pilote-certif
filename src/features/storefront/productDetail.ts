@@ -1,9 +1,8 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import type { StoreSettings } from '../settings/db';
-import { getProductBySlug, listProductImages, type Product } from '../products/db';
-import { listVariants, listExtras } from '../products/variants';
-import { categoriesForProduct, relatedProducts } from '../categories/db';
+import { getProductBySlug, type Product } from '../products/db';
 import { getRelatedStored, storeRelatedIds } from '../search';
+import { readProductPageRows } from './reads';
 import { enabledMethods } from '../payments';
 import { markdownExcerpt, renderMarkdown } from '../pages/markdown.ts';
 import { productImageSources, productImageUrl, type ImageDelivery } from '../products/image';
@@ -91,21 +90,20 @@ export async function loadProductDetail(
   const product = options.slug ? await getProductBySlug(db, options.slug) : null;
   if (!product) return { status: 'not_found' };
 
-  // Independent once the product is known. Run together so an uncached render
-  // pays one concurrent wait instead of a serial chain.
-  const [categories, storedRelated, variants, extras, gallery] = await Promise.all([
-    categoriesForProduct(db, product.id),
-    getRelatedStored(product, RELATED_TARGET),
-    listVariants(db, product.id),
-    listExtras(db, product.id),
-    listProductImages(db, product.id),
-  ]);
+  // Independent once the product is known: one D1 batch (reads.ts says why),
+  // beside the stored neighbours, which only a semantic-search shop has. The
+  // category top-up is read whether or not they fill the row — twice the
+  // target covers any shortfall, and inside the batch it costs no call.
+  const [{ categories, variants, extras, images: gallery, related: byCategory }, storedRelated] =
+    await Promise.all([
+      readProductPageRows(db, product.id, RELATED_TARGET * 2),
+      getRelatedStored(product, RELATED_TARGET),
+    ]);
 
   const semantic = storedRelated ?? [];
   let related = semantic;
   if (related.length < RELATED_TARGET) {
     const seen = new Set(related.map((p) => p.id));
-    const byCategory = await relatedProducts(db, product.id, RELATED_TARGET + semantic.length);
     related = [...related, ...byCategory.filter((p) => !seen.has(p.id))].slice(0, RELATED_TARGET);
   }
 

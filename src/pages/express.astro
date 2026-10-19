@@ -237,7 +237,9 @@ const methodRows = methods.map((m, i) => ({ m, primary: i === 0, copy: paymentMe
           >
             <span>
               <span class="block text-sm font-medium">{copy.label}</span>
-              <span class={`block text-xs ${primary ? 'text-on-brand/70' : 'text-muted'}`}>
+              {/* Full on-brand: at 70 % the hint fell under AA on atelier and
+                  studio (certification, étape 6). Its size already ranks it. */}
+              <span class={`block text-xs ${primary ? 'text-on-brand' : 'text-muted'}`}>
                 {copy.hint}
               </span>
             </span>

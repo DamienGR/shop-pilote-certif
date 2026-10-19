@@ -5,6 +5,7 @@ import { parseCategoryForm } from '../../../features/categories/form';
 import { uniqueCategorySlug } from '../../../features/categories/slug';
 import { CACHE_TAG } from '../../../features/cache/tags';
 import { purgeCacheTags } from '../../../features/cache/purge';
+import { t } from '../../../features/i18n';
 
 export const prerender = false;
 
@@ -21,7 +22,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   let parentId: number | null = null;
   if (parsed.data.parentPublicId) {
     const parent = await getCategoryByPublicId(env.DB, parsed.data.parentPublicId);
-    if (!parent) return redirect(fail('That parent category no longer exists.'), 303);
+    if (!parent) return redirect(fail(t('admin.categories.error.parentGone')), 303);
     parentId = parent.id;
   }
 

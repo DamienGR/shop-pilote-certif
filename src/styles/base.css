@@ -181,7 +181,7 @@
   }
 }
 
-/* Admin → Navigation → "Add an item".
+/* Admin → Navigation → « Ajouter un élément ».
    Every target type's picker is rendered up front and revealed by the type
    <select>, so choosing a type is instant instead of a page reload. Pure CSS via
    :has() + option:checked, which tracks the live selection — no JS, so the form

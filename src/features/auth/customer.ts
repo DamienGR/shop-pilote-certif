@@ -23,7 +23,7 @@ const normalize = (email: string) => email.trim().toLowerCase();
 
 /**
  * Accounts are usable only when the feature is on AND the signing secret is set.
- * The on/off flag is the Settings → Features toggle (D1 `accounts_enabled`),
+ * The on/off flag is the Réglages → Général toggle (D1 `accounts_enabled`),
  * falling back to the build-time `features.accounts` default when unset.
  */
 export async function accountsEnabled(): Promise<boolean> {

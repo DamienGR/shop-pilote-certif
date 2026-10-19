@@ -28,6 +28,7 @@ describe('carriers', () => {
 
   it('names a known carrier, and leaves "other" unnamed for the customer', () => {
     expect(carrierName('colissimo')).toBe('Colissimo');
+    expect(carrierName('other')).toBe('Autre');
     expect(shippedCarrierName('colissimo')).toBe('Colissimo');
     expect(shippedCarrierName('other')).toBeNull();
     expect(shippedCarrierName(null)).toBeNull();

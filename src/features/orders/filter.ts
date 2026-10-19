@@ -7,6 +7,8 @@
 // purpose. Filtering one but not the other is the classic pagination bug — the
 // table shows 3 rows while the pager offers 12 pages of them.
 
+import { t } from '../i18n/index.ts';
+
 export interface OrderFilters {
   status: OrderStatusFilter | null;
   fulfillment: 'fulfilled' | 'unfulfilled' | null;
@@ -34,17 +36,17 @@ const STATUS: Record<OrderStatusFilter, string> = {
 };
 
 export const ORDER_STATUS_OPTIONS: { value: OrderStatusFilter; label: string }[] = [
-  { value: 'paid', label: 'Paid' },
-  { value: 'partially_refunded', label: 'Partially refunded' },
-  { value: 'refunded', label: 'Refunded' },
-  { value: 'pending', label: 'Unpaid' },
+  { value: 'paid', label: t('admin.orders.status.paid') },
+  { value: 'partially_refunded', label: t('admin.orders.status.partiallyRefunded') },
+  { value: 'refunded', label: t('admin.orders.status.refunded') },
+  { value: 'pending', label: t('admin.orders.status.pending') },
 ];
 
 export const ORDER_METHOD_OPTIONS: { value: string; label: string }[] = [
-  { value: 'stripe', label: 'Card (Stripe)' },
-  { value: 'lightning', label: 'Lightning' },
-  { value: 'opennode', label: 'Bitcoin (OpenNode)' },
-  { value: 'demo', label: 'Demo' },
+  { value: 'stripe', label: t('admin.orders.method.stripe') },
+  { value: 'lightning', label: t('admin.orders.method.lightning') },
+  { value: 'opennode', label: t('admin.orders.method.opennode') },
+  { value: 'demo', label: t('admin.orders.method.demo') },
 ];
 
 const isStatus = (v: string | null): v is OrderStatusFilter =>

@@ -1,4 +1,5 @@
 import type { RateLimit } from '@cloudflare/workers-types';
+import { t } from '../i18n/index.ts';
 
 export type RateLimitBucket = 'auth' | 'checkout' | 'search';
 
@@ -49,10 +50,10 @@ export async function checkRateLimit(
 
 export function rateLimitedResponse(pathname: string): Response {
   const api = pathname.startsWith('/api/');
+  // A page's 429 is read by a person (the customer or Admin login form); the
+  // JSON one is part of the public API's contract and keeps its English text.
   return new Response(
-    api
-      ? JSON.stringify({ error: 'Too many requests. Try again shortly.' })
-      : 'Too many requests. Try again shortly.',
+    api ? JSON.stringify({ error: 'Too many requests. Try again shortly.' }) : t('tooManyRequests.body'),
     {
       status: 429,
       headers: {

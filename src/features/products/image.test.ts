@@ -178,6 +178,6 @@ describe('validateImage', () => {
   });
 
   it('rejects files larger than 5 MB', async () => {
-    expect(await validateImage(file('image/png', 5 * 1024 * 1024 + 1))).toMatch(/5 MB/);
+    expect(await validateImage(file('image/png', 5 * 1024 * 1024 + 1))).toMatch(/5 Mo/);
   });
 });

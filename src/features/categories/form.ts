@@ -1,4 +1,5 @@
 import { parsePublicId } from '../ids/publicId';
+import { t } from '../i18n/index.ts';
 
 /** Parsed category form fields (slug + parent resolved by the endpoint). */
 export interface ParsedCategoryForm {
@@ -12,7 +13,7 @@ export function parseCategoryForm(
   form: FormData,
 ): { data: ParsedCategoryForm } | { error: string } {
   const name = String(form.get('name') ?? '').trim();
-  if (!name) return { error: 'Name is required.' };
+  if (!name) return { error: t('admin.categories.error.nameRequired') };
 
   const slugInput = String(form.get('slug') ?? '').trim();
 
@@ -21,7 +22,7 @@ export function parseCategoryForm(
   let parentPublicId: string | null = null;
   if (parentRaw) {
     parentPublicId = parsePublicId(parentRaw, 'category');
-    if (!parentPublicId) return { error: 'Invalid parent category.' };
+    if (!parentPublicId) return { error: t('admin.categories.error.invalidParent') };
   }
 
   return { data: { name, slugInput, parentPublicId } };

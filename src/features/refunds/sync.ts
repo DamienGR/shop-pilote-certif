@@ -13,6 +13,7 @@ import type { RefundSyncInput } from '../payments/provider';
 // astro check both accept it.
 import { syncProviderRefund, openRefundReview, openReviewIfOverRefunded } from './db.ts';
 import { logSafe } from '../observability/logSafe.ts';
+import { t } from '../i18n/index.ts';
 
 export type SyncOutcome =
   /** Applied; `deltaCents` is how much the provider total advanced by. */
@@ -168,7 +169,7 @@ export async function applyRefundEvent(
     // The event id is the idempotency boundary; the charge is already recorded
     // on the refund_sync_events row.
     providerEventId: input.eventId,
-    reason: 'Synchronised from a provider refund event',
+    reason: t('admin.refunds.reason.syncedFromEvent'),
   });
 
   if (!result.ok) {

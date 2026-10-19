@@ -1,7 +1,7 @@
 /**
  * The shop can still send an e-mail (plan §7.3: "e-mail de test").
  *
- * The same button the merchant presses in Admin → Paramètres → E-mail: the
+ * The same button the merchant presses in Admin → Réglages → E-mail: the
  * SAVED configuration — provider, key from the vault, sender — sends one
  * message to an operator's address. A provider key revoked, a sending domain
  * whose DNS lost its records, a vault that no longer decrypts: each of those
@@ -60,7 +60,7 @@ async function turnstileField() {
   if (!siteKey) return null;
   if (TEST_SITEKEY.test(siteKey)) return { 'cf-turnstile-response': DUMMY_TOKEN };
   console.log(
-    '::warning::e-mail de test sauté : Turnstile garde la connexion de l\'admin avec un widget réel. Posez les clés de test de Cloudflare dans les réglages de staging (Admin → Réglages → Protection) pour que ce contrôle tourne.',
+    '::warning::e-mail de test sauté : Turnstile garde la connexion de l\'admin avec un widget réel. Posez les clés de test de Cloudflare dans les réglages de staging (Admin → Réglages → Protection anti-robots) pour que ce contrôle tourne.',
   );
   process.exit(0);
 }

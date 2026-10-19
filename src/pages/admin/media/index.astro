@@ -8,6 +8,7 @@ import { isUnused, usageLinks } from '../../../features/media/usage';
 import { mediaUrl } from '../../../features/media/url';
 import { loadMediaPage } from '../../api/admin/media';
 import { paginate, queryHref } from '../../../pagination';
+import { t, tn, formatNumber } from '../../../features/i18n';
 
 const error = Astro.url.searchParams.get('error');
 
@@ -21,22 +22,28 @@ const hrefFor = (p: number) => queryHref('/admin/media', { page: p > 1 ? p : und
 // See the note in admin/pages: the shared formatter, in the store's time zone.
 const timeZone = Astro.locals.settings?.timeZone ?? getConfig().timeZone;
 
-/** Legacy rows backfilled from R2 have no size — show nothing, not "0 B". */
+/** Legacy rows backfilled from R2 have no size — show nothing, not "0 o". */
 function formatSize(bytes: number | null): string | null {
   if (bytes == null) return null;
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024) return t('admin.media.size.bytes', { taille: formatNumber(bytes) });
+  if (bytes < 1024 * 1024) {
+    return t('admin.media.size.kilobytes', { taille: formatNumber(Math.round(bytes / 1024)) });
+  }
+  const megabytes = formatNumber(bytes / (1024 * 1024), {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
+  return t('admin.media.size.megabytes', { taille: megabytes });
 }
 ---
 
-<AdminLayout title="Media" active="media">
+<AdminLayout title={t('admin.media.title')} active="media">
   <div class="mb-8 flex flex-wrap items-center justify-between gap-4">
     <div>
-      <h1 class="font-serif text-3xl tracking-tight">Media</h1>
+      <h1 class="font-serif text-3xl tracking-tight">{t('admin.media.title')}</h1>
       <p class="mt-1 text-sm text-gray-500">
-        {total} file{total === 1 ? '' : 's'}. Deleting here removes the file everywhere —
-        it is refused while anything still uses it.
+        {tn('admin.media.count.one', 'admin.media.count.other', total)}
+        {t('admin.media.intro')}
       </p>
     </div>
   </div>
@@ -67,15 +74,15 @@ function formatSize(bytes: number | null): string | null {
       type="submit"
       class="rounded-md bg-brand px-4 py-2 text-xs font-medium uppercase tracking-wider text-white hover:bg-brand-hover"
     >
-      Upload
+      {t('admin.media.upload')}
     </button>
-    <span class="text-xs text-gray-500">JPEG, PNG, WebP, or GIF. Max 5 MB each.</span>
+    <span class="text-xs text-gray-500">{t('admin.media.uploadHint')}</span>
   </form>
 
   {
     items.length === 0 ? (
       <p class="py-12 text-center text-sm text-gray-500">
-        No files yet. Upload one above, or add a product image — every upload lands here.
+        {t('admin.media.empty')}
       </p>
     ) : (
       <ul class="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-4">
@@ -105,14 +112,14 @@ function formatSize(bytes: number | null): string | null {
                 {formatDate(m.created_at, { dateStyle: 'medium' }, timeZone)}
                 {dimensions ? ` · ${dimensions}` : ''}
                 {size ? ` · ${size}` : ''}
-                {!m.mime_type && !size ? ' · Legacy image' : ''}
+                {!m.mime_type && !size ? ` · ${t('admin.media.legacy')}` : ''}
               </p>
               <p class="text-xs text-gray-600">
                 {unused ? (
-                  <span class="text-gray-400">Unused</span>
+                  <span class="text-gray-400">{t('admin.media.unused')}</span>
                 ) : (
                   <Fragment>
-                    Used by{' '}
+                    {t('admin.media.usedBy')}{' '}
                     {usageLinks(entry!).map((link, index) => (
                       <Fragment>
                         {index > 0 && ', '}
@@ -132,9 +139,10 @@ function formatSize(bytes: number | null): string | null {
                 <button
                   type="button"
                   data-copy-url={url}
+                  data-copied-label={t('admin.media.copied')}
                   class="text-xs uppercase tracking-widest text-gray-500 hover:text-brand"
                 >
-                  Copy URL
+                  {t('admin.media.copyUrl')}
                 </button>
                 {unused && (
                   <form method="post" action={`/api/admin/media/${m.public_id}`}>
@@ -143,7 +151,7 @@ function formatSize(bytes: number | null): string | null {
                       type="submit"
                       class="text-xs uppercase tracking-widest text-red-600 hover:text-red-700"
                     >
-                      Delete
+                      {t('admin.common.delete')}
                     </button>
                   </form>
                 )}
@@ -168,7 +176,7 @@ function formatSize(bytes: number | null): string | null {
     try {
       await navigator.clipboard.writeText(url);
       const original = button.textContent;
-      button.textContent = 'Copied';
+      button.textContent = button.dataset.copiedLabel ?? original;
       setTimeout(() => {
         button.textContent = original;
       }, 1200);

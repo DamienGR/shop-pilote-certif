@@ -11,6 +11,7 @@ import { getStoreSettings } from '../../../../features/settings/db';
 import { parsePublicId } from '../../../../features/ids/publicId';
 import { CACHE_TAG } from '../../../../features/cache/tags';
 import { purgeCacheTags } from '../../../../features/cache/purge';
+import { t, tn } from '../../../../features/i18n';
 
 export const prerender = false;
 
@@ -26,7 +27,8 @@ function nonNegativeInteger(value: FormDataEntryValue | null): number {
 
 // POST /api/admin/search/reindex — (re)build the semantic-search index from every
 // product in bounded batches. JS advances automatically; without JS the redirect
-// preserves the cursor and presents a "Continue reindex" button.
+// preserves the cursor and presents a "Reprendre la réindexation" button. Every
+// message here is shown on Admin → Réglages → Recherche, so it is French.
 //
 // The wire-format cursor is the LAST PROCESSED product's prod_ public ID ('' =
 // start): admin output never carries a numeric row id, while the keyset itself
@@ -51,10 +53,10 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   const settings = await getStoreSettings(env.DB);
   const provider = settings.searchProvider ?? getConfig().search.provider;
   if (provider !== 'vector') {
-    return fail('Semantic search is off — enable it in Settings first.');
+    return fail(t('admin.settings.reindex.off'));
   }
   if (!env.AI || !env.VECTORIZE) {
-    return fail('Semantic search is unavailable — add the AI and VECTORIZE bindings first.');
+    return fail(t('admin.settings.reindex.unavailable'));
   }
 
   const form = await request.formData();
@@ -87,14 +89,14 @@ export const POST: APIRoute = async ({ request, redirect }) => {
       return Response.json({ processed, total, nextCursor, done });
     }
     return done
-      ? back(`Reindexed ${processed} product(s) into the semantic search index.`)
+      ? back(tn('admin.settings.reindex.done.one', 'admin.settings.reindex.done.other', processed))
       : back(
-          `Reindexed ${processed} of ${total} products. Continue to process the next batch.`,
+          t('admin.settings.reindex.partial', { traites: processed, total }),
           nextCursor,
           processed,
         );
   } catch (err) {
-    const message = `Reindex failed: ${(err as Error).message}`;
+    const message = t('admin.settings.reindex.failed', { erreur: (err as Error).message });
     return wantsJson
       ? Response.json({ error: message }, { status: 500 })
       : back(message, cursorPublicId, processedBefore);

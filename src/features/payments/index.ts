@@ -69,7 +69,7 @@ export function paymentsInDemoMode(settings: StoreSettings, vault = vaultReady()
   return !hasRealMethod(settings, vault);
 }
 
-/** The store's default rail (Settings → Payments; default 'stripe'). */
+/** The store's default rail (Réglages → Paiements; default 'stripe'). */
 export function defaultMethod(settings: StoreSettings): PaymentMethod {
   return settings.paymentProvider;
 }

@@ -4,6 +4,8 @@ import {
   orderFilterClause,
   hasOrderFilters,
   orderFilterParams,
+  ORDER_STATUS_OPTIONS,
+  ORDER_METHOD_OPTIONS,
 } from './filter';
 
 const parse = (qs: string) => parseOrderFilters(new URLSearchParams(qs));
@@ -27,6 +29,24 @@ describe('parseOrderFilters', () => {
   it('is empty with no params', () => {
     expect(hasOrderFilters(parse(''))).toBe(false);
     expect(hasOrderFilters(parse('status=paid'))).toBe(true);
+  });
+
+  it('labels the options in French, keeping the values as query codes', () => {
+    // The label is what the Admin shows; the value is what the URL carries, so
+    // translating one must never touch the other.
+    expect(ORDER_STATUS_OPTIONS).toEqual([
+      { value: 'paid', label: 'Payée' },
+      { value: 'partially_refunded', label: 'Partiellement remboursée' },
+      { value: 'refunded', label: 'Remboursée' },
+      { value: 'pending', label: 'En attente' },
+    ]);
+    expect(ORDER_METHOD_OPTIONS.map((o) => o.value)).toEqual([
+      'stripe',
+      'lightning',
+      'opennode',
+      'demo',
+    ]);
+    expect(ORDER_METHOD_OPTIONS.find((o) => o.value === 'stripe')?.label).toBe('Carte (Stripe)');
   });
 });
 

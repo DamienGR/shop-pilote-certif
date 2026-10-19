@@ -10,7 +10,7 @@ propriétaire et ses opérateurs ont.
 
 ## D'abord : bloqué n'est pas perdu
 
-Si la page de connexion répond « Too many failed attempts », le mot de passe
+Si la page de connexion répond « Trop de tentatives échouées », le mot de passe
 n'est peut-être pas perdu : le réseau du commerçant a épuisé ses cinq essais du
 quart d'heure (`src/features/auth/loginThrottle.ts`, table
 `admin_login_attempts`). Le compteur est par réseau client, pas par mot de

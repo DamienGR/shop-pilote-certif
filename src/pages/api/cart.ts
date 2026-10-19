@@ -19,7 +19,7 @@ export const POST: APIRoute = async ({ request, cookies, url, redirect }) => {
   const action = String(form.get('_action'));
   const cart = readCart(cookies);
   const partial = request.headers.get('x-partial') === '1';
-  // Cart switched off in Settings → browse-only; refuse all cart mutations.
+  // Cart switched off in Réglages → Général (browse-only); refuse all cart mutations.
   if (!(await getStoreSettings(env.DB)).cartEnabled) {
     return partial ? new Response(null, { status: 204 }) : redirect('/', 303);
   }

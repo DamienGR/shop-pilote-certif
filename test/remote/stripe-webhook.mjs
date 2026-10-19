@@ -73,7 +73,7 @@ async function stockOf(slug) {
   if (status === 409 && Number.isInteger(body.available)) return body.available;
   if (status === 429) return null;
   if (status === 400 && /Unsupported payment method/.test(body.error ?? '')) {
-    fail('Stripe n\'est pas activé sur cette boutique (clé secrète et secret de webhook dans Admin → Paramètres).');
+    fail('Stripe n\'est pas activé sur cette boutique (clé secrète et secret de webhook dans Admin → Réglages).');
   }
   fail(`la sonde de stock a reçu ${status} ${JSON.stringify(body)}`);
 }

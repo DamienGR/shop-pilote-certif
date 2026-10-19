@@ -104,13 +104,13 @@ describe('validateVariantWeights', () => {
     return f;
   };
   it('refuses the inputs that used to be silently discarded', () => {
-    expect(validateVariantWeights(withWeights('heavy'), 'g')).toMatch(/must be a number/);
-    expect(validateVariantWeights(withWeights('-1'), 'g')).toMatch(/negative/);
-    expect(validateVariantWeights(withWeights('0.5'), 'g')).toMatch(/decimal places/);
-    expect(validateVariantWeights(withWeights('2000'), 'kg')).toMatch(/too heavy/);
+    expect(validateVariantWeights(withWeights('heavy'), 'g')).toMatch(/doit être un nombre/);
+    expect(validateVariantWeights(withWeights('-1'), 'g')).toMatch(/négatif/);
+    expect(validateVariantWeights(withWeights('0.5'), 'g')).toMatch(/trop de décimales/);
+    expect(validateVariantWeights(withWeights('2000'), 'kg')).toMatch(/dépasse la limite/);
   });
   it('names the offending row', () => {
-    expect(validateVariantWeights(withWeights('1', 'heavy'), 'g')).toMatch(/^Variant 2:/);
+    expect(validateVariantWeights(withWeights('1', 'heavy'), 'g')).toBe('Variante 2 : le poids doit être un nombre.');
   });
   it('accepts blank (inherit), zero, and ordinary values', () => {
     expect(validateVariantWeights(withWeights('', '0', '250'), 'g')).toBeNull();

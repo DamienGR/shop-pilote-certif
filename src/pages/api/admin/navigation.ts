@@ -13,6 +13,7 @@ import {
   getMenuItemIdByPublicId,
   menuItemIdsByPublicId,
   MENU_CAPS,
+  type MenuLocation,
   type MenuTargetType,
 } from '../../../features/navigation/db';
 import { getPageByPublicId } from '../../../features/pages/db';
@@ -21,14 +22,28 @@ import { getCategoryByPublicId } from '../../../features/categories/db';
 import { parsePublicId } from '../../../features/ids/publicId';
 import { CACHE_TAG } from '../../../features/cache/tags';
 import { purgeCacheTags } from '../../../features/cache/purge';
+import { t } from '../../../features/i18n';
 
 export const prerender = false;
 
+// One key per menu rather than the menu's name as a parameter: French puts it
+// after a preposition that changes with it ("du menu d’en-tête", "du pied de page").
 const FAILURE_MESSAGES = {
-  full: (location: string) =>
-    `The ${location} menu is full (${MENU_CAPS[location as 'header' | 'footer']} items). Remove one first.`,
-  duplicate: (location: string, what: string) => `${what} is already in the ${location} menu.`,
-  unavailable: () => 'That page, product, or category is no longer available.',
+  full: (location: MenuLocation) =>
+    t(
+      location === 'header'
+        ? 'admin.navigation.error.full.header'
+        : 'admin.navigation.error.full.footer',
+      { max: MENU_CAPS[location] },
+    ),
+  duplicate: (location: MenuLocation, what: string) =>
+    t(
+      location === 'header'
+        ? 'admin.navigation.error.duplicate.header'
+        : 'admin.navigation.error.duplicate.footer',
+      { element: what },
+    ),
+  unavailable: () => t('admin.navigation.error.unavailable'),
 };
 
 /**
@@ -70,7 +85,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
    * Redirect back to the page the merchant was on, in the state they left it.
    *
    * Adding several items to the footer is the normal case, and a bare redirect
-   * reset the "Add to" selector to Header every time — so the second and third
+   * reset the "Ajouter à" selector to En-tête every time — so the second and third
    * add silently went to the wrong menu unless the merchant re-picked it.
    *
    * The submitted form wins for the fields it carries (the merchant may have
@@ -87,7 +102,10 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   const back = (msg?: string) => {
     if (wantsNoContent) {
       return msg
-        ? new Response(msg, { status: 400, headers: { 'content-type': 'text/plain' } })
+        ? new Response(msg, {
+            status: 400,
+            headers: { 'content-type': 'text/plain; charset=utf-8' },
+          })
         : new Response(null, { status: 204 });
     }
     const params = new URLSearchParams();
@@ -119,8 +137,12 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   if (action === 'add') {
     const location = form.get('location');
     const targetType = form.get('target_type');
-    if (!isMenuLocation(location)) return new Response('Invalid location', { status: 400 });
-    if (!isMenuTargetType(targetType)) return new Response('Invalid target type', { status: 400 });
+    if (!isMenuLocation(location)) {
+      return new Response(t('admin.navigation.error.invalidLocation'), { status: 400 });
+    }
+    if (!isMenuTargetType(targetType)) {
+      return new Response(t('admin.navigation.error.invalidTargetType'), { status: 400 });
+    }
 
     // Singletons carry no target; the rest submit a public ID that must resolve.
     let targetId: number | null = null;
@@ -131,7 +153,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
       // direct API caller does not have to know that detail.
       const raw = form.get(`target_id_${targetType}`) ?? form.get('target_id');
       targetId = await resolveTargetId(targetType, raw);
-      if (targetId === null) return back('Choose a target first.');
+      if (targetId === null) return back(t('admin.navigation.error.noTarget'));
     }
 
     const result = await addMenuItem(env.DB, {
@@ -142,7 +164,9 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     });
     if (result.ok) return saved();
 
-    const what = targetType === 'home' ? 'Home' : 'Catalog';
+    const what = t(
+      targetType === 'home' ? 'admin.navigation.type.home' : 'admin.navigation.type.catalog',
+    );
     return back(
       result.reason === 'full'
         ? FAILURE_MESSAGES.full(location)
@@ -157,7 +181,9 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   // a tampered payload) simply drop out and fail the permutation check below.
   if (action === 'reorder') {
     const location = form.get('location');
-    if (!isMenuLocation(location)) return new Response('Invalid location', { status: 400 });
+    if (!isMenuLocation(location)) {
+      return new Response(t('admin.navigation.error.invalidLocation'), { status: 400 });
+    }
     const byPublicId = await menuItemIdsByPublicId(env.DB, location);
     const ids = form
       .getAll('order')
@@ -170,14 +196,14 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     // position. The client reloads on a non-OK response, so the merchant sees
     // the real order rather than an optimistic one.
     const applied = await reorderMenuItems(env.DB, location, ids);
-    if (!applied) return back('That reorder did not match the menu. Reloading.');
+    if (!applied) return back(t('admin.navigation.error.reorderMismatch'));
     return saved();
   }
 
   // Row actions address the item by its nav_ public ID.
   const itemPublicId = parsePublicId(form.get('id'), 'navItem');
   const id = itemPublicId ? await getMenuItemIdByPublicId(env.DB, itemPublicId) : null;
-  if (id === null) return new Response('Invalid id', { status: 400 });
+  if (id === null) return new Response(t('admin.navigation.error.invalidId'), { status: 400 });
 
   if (action === 'move') {
     await moveMenuItem(env.DB, id, form.get('direction') === 'up' ? 'up' : 'down');
@@ -194,5 +220,5 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     return saved();
   }
 
-  return back('Unknown action.');
+  return back(t('admin.navigation.error.unknownAction'));
 };

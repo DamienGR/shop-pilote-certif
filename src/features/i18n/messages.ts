@@ -1,7 +1,9 @@
+import { frAdmin } from './admin/index.ts';
 import type { Catalog } from './catalog.ts';
 
 /**
- * Every customer-facing string the core renders, in French.
+ * Every string the core renders, in French: the storefront's below, and the
+ * Admin's spread in at the end from `admin/` (one fragment per Admin section).
  *
  * ONE flat object with dotted keys, not nested groups. The key is the thing a
  * call site writes and a reviewer greps for; nesting would make `t()` walk a
@@ -255,6 +257,9 @@ export const fr = {
   'notFound.backToShop': 'Retour à la boutique',
   'notFound.searchCatalog': 'Rechercher dans le catalogue',
 
+  // ─── Trop de requêtes (429 d’une page, connexion client ou admin) ──────────────
+  'tooManyRequests.body': 'Trop de requêtes. Réessayez dans un instant.',
+
   // ─── Compte client ─────────────────────────────────────────────────────────────
   'account.title': 'Votre compte',
   'account.signIn': 'Se connecter',
@@ -283,20 +288,20 @@ export const fr = {
   'paymentSetup.opennode.title': 'Configurer les paiements Bitcoin (OpenNode)',
   'paymentSetup.opennode.intro': 'Paiement on-chain et Lightning hébergé par OpenNode.',
   'paymentSetup.backToCart': 'Retour au panier',
-  'paymentSetup.unconfigured': 'Ce moyen de paiement n’est pas encore configuré. Activez un vrai canal (carte ou Lightning) dans Admin → Settings → Payments, ou continuez avec la commande de démonstration pour essayer la boutique.',
+  'paymentSetup.unconfigured': 'Ce moyen de paiement n’est pas encore configuré. Activez un vrai canal (carte ou Lightning) dans Admin → Réglages → Paiements, ou continuez avec la commande de démonstration pour essayer la boutique.',
   'paymentSetup.demoNotice.before': 'En attendant, la',
   'paymentSetup.demoNotice.strong': 'commande de démonstration',
   'paymentSetup.demoNotice.after': 'fonctionne dès maintenant : elle enregistre une vraie commande marquée « demo », pour voir le parcours complet sans débiter personne.',
   'paymentSetup.stripe.step1': 'Créez un compte Stripe et récupérez votre clé secrète sur dashboard.stripe.com/apikeys.',
-  'paymentSetup.stripe.step2': 'Collez-la dans Admin → Settings → Payment keys (Stripe secret key). Elle est chiffrée dans votre base.',
+  'paymentSetup.stripe.step2': 'Collez-la dans Admin → Réglages → Paiements, bloc Carte (Stripe), champ « Clé secrète ». Elle est chiffrée dans votre base.',
   'paymentSetup.stripe.step3': 'Ajoutez un point de terminaison webhook dans Stripe vers {url} (événements : checkout.session.completed, checkout.session.async_payment_succeeded et charge.refunded — ce dernier reporte dans vos commandes les remboursements faits depuis le tableau de bord Stripe).',
-  'paymentSetup.stripe.step4': 'Collez la clé de signature obtenue dans Payment keys (Stripe webhook signing secret). Le bouton carte s’active tout seul.',
+  'paymentSetup.stripe.step4': 'Collez la clé de signature obtenue dans le même bloc, champ « Secret de signature du webhook ». Le bouton carte s’active tout seul.',
   'paymentSetup.lightning.step1': 'Montez une instance LNbits (ou un nœud phoenixd).',
-  'paymentSetup.lightning.step2': 'Dans Admin → Settings → Payments, choisissez Lightning comme canal par défaut et sélectionnez le nœud (LNbits ou phoenixd).',
-  'paymentSetup.lightning.step3': 'Renseignez l’URL du nœud dans Payment config, et la clé (clé invoice/read LNbits, ou mot de passe phoenixd) dans Payment keys. Le bouton Lightning s’active tout seul.',
+  'paymentSetup.lightning.step2': 'Dans Admin → Réglages → Paiements, choisissez Lightning comme moyen de paiement par défaut, puis le type de nœud (LNbits ou phoenixd) dans le bloc Lightning.',
+  'paymentSetup.lightning.step3': 'Dans le même bloc, renseignez l’URL du nœud et sa clé (« Clé invoice/read LNbits » ou « Mot de passe phoenixd »). Le bouton Lightning s’active tout seul.',
   'paymentSetup.opennode.step1': 'Créez un compte OpenNode et une clé d’API.',
-  'paymentSetup.opennode.step2': 'Collez-la dans Admin → Settings → Payment keys (OpenNode API key).',
-  'paymentSetup.opennode.step3': 'Pointez son webhook vers {url}, et choisissez OpenNode comme canal par défaut dans Settings → Payments.',
+  'paymentSetup.opennode.step2': 'Collez-la dans Admin → Réglages → Paiements, bloc Bitcoin (OpenNode), champ « Clé d’API ».',
+  'paymentSetup.opennode.step3': 'Pointez son webhook vers {url}, et choisissez OpenNode comme moyen de paiement par défaut dans Réglages → Paiements.',
 
   // ─── E-mails ───────────────────────────────────────────────────────────────────
   'email.order.subject': 'Votre commande {boutique} n°{numero}',
@@ -365,4 +370,7 @@ export const fr = {
   'email.reissue.ignore1': 'Si vous n’avez pas demandé de nouveau lien, ignorez cet e-mail ; le nouveau',
   'email.reissue.ignore2': 'lien affiche votre commande comme d’habitude.',
   'email.reissue.footer': 'Si vous n’avez pas demandé de nouveau lien, vous pouvez ignorer cet e-mail.',
+
+  // ─── Administration (admin/, ADR 0018) ─────────────────────────────────────────
+  ...frAdmin,
 } satisfies Catalog;

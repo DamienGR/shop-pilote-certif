@@ -8,6 +8,7 @@ import { savePageBody, saveWarning } from '../../../../features/pages/save';
 import { parsePublicId } from '../../../../features/ids/publicId';
 import { CACHE_TAG } from '../../../../features/cache/tags';
 import { purgeCacheTags } from '../../../../features/cache/purge';
+import { t } from '../../../../features/i18n';
 
 export const prerender = false;
 
@@ -16,7 +17,7 @@ export const prerender = false;
 export const POST: APIRoute = async ({ request, params, redirect }) => {
   const publicId = parsePublicId(params.id, 'page');
   const existing = publicId ? await getPageByPublicId(env.DB, publicId) : null;
-  if (!existing) return new Response('Not found', { status: 404 });
+  if (!existing) return new Response(t('admin.pages.notFound'), { status: 404 });
   const id = existing.id;
 
   const form = await request.formData();

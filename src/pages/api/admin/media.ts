@@ -14,6 +14,7 @@ import { optimizeUpload } from '../../../features/products/imageOptimize';
 import { prewarmImageTransforms } from '../../../features/products/image';
 import { getSetting } from '../../../features/settings/db';
 import { getStorage } from '../../../features/storage';
+import { t } from '../../../features/i18n';
 
 export const prerender = false;
 
@@ -115,7 +116,7 @@ export const POST: APIRoute = async ({ request, redirect, locals }) => {
         })
       : redirect(`/admin/media?error=${encodeURIComponent(msg)}`, 303);
 
-  if (files.length === 0) return fail('Choose at least one image.');
+  if (files.length === 0) return fail(t('admin.media.error.noFiles'));
 
   // Validate everything before storing anything, so a bad file in a multi-select
   // doesn't leave half the batch uploaded.

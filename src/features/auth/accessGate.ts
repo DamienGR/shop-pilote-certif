@@ -1,3 +1,5 @@
+import { t } from '../i18n/index.ts';
+
 export type AccessGateDecision =
   | { action: 'bootstrap' }
   | { action: 'deny'; message: string }
@@ -20,11 +22,11 @@ export function accessGateDecision(
     if (!teamDomain || !aud) {
       return {
         action: 'deny',
-        message: 'Cloudflare Access is misconfigured: set both CF_ACCESS_TEAM_DOMAIN and CF_ACCESS_AUD.',
+        message: t('admin.shell.gate.accessMisconfigured'),
       };
     }
     if (!token) {
-      return { action: 'deny', message: 'Cloudflare Access authentication required.' };
+      return { action: 'deny', message: t('admin.shell.gate.accessRequired') };
     }
     return { action: 'verify', token, teamDomain, aud };
   }
@@ -35,7 +37,7 @@ export function accessGateDecision(
   if (token) {
     return {
       action: 'deny',
-      message: 'Cloudflare Access is not configured: set CF_ACCESS_TEAM_DOMAIN and CF_ACCESS_AUD.',
+      message: t('admin.shell.gate.accessNotConfigured'),
     };
   }
   return { action: 'bootstrap' };

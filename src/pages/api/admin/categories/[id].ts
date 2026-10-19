@@ -11,6 +11,7 @@ import { uniqueCategorySlug } from '../../../../features/categories/slug';
 import { parsePublicId } from '../../../../features/ids/publicId';
 import { CACHE_TAG } from '../../../../features/cache/tags';
 import { purgeCacheTags } from '../../../../features/cache/purge';
+import { t } from '../../../../features/i18n';
 
 export const prerender = false;
 
@@ -19,7 +20,7 @@ export const prerender = false;
 export const POST: APIRoute = async ({ request, params, redirect }) => {
   const publicId = parsePublicId(params.id, 'category');
   const category = publicId ? await getCategoryByPublicId(env.DB, publicId) : null;
-  if (!category) return new Response('Not found', { status: 404 });
+  if (!category) return new Response(t('admin.categories.notFound'), { status: 404 });
   const id = category.id;
 
   const form = await request.formData();
@@ -40,7 +41,7 @@ export const POST: APIRoute = async ({ request, params, redirect }) => {
   let parentId: number | null = null;
   if (parsed.data.parentPublicId) {
     const parent = await getCategoryByPublicId(env.DB, parsed.data.parentPublicId);
-    if (!parent) return fail('That parent category no longer exists.');
+    if (!parent) return fail(t('admin.categories.error.parentGone'));
     parentId = parent.id;
   }
 
@@ -48,7 +49,7 @@ export const POST: APIRoute = async ({ request, params, redirect }) => {
   if (parentId != null) {
     const blocked = new Set(await descendantIds(env.DB, id));
     if (blocked.has(parentId)) {
-      return fail('A category cannot be moved under itself or one of its sub-categories.');
+      return fail(t('admin.categories.error.cycle'));
     }
   }
 

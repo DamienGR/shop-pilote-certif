@@ -61,7 +61,7 @@ export function assertNoCredentialsInArgv(argv) {
     if (what) {
       throw inputError(
         `an argument looks like ${what}.`,
-        'shopctl never takes a credential on the command line: it is already in your shell history and in the CI log of whatever ran it. Rotate that key, then set it in Admin → Settings or the platform secret store.',
+        'shopctl never takes a credential on the command line: it is already in your shell history and in the CI log of whatever ran it. Rotate that key, then set it in Admin → Réglages or the platform secret store.',
       );
     }
   }

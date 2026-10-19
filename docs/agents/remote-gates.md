@@ -34,6 +34,15 @@ from an argument: `BASE_URL`, and behind a private preview
   a URL, it fails; in a header or the `cf` metadata — the browser's and the
   edge's, Access's identity included — it is reported, not judged. The report
   names findings and never reproduces one, because it is a committed proof.
+- `npm run test:cpu:remote -- tail.json` — reads the same kind of capture for
+  the CPU and wall time of each event, grouped by the page file that answered
+  it (derived from `src/pages`, so a URL — a guest token, an e-mail in an
+  admin path — never reaches the report): first request, p50/p90/p99, max,
+  and the count past the Free plan's 10 ms, reported and not judged. An
+  invocation Cloudflare stopped (`exceededCpu`, error 1102) fails it. Cold
+  and warm come from when the capture is taken — right after a deploy, or
+  during the load test. A capture whose events carry no CPU time is exit 2,
+  pointing at Workers Logs.
 - `npm run test:browser:remote` — the browser gate against `BASE_URL`.
   `test/browser/remote-routes.mjs` finds the kinds of page the specs need in
   the merchant's catalogue (once per run, through `MINSHOP_REMOTE_FIXTURE`),

@@ -54,10 +54,17 @@ Elle échoue (code 6) quand :
 - plus de 1 % des invocations du Worker se terminent en erreur sur les
   dernières vingt-quatre heures (jugé à partir de cent requêtes) ;
 - au plan **Workers Free**, 70 % d'un quota quotidien est atteint : 100 000
-  requêtes, 10 ms de CPU par requête, 5 millions de lignes D1 lues, 100 000
-  écrites. Au-delà de ces quotas, la boutique répond en erreur jusqu'à minuit
-  UTC ; l'alerte sonne donc le jour où le commerçant doit **passer au plan
-  Workers Paid**, pas le jour du blocage.
+  requêtes, 5 millions de lignes D1 lues, 100 000 écrites. Au-delà de ces
+  quotas, la boutique répond en erreur jusqu'à minuit UTC ; l'alerte sonne
+  donc le jour où le commerçant doit **passer au plan Workers Paid**, pas le
+  jour du blocage ;
+- au plan **Workers Free**, Cloudflare a arrêté une invocation pour ses
+  limites (erreur 1102 pour le visiteur). Les 10 ms de CPU par requête se
+  jugent ainsi, et non sur le p99, qui est relevé sans être jugé : Cloudflare
+  tolère un dépassement occasionnel par isolat, et le p99 d'une petite
+  boutique, ce sont ses démarrages à froid, qui dépassent toujours (rouge
+  chaque nuit sur le staging de la certification sans qu'aucune requête ait
+  été arrêtée — étape 6, 2026-10-15).
 
 Une analytique injoignable ou refusée est un échec (code 5), jamais un vert.
 

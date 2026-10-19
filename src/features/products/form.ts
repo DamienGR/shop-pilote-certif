@@ -1,6 +1,7 @@
 import type { ProductFields } from './db';
 import { toMinorUnits } from '../../money';
 import { toGrams, type WeightUnit } from '../shipping/weight';
+import { t } from '../i18n';
 
 export interface ProductFormOptions {
   /** Admin's display unit. Storage is always grams. */
@@ -27,7 +28,7 @@ export function parseProductForm(
   const { unit = 'g', requireWeight = false } = options;
 
   const name = String(form.get('name') ?? '').trim();
-  if (!name) return { error: 'Name is required.' };
+  if (!name) return { error: t('admin.products.error.nameRequired') };
 
   // Free text on purpose. The merchant's own reference is whatever their
   // supplier prints on the box, and the invariant that matters — one product per
@@ -39,12 +40,12 @@ export function parseProductForm(
 
   const price = Number(String(form.get('price') ?? '').trim());
   if (!Number.isFinite(price) || price < 0) {
-    return { error: 'Price must be a non-negative number.' };
+    return { error: t('admin.products.error.price') };
   }
 
   const stock = Number(String(form.get('stock') ?? '0').trim());
   if (!Number.isInteger(stock) || stock < 0) {
-    return { error: 'Stock must be a non-negative whole number.' };
+    return { error: t('admin.products.error.stock') };
   }
 
   const currency = String(form.get('currency') ?? 'usd').trim().toLowerCase() || 'usd';
@@ -62,11 +63,7 @@ export function parseProductForm(
   } else if (parsedWeight.status === 'error') {
     return { error: weightFieldError(parsedWeight.reason, unit) };
   } else if (requireWeight && requires_shipping === 1 && active === 1) {
-    return {
-      error:
-        'This product needs a shipping weight: every shipping zone prices by weight, ' +
-        'so without one it cannot be purchased.',
-    };
+    return { error: t('admin.products.error.weightRequired') };
   }
 
   return {
@@ -80,12 +77,12 @@ function weightFieldError(
 ): string {
   switch (reason) {
     case 'negative':
-      return 'Weight cannot be negative.';
+      return t('admin.products.error.weightNegative');
     case 'precision':
-      return `Weight has too many decimal places for ${unit}.`;
+      return t('admin.products.error.weightPrecision', { unite: unit });
     case 'over_limit':
-      return 'Weight is too heavy for parcel shipping.';
+      return t('admin.products.error.weightOverLimit');
     default:
-      return 'Weight must be a number.';
+      return t('admin.products.error.weightNotNumber');
   }
 }

@@ -4,6 +4,7 @@ import { paymentsInDemoMode } from '../features/payments';
 import { shippingFor } from '../features/shipping/effective';
 import { env } from 'cloudflare:workers';
 import { countUnresolvedInventoryExceptions } from '../features/orders/db';
+import { LANG, t, tn } from '../features/i18n';
 // Admin's OWN stylesheet — never global.css, which carries the active
 // storefront set's tokens and base-layer rules. A dark set would otherwise
 // restyle every authenticated Admin page (see src/styles/admin.css).
@@ -32,10 +33,12 @@ const storeName = Astro.locals.settings?.storeName ?? config.storeName;
 // Nudge to finish first-run setup — except while on the wizard itself.
 const showSetupNudge =
   !Astro.locals.settings?.setupComplete && Astro.url.pathname !== '/admin/setup';
-// Show "Log out" only when a password-login session cookie is present. Under
+// Show "Se déconnecter" only when a password-login session cookie is present. Under
 // Cloudflare Access or local dev there's no minshop session to clear.
 const showLogout = !!Astro.cookies.get('admin_session')?.value;
-const pageTitle = title ? `${title} — ${storeName} admin` : `${storeName} admin`;
+const pageTitle = title
+  ? t('admin.shell.title', { titre: title, boutique: storeName })
+  : t('admin.shell.titleBare', { boutique: storeName });
 // Configuration that fails closed blocks checkout for physical orders, and the only
 // other signal is a Worker log nobody is watching. Surface it on EVERY admin page,
 // not just the shipping one — the merchant should not have to go looking to find
@@ -45,28 +48,29 @@ const shippingIssue = shippingFor(Astro.locals.settings).issue;
 const inventoryExceptionCount = await countUnresolvedInventoryExceptions(env.DB);
 
 const nav: { key: Section; label: string; href: string }[] = [
-  { key: 'dashboard', label: 'Dashboard', href: '/admin' },
-  { key: 'products', label: 'Products', href: '/admin/products' },
-  { key: 'orders', label: 'Orders', href: '/admin/orders' },
-  { key: 'customers', label: 'Customers', href: '/admin/customers' },
-  { key: 'categories', label: 'Categories', href: '/admin/categories' },
-  { key: 'pages', label: 'Pages', href: '/admin/pages' },
-  { key: 'navigation', label: 'Navigation', href: '/admin/navigation' },
-  { key: 'shipping', label: 'Shipping', href: '/admin/shipping' },
-  { key: 'media', label: 'Media', href: '/admin/media' },
-  { key: 'settings', label: 'Settings', href: '/admin/settings' },
+  { key: 'dashboard', label: t('admin.shell.nav.dashboard'), href: '/admin' },
+  { key: 'products', label: t('admin.shell.nav.products'), href: '/admin/products' },
+  { key: 'orders', label: t('admin.shell.nav.orders'), href: '/admin/orders' },
+  { key: 'customers', label: t('admin.shell.nav.customers'), href: '/admin/customers' },
+  { key: 'categories', label: t('admin.shell.nav.categories'), href: '/admin/categories' },
+  { key: 'pages', label: t('admin.shell.nav.pages'), href: '/admin/pages' },
+  { key: 'navigation', label: t('admin.shell.nav.navigation'), href: '/admin/navigation' },
+  { key: 'shipping', label: t('admin.shell.nav.shipping'), href: '/admin/shipping' },
+  { key: 'media', label: t('admin.shell.nav.media'), href: '/admin/media' },
+  { key: 'settings', label: t('admin.shell.nav.settings'), href: '/admin/settings' },
 ];
 // Label of the section we're on — shown in the collapsed mobile disclosure.
-const currentLabel = nav.find((n) => n.key === active)?.label ?? 'Menu';
+const currentLabel = nav.find((n) => n.key === active)?.label ?? t('admin.shell.nav.menu');
 ---
 
 <!doctype html>
-{/* Deliberately NOT the storefront's lang. The admin is operator-facing and
-    stays in English for the pilot (ADR 0011); a `lang` that lies about the
-    content is worse than a foreign one — it mispronounces the page in a screen
-    reader and invites machine translation of words that do not want it. Money
-    and dates still format in the store's locale, through the same helpers. */}
-<html lang="en">
+{/* The storefront's lang, because the admin now speaks the store's single
+    locale too (ADR 0018, which replaces ADR 0011): every string comes from the
+    same catalog through `t()`. A `lang` that matched anything else would lie
+    about the content — mispronouncing it in a screen reader and inviting
+    machine translation. Money and dates already formatted in the store's
+    locale, through the same helpers. */}
+<html lang={LANG}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -91,7 +95,7 @@ const currentLabel = nav.find((n) => n.key === active)?.label ?? 'Menu';
           id="admin-nav"
           data-admin-nav-toggle
           class="peer sr-only"
-          aria-label="Toggle admin sections"
+          aria-label={t('admin.shell.nav.toggle')}
         />
         <label
           for="admin-nav"
@@ -99,7 +103,7 @@ const currentLabel = nav.find((n) => n.key === active)?.label ?? 'Menu';
           class="flex cursor-pointer select-none items-center justify-between gap-3 rounded-md border border-line bg-white/60 px-4 py-3 transition hover:border-brand sm:hidden"
         >
           <span class="flex flex-col gap-0.5">
-            <span class="text-[0.625rem] uppercase tracking-[0.25em] text-gray-400">Admin</span>
+            <span class="text-[0.625rem] uppercase tracking-[0.25em] text-gray-400">{t('admin.shell.eyebrow')}</span>
             <span class="font-serif text-lg leading-none tracking-tight text-gray-900">{currentLabel}</span>
           </span>
           <svg
@@ -140,8 +144,8 @@ const currentLabel = nav.find((n) => n.key === active)?.label ?? 'Menu';
         </nav>
 
         <div class="mt-4 flex gap-4 text-xs uppercase tracking-widest text-gray-400 sm:mt-8 sm:flex-col sm:gap-2">
-          <a href="/" class="hover:text-brand">&larr; View store</a>
-          {showLogout && <a href="/admin/logout" class="hover:text-brand">Log out</a>}
+          <a href="/" class="hover:text-brand">&larr; {t('admin.shell.viewStore')}</a>
+          {showLogout && <a href="/admin/logout" class="hover:text-brand">{t('admin.shell.logout')}</a>}
         </div>
       </aside>
 
@@ -153,8 +157,8 @@ const currentLabel = nav.find((n) => n.key === active)?.label ?? 'Menu';
               class="mb-6 flex items-center justify-between gap-3 rounded-md border border-brand/30 bg-brand/5 px-4 py-3 text-sm text-gray-700 transition hover:border-brand"
             >
               <span>
-                <strong class="font-semibold">Finish setting up your store</strong> — store name,
-                payment status, and more.
+                <strong class="font-semibold">{t('admin.shell.setupNudge.title')}</strong> —{' '}
+                {t('admin.shell.setupNudge.detail')}
               </span>
               <span aria-hidden="true" class="text-brand">&rarr;</span>
             </a>
@@ -163,10 +167,10 @@ const currentLabel = nav.find((n) => n.key === active)?.label ?? 'Menu';
         {
           Astro.locals.settings && paymentsInDemoMode(Astro.locals.settings) && (
             <div class="mb-6 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              <strong class="font-semibold">No real payment method configured.</strong> Only{' '}
-              <strong>Demo checkout</strong> can take orders right now — they're recorded and tagged{' '}
-              <code class="rounded bg-amber-100 px-1 text-xs">demo</code>. Shoppers see setup links
-              for Card &amp; Lightning until you add a key. Demo is withdrawn once a real rail is live.
+              <strong class="font-semibold">{t('admin.shell.demoBanner.title')}</strong>{' '}
+              {t('admin.shell.demoBanner.before')} <strong>{t('payment.demo.label')}</strong>{' '}
+              {t('admin.shell.demoBanner.middle')}{' '}
+              <code class="rounded bg-amber-100 px-1 text-xs">demo</code>{t('admin.shell.demoBanner.after')}
             </div>
           )
         }
@@ -177,7 +181,7 @@ const currentLabel = nav.find((n) => n.key === active)?.label ?? 'Menu';
               class="mb-6 flex items-center justify-between gap-3 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 transition hover:border-red-500"
             >
               <span>
-                <strong class="font-semibold">Shipping checkout is blocked by invalid configuration:</strong>{' '}
+                <strong class="font-semibold">{t('admin.shell.shippingBlocked')}</strong>{' '}
                 {shippingIssue.reason}
               </span>
               <span aria-hidden="true">&rarr;</span>
@@ -191,8 +195,9 @@ const currentLabel = nav.find((n) => n.key === active)?.label ?? 'Menu';
               class="mb-6 flex items-center justify-between gap-3 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 transition hover:border-red-500"
             >
               <span>
-                <strong class="font-semibold">Inventory needs attention.</strong>{' '}
-                {inventoryExceptionCount} paid order line{inventoryExceptionCount === 1 ? '' : 's'} arrived after its stock hold ended and could not be fully deducted. Open the affected orders and reconcile stock.
+                <strong class="font-semibold">{t('admin.shell.inventory.title')}</strong>{' '}
+                {tn('admin.shell.inventory.one', 'admin.shell.inventory.other', inventoryExceptionCount)}{' '}
+                {t('admin.shell.inventory.action')}
               </span>
               <span aria-hidden="true">&rarr;</span>
             </a>

@@ -28,7 +28,7 @@ suffit pas : l'historique, les forks et les caches l'ont gardé.
   nouveau de même portée, puis `CLOUDFLARE_API_TOKEN_<ENV>=… npm run shopctl --
   repo` réécrit les secrets GitHub (la commande les réécrit toujours).
 - **Clés du coffre** (Stripe, Resend, Turnstile) : générer la nouvelle chez le
-  fournisseur, la saisir dans Admin → Settings, puis révoquer l'ancienne. Pour
+  fournisseur, la saisir dans Admin → Réglages, puis révoquer l'ancienne. Pour
   Stripe, préférer une clé restreinte et utiliser l'expiration différée que
   propose Stripe si un déploiement doit d'abord passer.
 - **`AUTH_SECRET`** :
@@ -37,7 +37,7 @@ suffit pas : l'historique, les forks et les caches l'ont gardé.
 - **`SECRETS_KEK`** : sa fuite n'expose les clés du coffre que si la base a
   fuité aussi, mais il faut le traiter comme si. Ordre : révoquer chez chaque
   fournisseur les clés que le coffre contient ; poser un nouveau
-  `SECRETS_KEK` comme ci-dessus ; ressaisir chaque clé dans Admin → Settings.
+  `SECRETS_KEK` comme ci-dessus ; ressaisir chaque clé dans Admin → Réglages.
   Les anciennes valeurs chiffrées deviennent illisibles, ce qui est voulu.
 - **Clé de sauvegarde** : elle ouvre toutes les archives prises avec elle. En
   écrire une nouvelle ailleurs (`backup keygen --key-file .shopctl/backup-2.key`),

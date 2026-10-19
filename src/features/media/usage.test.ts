@@ -15,7 +15,7 @@ describe('usageLinks', () => {
         href: '/admin/products/prod_k7m2qx8vn6/edit',
         label: 'Merino Beanie',
         kind: 'product',
-        title: 'Edit Merino Beanie',
+        title: 'Modifier « Merino Beanie »',
       },
     ]);
   });
@@ -24,14 +24,14 @@ describe('usageLinks', () => {
     expect(
       usageLinks(usage({ pages: [{ id: 3, public_id: 'page_b8nr4qx7km', title: 'About' }] })),
     ).toEqual([
-      { href: '/admin/pages/page_b8nr4qx7km/edit', label: 'About', kind: 'page', title: 'Edit the About page' },
+      { href: '/admin/pages/page_b8nr4qx7km/edit', label: 'About', kind: 'page', title: 'Modifier la page « About »' },
     ]);
   });
 
   it('links the logo to settings, where it is chosen', () => {
     // The logo is a setting rather than a row, so there is no per-item URL.
     expect(usageLinks(usage({ logo: true }))).toEqual([
-      { href: '/admin/settings', label: 'Store logo', kind: 'logo', title: 'Change the logo in Settings' },
+      { href: '/admin/settings', label: 'Logo de la boutique', kind: 'logo', title: 'Changer le logo dans Réglages' },
     ]);
   });
 

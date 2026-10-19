@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
 import { createDraft, getPage } from '../../../features/pages/db';
 import { uniquePageSlug } from '../../../features/pages/slug';
+import { t } from '../../../features/i18n';
 
 export const prerender = false;
 
@@ -12,7 +13,10 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   const form = await request.formData();
   const title = String(form.get('title') ?? '').trim();
   if (!title) {
-    return redirect(`/admin/pages/new?error=${encodeURIComponent('Title is required.')}`, 303);
+    return redirect(
+      `/admin/pages/new?error=${encodeURIComponent(t('admin.pages.form.titleRequired'))}`,
+      303,
+    );
   }
 
   const slugBase = String(form.get('slug') ?? '').trim() || title;

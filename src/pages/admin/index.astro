@@ -7,6 +7,7 @@ import { listOrders, orderStats, dailyOrderTotals } from '../../features/orders/
 import { countCustomers } from '../../features/customers/db';
 import { orderReference } from '../../features/orders/number';
 import RevenueChart from '../../components/RevenueChart.astro';
+import { t } from '../../features/i18n';
 
 // First-run onboarding: bounce to the setup wizard until it's been completed.
 // (settings is populated by middleware; absent/incomplete → wizard.)
@@ -22,18 +23,21 @@ const onCfg = getConfig().orderNumber;
 
 const cards = [
   {
-    label: 'Net revenue',
+    label: t('admin.dashboard.card.netRevenue'),
     value: formatPrice(stats.revenue_cents),
-    sub: stats.refunded_cents > 0 ? `${formatPrice(stats.refunded_cents)} refunded` : null,
+    sub:
+      stats.refunded_cents > 0
+        ? t('admin.dashboard.card.refunded', { montant: formatPrice(stats.refunded_cents) })
+        : null,
   },
-  { label: 'Orders', value: String(stats.count), sub: null },
-  { label: 'Products', value: String(productCount), sub: null },
-  { label: 'Customers', value: String(customerCount), sub: null },
+  { label: t('admin.dashboard.card.orders'), value: String(stats.count), sub: null },
+  { label: t('admin.dashboard.card.products'), value: String(productCount), sub: null },
+  { label: t('admin.dashboard.card.customers'), value: String(customerCount), sub: null },
 ];
 ---
 
-<AdminLayout title="Dashboard" active="dashboard">
-  <h1 class="mb-8 font-serif text-3xl tracking-tight">Dashboard</h1>
+<AdminLayout title={t('admin.dashboard.title')} active="dashboard">
+  <h1 class="mb-8 font-serif text-3xl tracking-tight">{t('admin.dashboard.title')}</h1>
 
   <div class="mb-12 grid grid-cols-2 gap-4 sm:grid-cols-4">
     {
@@ -54,9 +58,9 @@ const cards = [
   <div class="grid gap-12 lg:grid-cols-2">
     <section>
       <div class="mb-3 flex items-baseline justify-between">
-        <h2 class="text-xs uppercase tracking-widest text-gray-400">Recent orders</h2>
+        <h2 class="text-xs uppercase tracking-widest text-gray-400">{t('admin.dashboard.recentOrders')}</h2>
         <a href="/admin/orders" class="text-xs uppercase tracking-widest text-accent hover:underline">
-          View all
+          {t('admin.dashboard.viewAll')}
         </a>
       </div>
       <table class="w-full text-left text-sm">
@@ -82,7 +86,7 @@ const cards = [
           {
             recent.length === 0 && (
               <tr>
-                <td class="py-6 text-center text-gray-400">No orders yet.</td>
+                <td class="py-6 text-center text-gray-400">{t('admin.dashboard.noOrders')}</td>
               </tr>
             )
           }
@@ -92,12 +96,12 @@ const cards = [
 
     <section>
       <div class="mb-3 flex items-baseline justify-between">
-        <h2 class="text-xs uppercase tracking-widest text-gray-400">Low stock</h2>
+        <h2 class="text-xs uppercase tracking-widest text-gray-400">{t('admin.dashboard.lowStock')}</h2>
         <a
           href="/admin/products?sort=stock&dir=asc"
           class="text-xs uppercase tracking-widest text-accent hover:underline"
         >
-          View all
+          {t('admin.dashboard.viewAll')}
         </a>
       </div>
       <table class="w-full text-left text-sm">
@@ -112,7 +116,7 @@ const cards = [
                 </td>
                 <td class="py-2 text-right tabular-nums">
                   <span class={0 >= p.stock ? 'text-red-600' : 'text-amber-700'}>
-                    {p.stock} left
+                    {t('admin.dashboard.stockLeft', { nombre: p.stock })}
                   </span>
                 </td>
               </tr>
@@ -121,7 +125,7 @@ const cards = [
           {
             lowStock.length === 0 && (
               <tr>
-                <td class="py-6 text-center text-gray-400">Everything's well-stocked.</td>
+                <td class="py-6 text-center text-gray-400">{t('admin.dashboard.wellStocked')}</td>
               </tr>
             )
           }

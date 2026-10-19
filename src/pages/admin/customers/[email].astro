@@ -6,13 +6,14 @@ import { getCustomerOrders, getCustomerSummary } from '../../../features/custome
 import { orderReference } from '../../../features/orders/number';
 import { paginate, queryHref } from '../../../pagination';
 import Pagination from '../../../components/Pagination.astro';
+import { t, tn, type MessageKey } from '../../../features/i18n';
 
 const email = Astro.params.email ? decodeURIComponent(Astro.params.email) : '';
 const summary = email ? await getCustomerSummary(env.DB, email) : null;
 
 // Unknown email (no orders) → 404, so the page can't be used to probe addresses.
 if (!summary) {
-  return new Response('Not found', { status: 404 });
+  return new Response(t('admin.customers.detail.notFound'), { status: 404 });
 }
 
 const PAGE_SIZE = 50;
@@ -26,6 +27,16 @@ const base = `/admin/customers/${encodeURIComponent(email)}`;
 const hrefFor = (p: number) => queryHref(base, { page: p > 1 ? p : undefined });
 const onCfg = getConfig().orderNumber;
 const timeZone = Astro.locals.settings?.timeZone ?? getConfig().timeZone;
+// `orders.status` only ever records these three; anything else shows as stored.
+const STATUS_LABEL: Partial<Record<string, MessageKey>> = {
+  paid: 'admin.orders.status.paid',
+  pending: 'admin.orders.status.pending',
+  refunded: 'admin.orders.status.refunded',
+};
+const statusLabel = (status: string) => {
+  const key = STATUS_LABEL[status];
+  return key ? t(key) : status;
+};
 ---
 
 <AdminLayout title={email} active="customers">
@@ -33,20 +44,22 @@ const timeZone = Astro.locals.settings?.timeZone ?? getConfig().timeZone;
     href="/admin/customers"
     class="text-xs uppercase tracking-widest text-gray-400 hover:text-brand"
   >
-    &larr; Back to customers
+    &larr; {t('admin.customers.detail.back')}
   </a>
   <h1 class="mt-4 mb-2 font-serif text-3xl tracking-tight break-all">{email}</h1>
   <p class="mb-8 text-sm text-gray-500">
-    {summary.orders} order{summary.orders === 1 ? '' : 's'} · {formatPrice(summary.lifetime_cents)} lifetime
+    {tn('admin.customers.detail.summary.one', 'admin.customers.detail.summary.other', summary.orders, {
+      montant: formatPrice(summary.lifetime_cents),
+    })}
   </p>
 
   <table class="admin-table w-full text-left text-sm">
     <thead>
       <tr class="border-b border-line text-xs uppercase tracking-widest text-gray-400">
-        <th class="py-3 pr-4 font-normal">Order</th>
-        <th class="py-3 pr-4 font-normal">Total</th>
-        <th class="py-3 pr-4 font-normal">Status</th>
-        <th class="py-3 font-normal">When</th>
+        <th class="py-3 pr-4 font-normal">{t('admin.customers.detail.column.order')}</th>
+        <th class="py-3 pr-4 font-normal">{t('admin.common.total')}</th>
+        <th class="py-3 pr-4 font-normal">{t('admin.common.status')}</th>
+        <th class="py-3 font-normal">{t('admin.common.date')}</th>
       </tr>
     </thead>
     <tbody>
@@ -61,9 +74,9 @@ const timeZone = Astro.locals.settings?.timeZone ?? getConfig().timeZone;
                 #{orderReference(o.public_id, o.id, onCfg)}
               </a>
             </td>
-            <td data-label="Total" class="py-3 pr-4 tabular-nums">{formatPrice(o.amount_total_cents, o.currency)}</td>
-            <td data-label="Status" class="py-3 pr-4">{o.status}</td>
-            <td data-label="When" class="py-3 text-gray-500">{formatDate(o.created_at, undefined, timeZone)}</td>
+            <td data-label={t('admin.common.total')} class="py-3 pr-4 tabular-nums">{formatPrice(o.amount_total_cents, o.currency)}</td>
+            <td data-label={t('admin.common.status')} class="py-3 pr-4">{statusLabel(o.status)}</td>
+            <td data-label={t('admin.common.date')} class="py-3 text-gray-500">{formatDate(o.created_at, undefined, timeZone)}</td>
           </tr>
         ))
       }

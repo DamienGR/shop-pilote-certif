@@ -127,7 +127,7 @@
       }
     },
     "features": {
-      "description": "Feature switches decided at build time. Runtime toggles live in Admin → Settings.",
+      "description": "Feature switches decided at build time. Runtime toggles live in Admin → Réglages.",
       "type": "object",
       "additionalProperties": false,
       "required": [

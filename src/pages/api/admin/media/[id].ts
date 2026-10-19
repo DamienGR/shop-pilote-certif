@@ -4,6 +4,7 @@ import { getMediaByPublicId, deleteMediaRecord } from '../../../../features/medi
 import { mediaUsage, describeUsage } from '../../../../features/media/usage';
 import { getStorage } from '../../../../features/storage';
 import { parsePublicId } from '../../../../features/ids/publicId';
+import { t } from '../../../../features/i18n';
 
 export const prerender = false;
 
@@ -12,16 +13,16 @@ export const prerender = false;
 // This is the ONLY place an object leaves storage.
 export const POST: APIRoute = async ({ request, params, redirect }) => {
   const publicId = parsePublicId(params.id, 'media');
-  if (!publicId) return new Response('Invalid id', { status: 400 });
+  if (!publicId) return new Response(t('admin.media.error.invalidId'), { status: 400 });
 
   const form = await request.formData();
   if (String(form.get('_action')) !== 'delete') {
-    return new Response('Unknown action', { status: 400 });
+    return new Response(t('admin.media.error.unknownAction'), { status: 400 });
   }
 
   const wantsJson = request.headers.get('accept')?.includes('application/json');
   const media = await getMediaByPublicId(env.DB, publicId);
-  if (!media) return new Response('Not found', { status: 404 });
+  if (!media) return new Response(t('admin.media.error.notFound'), { status: 404 });
   const id = media.id;
 
   // One guarded statement: it deletes only while nothing references the row, so
@@ -30,7 +31,7 @@ export const POST: APIRoute = async ({ request, params, redirect }) => {
   const deletedKey = await deleteMediaRecord(env.DB, id);
   if (!deletedKey) {
     const usage = await mediaUsage(env.DB, id);
-    const message = `Still used by ${describeUsage(usage)}. Remove it there first.`;
+    const message = t('admin.media.error.inUse', { usages: describeUsage(usage) });
     return wantsJson
       ? new Response(JSON.stringify({ error: message }), {
           status: 409,

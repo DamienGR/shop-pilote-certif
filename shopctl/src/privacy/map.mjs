@@ -141,6 +141,9 @@ export const NOT_PERSONAL = {
   'products.name': 'Catalogue.',
   'products.variant_label': 'Catalogue.',
   'products.file_name': 'Catalogue.',
+  'sweep_cursors.name':
+    "Le nom d'un balayage du socle (« guest-access-hide »). Le curseur porte au plus un identifiant " +
+    "public de commande, que la commande anonymisée garde aussi : il ne nomme personne.",
 };
 
 /**

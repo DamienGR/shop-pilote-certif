@@ -20,6 +20,9 @@ npx wrangler deployments list --name minshop-<slug>-production
 - `/` répond, `/products` non : la liaison D1 (base supprimée, quota D1).
 - Erreur **1027** : le quota quotidien du plan Workers gratuit est atteint ;
   aller directement à la section 4.
+- Erreur **1102**, ou `shopctl monitor` qui compte des invocations arrêtées :
+  le CPU du plan gratuit ne suffit plus ; section 4 aussi, après avoir écarté
+  un déploiement récent (section 2).
 
 ## 2. Revenir en arrière (5 minutes)
 
@@ -57,15 +60,27 @@ Causes vues ou plausibles :
   échouent, la vitrine doit continuer à répondre — si elle ne répond plus, c'est
   un défaut du socle à reproduire en test.
 
-## 4. Quota du plan gratuit (erreur 1027)
+## 4. Limites du plan gratuit (erreurs 1027 et 1102)
 
 Le plan Workers gratuit plafonne à 100 000 requêtes par jour ; au-delà, chaque
 requête reçoit une page d'erreur jusqu'à la remise à zéro quotidienne (minuit
-UTC). Il n'y a pas de contournement côté boutique : le commerçant passe le
-compte au plan **Workers Paid** (tableau de bord → Workers & Pages → Plans).
+UTC). Il accorde aussi 10 ms de CPU par requête : Cloudflare tolère qu'un
+isolat les dépasse de temps en temps — un démarrage à froid les dépasse
+toujours —, et arrête les invocations d'un isolat qui les dépasse
+régulièrement (erreur 1102). Pour savoir quelle page coûte quoi, une capture
+prise pendant l'incident :
+
+```sh
+npx wrangler tail minshop-<slug>-production --format json > tail.json
+npm run test:cpu:remote -- tail.json
+```
+
+Il n'y a pas de contournement côté boutique : le commerçant passe le
+compte au plan **Workers Paid** (tableau de bord → Workers & Pages → Plans),
+qui accorde trente secondes de CPU par requête et lève le quota quotidien.
 C'est une action du commerçant, propriétaire du compte (ADR 0002) ; l'agence
-le prévient dès que `shopctl monitor` dépasse le seuil d'alerte, pas le jour du
-blocage.
+le prévient dès que `shopctl monitor` dépasse le seuil d'alerte ou compte une
+invocation arrêtée, pas le jour du blocage.
 
 ## 5. Après
 

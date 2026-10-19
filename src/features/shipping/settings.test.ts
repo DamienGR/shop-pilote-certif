@@ -160,7 +160,7 @@ describe('effectiveShippingConfig', () => {
         },
       ],
     };
-    expect(validateBuildTimeShipping(overCap)).toMatch(/at most 5 options/i);
+    expect(validateBuildTimeShipping(overCap)).toMatch(/au maximum 5 options/i);
     const effective = effectiveShippingConfig(overCap, { status: 'absent' }, null);
     expect(effective.config.zones).toEqual([]);
     expect(effective.issue?.source).toBe('build-time');
@@ -184,7 +184,7 @@ describe('effectiveShippingConfig', () => {
       enabled: true,
       zones: [{ countries: ['US'], rates: [], freeOverCents: null }],
     };
-    expect(validateBuildTimeShipping(empty)).toMatch(/at least one shipping rate/i);
+    expect(validateBuildTimeShipping(empty)).toMatch(/au moins un tarif de livraison/i);
   });
   it('accepts an ordinary build-time configuration', () => {
     expect(validateBuildTimeShipping(buildTime)).toBeNull();
@@ -203,7 +203,7 @@ describe('validateShippingDocument', () => {
   });
   it('requires a zone and rate before enabling', () => {
     expect(messages(doc({ zones: [] }))).toContain(
-      'Add at least one zone with one rate before turning shipping on.',
+      'Ajoutez au moins une zone avec un tarif avant d’activer la livraison.',
     );
   });
   it('rejects a country appearing in two zones', () => {
@@ -213,7 +213,7 @@ describe('validateShippingDocument', () => {
         { ...doc().zones[0]!, name: 'B' },
       ],
     });
-    expect(messages(two).some((m) => /already in another zone/.test(m))).toBe(true);
+    expect(messages(two).some((m) => /déjà dans une autre zone/.test(m))).toBe(true);
   });
   it('rejects duplicate zone names case-insensitively', () => {
     const two = doc({
@@ -222,23 +222,25 @@ describe('validateShippingDocument', () => {
         { ...doc().zones[0]!, name: 'HOME', countries: ['CA'] },
       ],
     });
-    expect(messages(two)).toContain('Another zone already uses this name.');
+    expect(messages(two)).toContain('Une autre zone porte déjà ce nom.');
   });
   it('rejects an unknown country code', () => {
     expect(messages(doc({ zones: [{ ...doc().zones[0]!, countries: ['ZZ'] }] }))).toContain(
-      'ZZ is not a country code.',
+      'ZZ n’est pas un code pays.',
     );
   });
   it('keeps the catch-all alone and last', () => {
     const mixed = doc({ zones: [{ ...doc().zones[0]!, countries: ['*', 'US'] }] });
-    expect(messages(mixed)).toContain('Rest of world cannot be combined with specific countries.');
+    expect(messages(mixed)).toContain(
+      '«\u202fReste du monde\u202f» ne peut pas être combiné avec des pays précis.',
+    );
     const notLast = doc({
       zones: [
         { ...doc().zones[0]!, name: 'World', countries: ['*'] },
         { ...doc().zones[0]!, name: 'US', countries: ['US'] },
       ],
     });
-    expect(messages(notLast)).toContain('Rest of world must be the last zone.');
+    expect(messages(notLast)).toContain('«\u202fReste du monde\u202f» doit être la dernière zone.');
   });
   it('rejects duplicate rate labels within a zone', () => {
     const dupe = doc({
@@ -252,7 +254,7 @@ describe('validateShippingDocument', () => {
         },
       ],
     });
-    expect(messages(dupe)).toContain('Another rate in this zone uses this label.');
+    expect(messages(dupe)).toContain('Un autre tarif de cette zone porte déjà ce libellé.');
   });
   it('reserves the free-shipping label while a threshold is set', () => {
     const collide = doc({
@@ -264,7 +266,7 @@ describe('validateShippingDocument', () => {
         },
       ],
     });
-    expect(messages(collide).some((m) => /reserved/.test(m))).toBe(true);
+    expect(messages(collide).some((m) => /réservé/.test(m))).toBe(true);
   });
   it('enforces the five-option ceiling with the synthesized free option', () => {
     const rates = ['A', 'B', 'C', 'D', 'E'].map((label) => ({
@@ -273,7 +275,7 @@ describe('validateShippingDocument', () => {
     }));
     expect(messages(doc({ zones: [{ ...doc().zones[0]!, rates }] }))).toEqual([]);
     const withFree = doc({ zones: [{ ...doc().zones[0]!, rates, freeOverCents: 1000 }] });
-    expect(messages(withFree).some((m) => /at most 5 options/i.test(m))).toBe(true);
+    expect(messages(withFree).some((m) => /au maximum 5 options/i.test(m))).toBe(true);
   });
   it('requires strictly increasing band maxima', () => {
     const bands = doc({
@@ -295,7 +297,9 @@ describe('validateShippingDocument', () => {
         },
       ],
     });
-    expect(messages(bands)).toContain('Each band must be heavier than the one above it.');
+    expect(messages(bands)).toContain(
+      'Le maximum de chaque tranche doit dépasser celui de la tranche précédente.',
+    );
   });
   it('allows no maximum only on the final band', () => {
     const bands = doc({
@@ -317,7 +321,7 @@ describe('validateShippingDocument', () => {
         },
       ],
     });
-    expect(messages(bands)).toContain('Only the last band can have no maximum.');
+    expect(messages(bands)).toContain('Seule la dernière tranche peut être sans maximum.');
   });
   it('accepts a pickup rate and validates its fee like a flat price', () => {
     const pickup = doc({
@@ -337,7 +341,7 @@ describe('validateShippingDocument', () => {
         },
       ],
     });
-    expect(messages(bad)).toContain('Enter a price.');
+    expect(messages(bad)).toContain('Indiquez un prix.');
   });
   it('requires at least one band on a weight rate', () => {
     const empty = doc({
@@ -348,14 +352,14 @@ describe('validateShippingDocument', () => {
         },
       ],
     });
-    expect(messages(empty)).toContain('Add at least one weight band.');
+    expect(messages(empty)).toContain('Ajoutez au moins une tranche de poids.');
   });
 });
 
 describe('legacy migration', () => {
   it('names zones deterministically', () => {
     expect(legacyZoneName(['US'], 0)).toBe('\u00c9tats-Unis');
-    expect(legacyZoneName(['*'], 1)).toBe('Rest of world');
+    expect(legacyZoneName(['*'], 1)).toBe('Reste du monde');
     expect(legacyZoneName(['US', 'CA'], 2)).toBe('Zone 3');
   });
   it('builds an editable candidate from raw build-time values', () => {

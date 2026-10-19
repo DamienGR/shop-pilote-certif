@@ -24,6 +24,7 @@ import {
   ORDER_METHOD_OPTIONS,
 } from '../../../features/orders/filter';
 import { listUnmatchedRefundEvents } from '../../../features/refunds/db';
+import { t, tn, type MessageKey } from '../../../features/i18n';
 import {
   parseOrderOrLegacyPublicId,
   parsePublicId,
@@ -52,7 +53,7 @@ if (rawQuery !== null) {
       const found = await getOrderByPublicId(env.DB, candidate);
       if (found) return Astro.redirect(`/admin/orders/${found.public_id}`, 302);
     }
-    lookupError = `No order matches “${query}”.`;
+    lookupError = t('admin.orders.list.lookup.notFound', { recherche: query });
   }
 }
 
@@ -104,21 +105,36 @@ const conflictOrders = new Map(
   ),
 );
 const listError = Astro.url.searchParams.get('error');
+// A conflicting event's last_error is a machine code; the known ones read as
+// French, anything newer falls back to the code with its underscores spaced.
+const CONFLICT_LABEL: Record<string, MessageKey> = {
+  currency_mismatch: 'admin.orders.list.refunds.error.currencyMismatch',
+};
+const conflictLabel = (code: string) =>
+  CONFLICT_LABEL[code] ? t(CONFLICT_LABEL[code]) : code.replace(/_/g, ' ');
+// orders.status holds pending | paid | refunded; an unknown value shows as is.
+const STATUS_LABEL: Record<string, MessageKey> = {
+  paid: 'admin.orders.status.paid',
+  pending: 'admin.orders.status.pending',
+  refunded: 'admin.orders.status.refunded',
+};
+const statusLabel = (status: string) =>
+  STATUS_LABEL[status] ? t(STATUS_LABEL[status]) : status;
 ---
 
-<AdminLayout title="Orders" active="orders">
+<AdminLayout title={t('admin.orders.title')} active="orders">
   {
     inventoryExceptions.length > 0 && (
       <section id="inventory-exceptions" class="mb-8 rounded-lg border border-red-300 bg-red-50 px-5 py-4">
-        <h2 class="text-sm font-medium text-red-900">{inventoryExceptions.length} inventory exception{inventoryExceptions.length === 1 ? '' : 's'} need attention</h2>
-        <p class="mt-1 text-xs text-red-800">These paid orders arrived after their stock holds ended. Open each order to reconcile the oversold quantity.</p>
+        <h2 class="text-sm font-medium text-red-900">{tn('admin.orders.list.inventory.heading.one', 'admin.orders.list.inventory.heading.other', inventoryExceptions.length)}</h2>
+        <p class="mt-1 text-xs text-red-800">{t('admin.orders.list.inventory.intro')}</p>
         <ul class="mt-3 space-y-2 text-sm text-red-900">
           {inventoryExceptions.map((entry) => (
             <li>
               <a class="font-medium underline" href={`/admin/orders/${entry.order_public_id}`}>
-                Order #{orderReference(entry.order_public_id, entry.order_id, onCfg)}
+                {t('admin.orders.reference', { numero: orderReference(entry.order_public_id, entry.order_id, onCfg) })}
               </a>{' '}
-              — {entry.shortfall_qty} unit{entry.shortfall_qty === 1 ? '' : 's'} oversold
+              — {tn('admin.orders.list.inventory.oversold.one', 'admin.orders.list.inventory.oversold.other', entry.shortfall_qty)}
             </li>
           ))}
         </ul>
@@ -136,11 +152,10 @@ const listError = Astro.url.searchParams.get('error');
     unmatched.length > 0 && (
       <section class="mb-8 rounded-lg border border-amber-200 bg-amber-50 px-5 py-4">
         <h2 class="text-sm font-medium text-amber-900">
-          {unmatched.length} refund{unmatched.length === 1 ? '' : 's'} need{unmatched.length === 1 ? 's' : ''} attention
+          {tn('admin.orders.list.refunds.heading.one', 'admin.orders.list.refunds.heading.other', unmatched.length)}
         </h2>
         <p class="mt-1 text-xs text-amber-800">
-          Your payment provider reported these refunds but they could not be applied. Nothing was
-          counted against your revenue yet.
+          {t('admin.orders.list.refunds.intro')}
         </p>
         <ul class="mt-3 space-y-2">
           {unmatched.map((e) => (
@@ -157,18 +172,20 @@ const listError = Astro.url.searchParams.get('error');
               {e.order_id && conflictOrders.get(e.order_id) ? (
                 <Fragment>
                   <span>
-                    Conflicts with{' '}
+                    {t('admin.orders.list.refunds.conflictsWith')}{' '}
                     <a
                       href={`/admin/orders/${conflictOrders.get(e.order_id)!.public_id}`}
                       class="underline"
                     >
-                      order #{orderReference(
-                        conflictOrders.get(e.order_id)!.public_id,
-                        e.order_id,
-                        onCfg,
-                      )}
+                      {t('admin.orders.list.refunds.conflictOrder', {
+                        numero: orderReference(
+                          conflictOrders.get(e.order_id)!.public_id,
+                          e.order_id,
+                          onCfg,
+                        ),
+                      })}
                     </a>
-                    {e.last_error ? ` — ${e.last_error.replace(/_/g, ' ')}` : ''}
+                    {e.last_error ? ` — ${conflictLabel(e.last_error)}` : ''}
                   </span>
                   <form method="POST" action="/api/admin/refunds">
                     <input type="hidden" name="_action" value="dismiss_refund_event" />
@@ -177,13 +194,13 @@ const listError = Astro.url.searchParams.get('error');
                       type="submit"
                       class="rounded-md border border-amber-300 bg-white px-3 py-1 font-medium uppercase tracking-wider hover:bg-amber-100"
                     >
-                      Dismiss
+                      {t('admin.orders.list.refunds.dismiss')}
                     </button>
                   </form>
                 </Fragment>
               ) : (
                 <Fragment>
-                  <span>No order records this payment</span>
+                  <span>{t('admin.orders.list.refunds.noOrder')}</span>
                   <form method="POST" action="/api/admin/refunds">
                     <input type="hidden" name="_action" value="retry_refund_event" />
                     <input type="hidden" name="event_id" value={e.provider_event_id} />
@@ -191,7 +208,7 @@ const listError = Astro.url.searchParams.get('error');
                       type="submit"
                       class="rounded-md border border-amber-300 bg-white px-3 py-1 font-medium uppercase tracking-wider hover:bg-amber-100"
                     >
-                      Retry
+                      {t('admin.orders.list.refunds.retry')}
                     </button>
                   </form>
                 </Fragment>
@@ -203,7 +220,7 @@ const listError = Astro.url.searchParams.get('error');
     )
   }
   <div class="mb-8 flex flex-wrap items-center justify-between gap-4">
-    <h1 class="font-serif text-3xl tracking-tight">Orders</h1>
+    <h1 class="font-serif text-3xl tracking-tight">{t('admin.orders.title')}</h1>
     <div class="flex flex-wrap items-center gap-3">
       {/* Lookup accepts the customer reference in any form it was communicated:
           the bare 10-char token, the full ord_ ID, or a legacy calculated
@@ -213,15 +230,15 @@ const listError = Astro.url.searchParams.get('error');
           type="search"
           name="q"
           value={rawQuery ?? ''}
-          placeholder="Order # or ID"
-          aria-label="Find an order by number or ID"
+          placeholder={t('admin.orders.list.lookup.placeholder')}
+          aria-label={t('admin.orders.list.lookup.label')}
           class="w-44 rounded-md border border-line bg-paper px-3 py-2 text-sm focus:border-brand focus:outline-none"
         />
         <button
           type="submit"
           class="rounded-md border border-line px-4 py-2 text-xs font-medium uppercase tracking-wider text-gray-700 hover:border-brand hover:text-brand"
         >
-          Find
+          {t('admin.common.search')}
         </button>
       </form>
       {/* Exports exactly what's on screen. Handing back the whole table right
@@ -230,7 +247,7 @@ const listError = Astro.url.searchParams.get('error');
         href={queryHref('/admin/orders/export.csv', filterQuery)}
         class="rounded-md border border-line px-4 py-2 text-xs font-medium uppercase tracking-wider text-gray-700 hover:border-brand hover:text-brand"
       >
-        {filtered ? 'Export these' : 'Export CSV'}
+        {filtered ? t('admin.orders.list.exportFiltered') : t('admin.orders.list.exportAll')}
       </a>
     </div>
   </div>
@@ -247,30 +264,30 @@ const listError = Astro.url.searchParams.get('error');
     action="/admin/orders"
     active={filtered}
     count={matchCount}
-    noun="order"
+    noun={t('admin.orders.list.filter.noun')}
     hidden={{ sort: sort ?? undefined, dir: dir ?? undefined }}
     selects={[
       {
         name: 'status',
-        label: 'Payment',
-        anyLabel: 'All payments',
+        label: t('admin.orders.list.filter.payment'),
+        anyLabel: t('admin.orders.list.filter.anyPayment'),
         value: filters.status,
         options: ORDER_STATUS_OPTIONS,
       },
       {
         name: 'fulfillment',
-        label: 'Fulfillment',
-        anyLabel: 'Any fulfillment',
+        label: t('admin.orders.list.filter.fulfillment'),
+        anyLabel: t('admin.orders.list.filter.anyFulfillment'),
         value: filters.fulfillment,
         options: [
-          { value: 'unfulfilled', label: 'Unfulfilled' },
-          { value: 'fulfilled', label: 'Fulfilled' },
+          { value: 'unfulfilled', label: t('admin.orders.fulfillment.unfulfilled') },
+          { value: 'fulfilled', label: t('admin.orders.fulfillment.fulfilled') },
         ],
       },
       {
         name: 'method',
-        label: 'Method',
-        anyLabel: 'All methods',
+        label: t('admin.orders.list.filter.method'),
+        anyLabel: t('admin.orders.list.filter.anyMethod'),
         value: filters.method,
         options: ORDER_METHOD_OPTIONS,
       },
@@ -282,23 +299,23 @@ const listError = Astro.url.searchParams.get('error');
     <thead>
       <tr class="border-b border-line text-xs uppercase tracking-widest text-gray-400">
         <th class="py-3 pr-4 font-normal">
-          <a href={sortHref('order')} class="hover:text-brand">Order #{arrow('order')}</a>
+          <a href={sortHref('order')} class="hover:text-brand">{t('admin.orders.list.col.order')}{arrow('order')}</a>
         </th>
-        <th class="py-3 pr-4 font-normal">Public ID</th>
+        <th class="py-3 pr-4 font-normal">{t('admin.orders.list.col.publicId')}</th>
         <th class="py-3 pr-4 font-normal">
-          <a href={sortHref('email')} class="hover:text-brand">Email{arrow('email')}</a>
-        </th>
-        <th class="py-3 pr-4 font-normal">
-          <a href={sortHref('total')} class="hover:text-brand">Total{arrow('total')}</a>
+          <a href={sortHref('email')} class="hover:text-brand">{t('admin.common.email')}{arrow('email')}</a>
         </th>
         <th class="py-3 pr-4 font-normal">
-          <a href={sortHref('status')} class="hover:text-brand">Status{arrow('status')}</a>
+          <a href={sortHref('total')} class="hover:text-brand">{t('admin.common.total')}{arrow('total')}</a>
         </th>
         <th class="py-3 pr-4 font-normal">
-          <a href={sortHref('fulfillment')} class="hover:text-brand">Fulfillment{arrow('fulfillment')}</a>
+          <a href={sortHref('status')} class="hover:text-brand">{t('admin.common.status')}{arrow('status')}</a>
+        </th>
+        <th class="py-3 pr-4 font-normal">
+          <a href={sortHref('fulfillment')} class="hover:text-brand">{t('admin.orders.list.col.fulfillment')}{arrow('fulfillment')}</a>
         </th>
         <th class="py-3 font-normal">
-          <a href={sortHref('when')} class="hover:text-brand">When{arrow('when')}</a>
+          <a href={sortHref('when')} class="hover:text-brand">{t('admin.common.date')}{arrow('when')}</a>
         </th>
       </tr>
     </thead>
@@ -306,12 +323,12 @@ const listError = Astro.url.searchParams.get('error');
       {
         orders.map((o) => (
           <tr class="border-b border-line">
-            <td data-label="Order #" class="py-3 pr-4">
+            <td data-label={t('admin.orders.list.col.order')} class="py-3 pr-4">
               <a href={`/admin/orders/${o.public_id}`} class="text-accent tabular-nums hover:underline">
                 #{o.id}
               </a>
             </td>
-            <td data-label="Public ID" class="py-3 pr-4 font-mono text-xs">
+            <td data-label={t('admin.orders.list.col.publicId')} class="py-3 pr-4 font-mono text-xs">
               {/* Shortened to the width of a current-format ID. Legacy hex/UUID
                   IDs are more than twice as long and would otherwise stretch
                   the column for every row. The link and the title keep the full
@@ -324,7 +341,7 @@ const listError = Astro.url.searchParams.get('error');
                 {o.public_id ? truncatePublicId(o.public_id, 'order') : ''}
               </a>
             </td>
-            <td data-label="Email" class="py-3 pr-4">
+            <td data-label={t('admin.common.email')} class="py-3 pr-4">
               {/* A long address is one unbreakable token, so left alone it sets
                   the table's width on its own and brings back the horizontal
                   scrollbar. Capped at sm+ only — the mobile card layout wraps
@@ -341,13 +358,13 @@ const listError = Astro.url.searchParams.get('error');
                 '—'
               )}
             </td>
-            <td data-label="Total" class="py-3 pr-4 tabular-nums">{formatPrice(o.amount_total_cents, o.currency)}</td>
-            <td data-label="Status" class="py-3 pr-4">
+            <td data-label={t('admin.common.total')} class="py-3 pr-4 tabular-nums">{formatPrice(o.amount_total_cents, o.currency)}</td>
+            <td data-label={t('admin.common.status')} class="py-3 pr-4">
               <span class="rounded-full bg-white px-2 py-0.5 text-xs uppercase tracking-wide text-gray-500 ring-1 ring-line">
-                {o.status}
+                {statusLabel(o.status)}
               </span>
             </td>
-            <td data-label="Fulfillment" class="py-3 pr-4">
+            <td data-label={t('admin.orders.list.col.fulfillment')} class="py-3 pr-4">
               <span
                 class={`rounded-full px-2 py-0.5 text-xs uppercase tracking-wide ring-1 ${
                   o.fulfillment_status === 'fulfilled'
@@ -355,10 +372,12 @@ const listError = Astro.url.searchParams.get('error');
                     : 'bg-white text-gray-500 ring-line'
                 }`}
               >
-                {o.fulfillment_status === 'fulfilled' ? 'Fulfilled' : 'Unfulfilled'}
+                {o.fulfillment_status === 'fulfilled'
+                  ? t('admin.orders.fulfillment.fulfilled')
+                  : t('admin.orders.fulfillment.unfulfilled')}
               </span>
             </td>
-            <td data-label="When" class="py-3 text-gray-500">{formatDate(o.created_at, undefined, timeZone)}</td>
+            <td data-label={t('admin.common.date')} class="py-3 text-gray-500">{formatDate(o.created_at, undefined, timeZone)}</td>
           </tr>
         ))
       }
@@ -366,7 +385,7 @@ const listError = Astro.url.searchParams.get('error');
         orders.length === 0 && (
           <tr>
             <td colspan="7" class="py-8 text-center text-gray-400">
-              {filtered ? 'No orders match these filters.' : 'No orders yet.'}
+              {filtered ? t('admin.orders.list.emptyFiltered') : t('admin.orders.list.empty')}
             </td>
           </tr>
         )

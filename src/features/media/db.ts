@@ -1,5 +1,6 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import { withPublicId } from '../ids/publicId.ts';
+import { t } from '../i18n/index.ts';
 
 export interface Media {
   id: number;
@@ -190,8 +191,8 @@ export async function attachMediaToProduct(
   // Nothing inserted — say which of the two guards refused.
   const media = await getMedia(db, mediaId);
   return media
-    ? { ok: false, error: 'That image is already in this product’s gallery.' }
-    : { ok: false, error: 'That image is no longer in the media library.' };
+    ? { ok: false, error: t('admin.media.error.alreadyAttached') }
+    : { ok: false, error: t('admin.media.error.gone') };
 }
 
 /**

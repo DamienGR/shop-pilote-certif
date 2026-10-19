@@ -1,4 +1,5 @@
 import type { StoreSettings } from './db';
+import { t } from '../i18n/index.ts';
 
 export interface RuntimeCapabilities {
   vault: boolean;
@@ -45,18 +46,18 @@ export function featureAvailability(
   if (key === 'discounts_enabled' || key === 'tax_enabled') {
     return stripeConfigured(settings, caps)
       ? { available: true }
-      : { available: false, reason: 'Unavailable until Stripe is configured' };
+      : { available: false, reason: t('admin.settings.availability.stripe') };
   }
   if (key === 'accounts_enabled') {
     if (!caps.authSecret) {
-      return { available: false, reason: 'Unavailable until AUTH_SECRET is set' };
+      return { available: false, reason: t('admin.settings.availability.authSecret') };
     }
     if (!emailConfigured(settings, caps)) {
-      return { available: false, reason: 'Unavailable until email is enabled and configured' };
+      return { available: false, reason: t('admin.settings.availability.email') };
     }
   }
   if (key === 'image_optimize' && !caps.images) {
-    return { available: false, reason: 'Unavailable until the IMAGES binding is added' };
+    return { available: false, reason: t('admin.settings.availability.imagesBinding') };
   }
   return { available: true };
 }
@@ -71,19 +72,19 @@ export function lightningConfigurationError(
   hasCredential: boolean,
 ): string | null {
   const label = backend === 'lnbits' ? 'LNbits' : 'phoenixd';
-  if (!url) return `Add the ${label} URL.`;
+  if (!url) return t('admin.settings.lightning.error.url', { nom: label });
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-      return `Enter a valid HTTP(S) URL for ${label}.`;
+      return t('admin.settings.lightning.error.invalidUrl', { nom: label });
     }
   } catch {
-    return `Enter a valid HTTP(S) URL for ${label}.`;
+    return t('admin.settings.lightning.error.invalidUrl', { nom: label });
   }
   if (!hasCredential) {
     return backend === 'lnbits'
-      ? 'Add the LNbits invoice/read key.'
-      : 'Add the phoenixd password.';
+      ? t('admin.settings.lightning.error.lnbitsKey')
+      : t('admin.settings.lightning.error.phoenixdPassword');
   }
   return null;
 }

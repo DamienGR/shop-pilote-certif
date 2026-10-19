@@ -5,6 +5,7 @@ import { listUnmatchedRefundEvents, dismissRefundEvent } from '../../../features
 import { sendRefundNotice } from '../../../features/refunds/notify';
 import { getOrder } from '../../../features/orders/db';
 import { getPaymentProvider, type PaymentMethod } from '../../../features/payments';
+import { t } from '../../../features/i18n';
 
 export const prerender = false;
 
@@ -21,11 +22,11 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   // still doesn't simply stays queued.
   if (action === 'retry_refund_event') {
     const eventId = String(form.get('event_id') ?? '').trim();
-    if (!eventId) return fail('Missing event.');
+    if (!eventId) return fail(t('admin.refunds.event.missing'));
 
     const events = await listUnmatchedRefundEvents(env.DB);
     const stored = events.find((e) => e.provider_event_id === eventId);
-    if (!stored) return fail('That event is no longer waiting to be reconciled.');
+    if (!stored) return fail(t('admin.refunds.event.notWaiting'));
 
     // Retry runs the same correlation the webhook did, including the provider
     // session lookup — so a merchant clicking Retry after a transient provider
@@ -52,9 +53,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     );
 
     if (outcome.status === 'unmatched') {
-      return fail(
-        'Still no order matches that payment. It stays queued — you can retry again after the order’s payment ID is filled in.',
-      );
+      return fail(t('admin.refunds.event.stillUnmatched'));
     }
     // Admin URLs carry the order's public ID, never the row id the correlation
     // worked with internally — one read to translate at the boundary.
@@ -82,7 +81,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   // reproduces the conflict, so without this the queue never empties.
   if (action === 'dismiss_refund_event') {
     const eventId = String(form.get('event_id') ?? '').trim();
-    if (!eventId) return fail('Missing event.');
+    if (!eventId) return fail(t('admin.refunds.event.missing'));
     const dismissed = await dismissRefundEvent(
       env.DB,
       eventId,
@@ -98,8 +97,8 @@ export const POST: APIRoute = async ({ request, redirect }) => {
       );
       return fail(
         stillQueued
-          ? 'This refund has not been matched to an order yet, so it can’t be dismissed — that would hide money that really moved. Use Retry once the order’s payment ID exists.'
-          : 'That event is no longer waiting to be reconciled.',
+          ? t('admin.refunds.event.cannotDismiss', { bouton: t('admin.orders.list.refunds.retry') })
+          : t('admin.refunds.event.notWaiting'),
       );
     }
     return back;

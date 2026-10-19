@@ -19,11 +19,19 @@
  *  - HEALTH, on every plan: the share of invocations that ended in error, over
  *    the window. Below a hundred requests the ratio is noise and is reported
  *    without being judged.
- *  - QUOTAS, on the Workers Free plan only: 100 000 requests a day, 10 ms of CPU
- *    per request, 5 million D1 rows read and 100 000 written a day. Past them
- *    the shop answers errors until midnight UTC, with nothing to do but wait —
- *    so the alarm rings at 70 %, which is the day the merchant should move the
- *    account to Workers Paid, not the day the shop stops.
+ *  - QUOTAS, on the Workers Free plan only: 100 000 requests a day, 5 million
+ *    D1 rows read and 100 000 written a day. Past them the shop answers errors
+ *    until midnight UTC, with nothing to do but wait — so the alarm rings at
+ *    70 %, which is the day the merchant should move the account to Workers
+ *    Paid, not the day the shop stops.
+ *  - CPU, on the Workers Free plan only: 10 ms per request, a limit Cloudflare
+ *    enforces by isolate and not by request — an isolate that runs over now
+ *    and then is tolerated, one that does it regularly has its invocations
+ *    stopped (error 1102, status `exceededResources`). So the judged signal is
+ *    the count of invocations stopped, and the p99 is reported unjudged: a
+ *    small shop's p99 is its cold starts, which run over by construction and
+ *    were judged red every night of the certification's staging while no
+ *    request was ever stopped (étape 6).
  *
  * "Could not ask" is never "nothing to report": an analytics error or an
  * unreachable endpoint is exit 5, not a green run.
@@ -62,7 +70,8 @@ export const monitorUsage = `Usage: shopctl monitor --env <staging|production> [
 Lit l'API GraphQL Analytics de Cloudflare avec CLOUDFLARE_API_TOKEN (droit
 « Account Analytics : Read »). Échoue (code 6) quand un seuil est franchi :
 taux d'erreur du Worker au-delà de 1 %, ou, au plan gratuit, 70 % d'un quota
-quotidien atteint — le moment de passer au plan Workers Paid.
+quotidien atteint ou une invocation arrêtée par Cloudflare (erreur 1102) —
+le moment de passer au plan Workers Paid. Le CPU p99 est relevé, pas jugé.
 `;
 
 const GRAPHQL_PATH = '/graphql';
@@ -100,6 +109,7 @@ const D1_QUERY = `query Database($account: String!, $database: String!, $since: 
  * @param {{ plan: 'free'|'paid', hours: number }} options
  */
 export function evaluateMonitor(worker, d1, { plan, hours }) {
+  const stopped = worker.exceededResources ?? 0;
   const checks = [];
   const rate = worker.requests > 0 ? worker.errors / worker.requests : 0;
   if (worker.requests < THRESHOLDS.minRequestsForRate) {
@@ -125,9 +135,21 @@ export function evaluateMonitor(worker, d1, { plan, hours }) {
     quota('requêtes Workers (plan gratuit)', perDay(worker.requests), FREE_PLAN.requestsPerDay);
     quota('lignes D1 lues (plan gratuit)', d1.rowsRead, FREE_PLAN.d1RowsReadPerDay);
     quota('lignes D1 écrites (plan gratuit)', d1.rowsWritten, FREE_PLAN.d1RowsWrittenPerDay);
+    checks.push({
+      name: 'invocations arrêtées (plan gratuit)',
+      ok: stopped === 0,
+      judged: true,
+      value: stopped,
+      detail: `${stopped} invocation(s) arrêtée(s) par Cloudflare pour ressources dépassées (erreur 1102) en ${hours} h`,
+    });
     if (worker.cpuP99Ms !== null) {
-      const share = worker.cpuP99Ms / FREE_PLAN.cpuMsPerRequest;
-      checks.push({ name: 'CPU p99 (plan gratuit)', ok: share < THRESHOLDS.quotaShare, judged: true, value: share, detail: `${worker.cpuP99Ms.toFixed(2)} ms sur ${FREE_PLAN.cpuMsPerRequest} ms par requête (${percent(share)})` });
+      checks.push({
+        name: 'CPU p99',
+        ok: true,
+        judged: false,
+        value: worker.cpuP99Ms,
+        detail: `${worker.cpuP99Ms.toFixed(2)} ms par requête ; le plan gratuit en accorde ${FREE_PLAN.cpuMsPerRequest} et tolère un dépassement occasionnel par isolat — les invocations arrêtées sont le signal`,
+      });
     }
   }
   return checks;
@@ -135,18 +157,28 @@ export function evaluateMonitor(worker, d1, { plan, hours }) {
 
 const percent = (share) => `${(share * 100).toFixed(share < 0.1 ? 2 : 0)} %`;
 
+/**
+ * The statuses of an invocation Cloudflare stopped for its limits. GraphQL
+ * documents `exceededResources` (1102, 1027); `exceededCpu` and
+ * `exceededMemory` are the names Logpush and tail events give the same thing,
+ * accepted so the count never depends on which one an API answers with.
+ */
+const STOPPED_STATUSES = new Set(['exceededResources', 'exceededCpu', 'exceededMemory']);
+
 /** Sum the per-status groups into one figure. CPU time comes in microseconds. */
 export function summariseWorker(groups) {
   let requests = 0;
   let errors = 0;
+  let exceededResources = 0;
   let cpu = null;
   for (const group of groups ?? []) {
     requests += group.sum?.requests ?? 0;
     errors += group.sum?.errors ?? 0;
+    if (STOPPED_STATUSES.has(group.dimensions?.status)) exceededResources += group.sum?.requests ?? 0;
     const p99 = group.quantiles?.cpuTimeP99;
     if (typeof p99 === 'number') cpu = Math.max(cpu ?? 0, p99);
   }
-  return { requests, errors, cpuP99Ms: cpu === null ? null : cpu / 1000 };
+  return { requests, errors, exceededResources, cpuP99Ms: cpu === null ? null : cpu / 1000 };
 }
 
 /** The busiest day of the window, which is the one a daily quota bites on. */
@@ -222,7 +254,7 @@ export async function runMonitor(args, reporter) {
     throw verificationError(
       `${failures.length} seuil(s) franchi(s) en ${env} : ${failures.map((check) => check.name).join(', ')}.`,
       quota
-        ? 'Un quota du plan gratuit approche : le commerçant passe le compte au plan Workers Paid (docs/operations/runbooks/worker-en-erreur.md, section 4).'
+        ? 'Une limite du plan gratuit approche ou mord : le commerçant passe le compte au plan Workers Paid (docs/operations/runbooks/worker-en-erreur.md, section 4).'
         : 'Voir docs/operations/runbooks/worker-en-erreur.md.',
     );
   }

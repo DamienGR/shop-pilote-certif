@@ -10,12 +10,13 @@ import { signSession } from '../../features/auth/session';
 import { catalogIsEmpty, seedDemoCatalog } from '../../features/seed/demo';
 import { CACHE_TAG } from '../../features/cache/tags';
 import { purgeCacheTags } from '../../features/cache/purge';
+import { t } from '../../features/i18n';
 
 // First-run setup wizard (onboarding). Reachable unauthenticated ONLY while no
 // admin password is set yet (bootstrap — see src/middleware.ts); once a password
 // exists the normal gate applies. A single form saves store basics + the admin
 // password, optionally seeds the demo catalog, then marks setup done. Payment
-// methods are configured later in Settings — not required to get running.
+// methods are configured later in Réglages — not required to get running.
 const cfg = getConfig();
 const SESSION_TTL = 7 * 24 * 3600; // 7 days (matches /admin/login)
 const MIN_PW = 8;
@@ -33,15 +34,14 @@ if (Astro.request.method === 'POST') {
   const behindAccess = !!Astro.locals.adminEmail;
 
   // Validate everything BEFORE persisting anything, so a bad field never half-saves.
-  if (!tz) timeZoneError = 'Enter a valid IANA time zone, such as UTC or America/New_York.';
-  if (pw && pw.length < MIN_PW) passwordError = `Password must be at least ${MIN_PW} characters.`;
+  if (!tz) timeZoneError = t('admin.setup.error.timeZone');
+  if (pw && pw.length < MIN_PW) passwordError = t('admin.setup.error.passwordTooShort', { nombre: MIN_PW });
   // Finishing without any admin credential would strand the operator (the bootstrap
   // gate keeps bouncing /admin back here, and this page stays public). Require a
   // password — unless one's already set, Access fronts /admin, or this is local dev.
   const willHaveCredential = hasPasswordAlready || behindAccess || pw.length >= MIN_PW;
   if (!import.meta.env.DEV && !willHaveCredential && !passwordError) {
-    passwordError =
-      'Set an admin password — without one the dashboard is unreachable and this page stays public.';
+    passwordError = t('admin.setup.error.passwordRequired');
   }
 
   if (!timeZoneError && !passwordError) {
@@ -87,21 +87,18 @@ const hasPassword = !!(await getSetting(env.DB, 'admin_password_hash'));
 const catalogEmpty = await catalogIsEmpty(env.DB);
 ---
 
-<AdminLayout title="Setup" active="dashboard">
+<AdminLayout title={t('admin.setup.title')} active="dashboard">
   <div class="mx-auto max-w-2xl">
-    <h1 class="text-2xl font-bold">Set up your store</h1>
-    <p class="mt-1 text-sm text-gray-500">
-      A few first-run settings — you can change them any time in Settings. This just gets
-      you running.
-    </p>
+    <h1 class="text-2xl font-bold">{t('admin.setup.heading')}</h1>
+    <p class="mt-1 text-sm text-gray-500">{t('admin.setup.intro')}</p>
 
     <form method="POST" class="mt-8 space-y-6">
       {/* ── Store basics ─────────────────────────────────────────────────────── */}
       <section class="rounded-lg border border-line bg-white p-5">
-        <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-500">Store basics</h2>
+        <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-500">{t('admin.setup.basics.heading')}</h2>
         <div class="mt-4 flex flex-wrap items-end gap-3">
           <label class="flex flex-col gap-1 text-xs uppercase tracking-widest text-gray-400">
-            Store name
+            {t('admin.setup.basics.storeName')}
             <input
               type="text"
               name="store_name"
@@ -110,7 +107,7 @@ const catalogEmpty = await catalogIsEmpty(env.DB);
             />
           </label>
           <label class="flex flex-col gap-1 text-xs uppercase tracking-widest text-gray-400">
-            Store time zone
+            {t('admin.setup.basics.timeZone')}
             <input
               type="text"
               name="time_zone"
@@ -119,7 +116,7 @@ const catalogEmpty = await catalogIsEmpty(env.DB);
               list="tz-list"
               data-time-zone
               data-auto-detect={settings.timeZone ? 'false' : 'true'}
-              placeholder="Search e.g. America/New_York"
+              placeholder={t('admin.setup.basics.timeZonePlaceholder')}
               class="w-64 rounded-md border border-gray-300 px-3 py-2 text-sm normal-case tracking-normal focus:border-brand focus:outline-none"
             />
             <datalist id="tz-list">
@@ -129,43 +126,44 @@ const catalogEmpty = await catalogIsEmpty(env.DB);
         </div>
         {timeZoneError && <p class="mt-2 text-xs text-red-600">{timeZoneError}</p>}
         <p class="mt-3 text-xs text-gray-400">
-          Currency stays a build-time setting (it's wired through every price) — set
-          <code class="rounded bg-gray-100 px-1">currency</code> in
-          <code class="rounded bg-gray-100 px-1">src/config.ts</code>. Current:
-          {' '}{cfg.currency.toUpperCase()}.
+          {t('admin.setup.basics.currency.before')}{' '}
+          <code class="rounded bg-gray-100 px-1">currency</code> {t('admin.setup.basics.currency.middle')}{' '}
+          <code class="rounded bg-gray-100 px-1">src/store.config.ts</code>.{' '}
+          {t('admin.setup.basics.currency.current', { devise: cfg.currency.toUpperCase() })}
         </p>
       </section>
 
       {/* ── Admin password ───────────────────────────────────────────────────── */}
       <section class="rounded-lg border border-line bg-white p-5">
-        <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-500">Admin password</h2>
+        <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-500">{t('admin.setup.password.heading')}</h2>
         <p class="mt-1 text-sm text-gray-500">
-          Password for <code class="rounded bg-gray-100 px-1">/admin/login</code> — stored hashed
-          (PBKDF2), never plaintext.{' '}
-          {hasPassword ? 'A password is already set; leave blank to keep it.' : 'Required to finish.'}
-          {' '}Cloudflare Access is the recommended production auth; this is the simpler stopgap.
+          {t('admin.setup.password.before')}{' '}
+          <code class="rounded bg-gray-100 px-1">/admin/login</code>{' '}
+          {t('admin.setup.password.after')}{' '}
+          {hasPassword ? t('admin.setup.password.alreadySet') : t('admin.setup.password.requiredToFinish')}
+          {' '}{t('admin.setup.password.accessHint')}
         </p>
         <label class="mt-4 flex flex-col gap-1 text-xs uppercase tracking-widest text-gray-400">
-          {hasPassword ? 'New password (optional)' : 'New password'}
+          {hasPassword ? t('admin.setup.password.newOptional') : t('admin.setup.password.new')}
           <input
             type="password"
             name="admin_password"
             autocomplete="new-password"
             minlength="8"
-            placeholder="at least 8 characters"
+            placeholder={t('admin.setup.password.placeholder', { nombre: MIN_PW })}
             class="w-64 rounded-md border border-gray-300 px-3 py-2 text-sm normal-case tracking-normal focus:border-brand focus:outline-none"
           />
         </label>
         {passwordError && <p class="mt-2 text-xs text-red-600">{passwordError}</p>}
       </section>
 
-      {/* ── Payments (configured later in Settings — not needed to get running) ─ */}
+      {/* ── Payments (configured later in Réglages — not needed to get running) ─ */}
       <section class="rounded-lg border border-line bg-white p-5">
-        <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-500">Payments</h2>
+        <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-500">{t('admin.setup.payments.heading')}</h2>
         <p class="mt-2 text-sm text-gray-500">
-          <strong>Demo</strong> checkout works right away. Set up real payment methods (card via
-          Stripe, Bitcoin Lightning, or OpenNode) whenever you're ready in
-          {' '}<strong>Settings → Payments</strong> — no need to do it now.
+          {t('admin.setup.payments.before')} <strong>{t('payment.demo.label')}</strong>{' '}
+          {t('admin.setup.payments.middle')}{' '}
+          <strong>{t('admin.setup.payments.location')}</strong> {t('admin.setup.payments.after')}
         </p>
       </section>
 
@@ -178,8 +176,8 @@ const catalogEmpty = await catalogIsEmpty(env.DB);
             class="mt-0.5 rounded border-gray-300 text-brand focus:ring-brand"
           />
           <span>
-            Load the <strong>demo catalog</strong> — 30 sample products across 6 categories,
-            to explore the storefront. Leave unchecked to start empty and add your own.
+            {t('admin.setup.seed.before')} <strong>{t('admin.setup.seed.catalog')}</strong>{' '}
+            {t('admin.setup.seed.after')}
           </span>
         </label>
       )}
@@ -187,7 +185,7 @@ const catalogEmpty = await catalogIsEmpty(env.DB);
         type="submit"
         class="w-fit rounded-md bg-brand px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-hover"
       >
-        Finish setup
+        {t('admin.setup.submit')}
       </button>
     </form>
   </div>

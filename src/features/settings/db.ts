@@ -120,7 +120,7 @@ export interface StoreSettings {
   turnstileEnabled: boolean;
   /** Turnstile public sitekey, or null. (The secret lives in the vault.) */
   turnstileSiteKey: string | null;
-  /** Default payment rail (Settings → Payments). Default 'stripe'. */
+  /** Default payment rail (Réglages → Paiements). Default 'stripe'. */
   paymentProvider: 'stripe' | 'lightning' | 'opennode' | 'demo';
   /** Self-hosted Lightning node (when provider/rail is lightning). Default 'phoenixd'. */
   lightningBackend: 'phoenixd' | 'lnbits';

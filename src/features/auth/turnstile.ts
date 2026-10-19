@@ -4,7 +4,7 @@
  * siteverify) — no separate siteverify Worker. Pure + dependency-free (takes the
  * secret as a param, no `cloudflare:workers` import) so it's unit-testable.
  *
- * Turnstile is OPT-IN, configured in Admin → Settings → Bot protection. When the
+ * Turnstile is OPT-IN, configured in Admin → Réglages → Protection anti-robots. When the
  * setting is on, verification fails closed if the secret or response is missing.
  * Off = no-op, so a fresh clone works without it.
  *

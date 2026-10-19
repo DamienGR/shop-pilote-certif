@@ -1,4 +1,4 @@
-import type { D1Database } from '@cloudflare/workers-types';
+import type { D1Database, D1PreparedStatement } from '@cloudflare/workers-types';
 import { generateAccessToken, isAccessToken } from '../ids/token.ts';
 import { generatePublicId, isPublicIdConflict } from '../ids/publicId.ts';
 import { guestLinkReissueKind } from '../email/outboxStore.ts';
@@ -156,40 +156,121 @@ export async function guestOrderUrl(
  *     is terminally unpayable — that IS the provider truth for these rails);
  *   - a registry row > 7 days old with no order, no live reservation, and no
  *     live pending payment (provider setup died mid-checkout).
- * LIMIT keeps it piggyback-sized; it rides along on settlements like the
- * notification sweep.
+ * It rides along on settlements like the notification sweep, and on the cron.
+ *
+ * Each clause walks its table with a cursor (`sweep_cursors`, migration 0045)
+ * and examines at most `scan` rows past it per call. Re-reading from the start
+ * is what it did before: D1 bills every row a query scans, and the registry
+ * keeps one row per order ever taken, so at three thousand orders the sweep
+ * alone spent a third of the Free plan's daily reads. A row is examined once,
+ * when it crosses its age threshold, and its verdict cannot change afterwards:
+ * reservations and pending payments are never deleted, and both columns the
+ * cursors follow are stamped `datetime('now')`, so a new row — or a terminal
+ * reservation that moves again — always lands ahead of a cursor that trails
+ * the clock by days. Two sweeps racing (cron and a sale) examine the same
+ * rows, which is harmless — both writes are guarded — and the cursor never
+ * moves backward.
  */
-export async function sweepAbandonedGuestAccess(db: D1Database, limit = 5): Promise<number> {
-  const hidden = await db
+export async function sweepAbandonedGuestAccess(db: D1Database, scan = 50): Promise<number> {
+  return (await hideTerminalGuestAccess(db, scan)) + (await deleteOrphanGuestAccess(db, scan));
+}
+
+const HIDE_CURSOR = 'guest-access-hide';
+const ORPHAN_CURSOR = 'guest-access-orphan';
+
+interface SweepRow {
+  at: string;
+  id: string;
+  act: number;
+}
+
+async function readCursor(db: D1Database, name: string): Promise<{ at: string; id: string }> {
+  const row = await db
+    .prepare('SELECT after_at, after_id FROM sweep_cursors WHERE name = ?')
+    .bind(name)
+    .first<{ after_at: string; after_id: string }>();
+  // '' sorts before every timestamp, so a fresh cursor starts at the oldest row.
+  return { at: row?.after_at ?? '', id: row?.after_id ?? '' };
+}
+
+function advanceCursor(db: D1Database, name: string, last: SweepRow): D1PreparedStatement {
+  return db
     .prepare(
-      `UPDATE order_guest_access
-          SET hidden_at = COALESCE(hidden_at, datetime('now'))
-        WHERE order_public_id IN (
-          SELECT g.order_public_id FROM order_guest_access g
-          JOIN checkout_reservations r ON r.public_id = g.order_public_id
-         WHERE r.status IN ('expired', 'failed')
-           AND r.terminal_at < datetime('now', '-3 days')
-           AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.public_id = g.order_public_id)
-         LIMIT ?1)`,
+      `INSERT INTO sweep_cursors (name, after_at, after_id) VALUES (?1, ?2, ?3)
+       ON CONFLICT(name) DO UPDATE SET after_at = excluded.after_at, after_id = excluded.after_id
+        WHERE excluded.after_at > sweep_cursors.after_at
+           OR (excluded.after_at = sweep_cursors.after_at AND excluded.after_id > sweep_cursors.after_id)`,
     )
-    .bind(limit)
-    .run();
-  const deleted = await db
+    .bind(name, last.at, last.id);
+}
+
+/** A self-rendered checkout terminal for three days: its credential becomes a tombstone. */
+async function hideTerminalGuestAccess(db: D1Database, scan: number): Promise<number> {
+  const cursor = await readCursor(db, HIDE_CURSOR);
+  const { results } = await db
     .prepare(
-      `DELETE FROM order_guest_access
-        WHERE order_public_id IN (
-          SELECT g.order_public_id FROM order_guest_access g
-           WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.public_id = g.order_public_id)
-             AND g.created_at < datetime('now', '-7 days')
-             AND NOT EXISTS (SELECT 1 FROM checkout_reservations r
-                              WHERE r.public_id = g.order_public_id)
-             AND NOT EXISTS (SELECT 1 FROM pending_payments p
-                              WHERE p.public_id = g.order_public_id)
-           LIMIT ?1)`,
+      `SELECT r.terminal_at AS at, r.public_id AS id,
+              (r.status IN ('expired', 'failed')
+               AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.public_id = r.public_id)) AS act
+         FROM checkout_reservations r
+        WHERE r.terminal_at < datetime('now', '-3 days')
+          AND (r.terminal_at, r.public_id) > (?1, ?2)
+        ORDER BY r.terminal_at, r.public_id
+        LIMIT ?3`,
     )
-    .bind(limit)
-    .run();
-  return (hidden.meta.changes ?? 0) + (deleted.meta.changes ?? 0);
+    .bind(cursor.at, cursor.id, scan)
+    .all<SweepRow>();
+  const rows = results ?? [];
+  if (rows.length === 0) return 0;
+  const writes = rows
+    .filter((row) => row.act)
+    .map((row) =>
+      db
+        .prepare(
+          `UPDATE order_guest_access SET hidden_at = datetime('now')
+            WHERE order_public_id = ?1 AND hidden_at IS NULL
+              AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.public_id = ?1)`,
+        )
+        .bind(row.id),
+    );
+  const done = await db.batch([...writes, advanceCursor(db, HIDE_CURSOR, rows[rows.length - 1])]);
+  return done.slice(0, writes.length).reduce((n, result) => n + (result.meta.changes ?? 0), 0);
+}
+
+/** A registry row seven days old that nothing ever followed: provider setup died mid-checkout. */
+async function deleteOrphanGuestAccess(db: D1Database, scan: number): Promise<number> {
+  const cursor = await readCursor(db, ORPHAN_CURSOR);
+  const { results } = await db
+    .prepare(
+      `SELECT g.created_at AS at, g.order_public_id AS id,
+              (NOT EXISTS (SELECT 1 FROM orders o WHERE o.public_id = g.order_public_id)
+               AND NOT EXISTS (SELECT 1 FROM checkout_reservations r WHERE r.public_id = g.order_public_id)
+               AND NOT EXISTS (SELECT 1 FROM pending_payments p WHERE p.public_id = g.order_public_id)) AS act
+         FROM order_guest_access g
+        WHERE g.created_at < datetime('now', '-7 days')
+          AND (g.created_at, g.order_public_id) > (?1, ?2)
+        ORDER BY g.created_at, g.order_public_id
+        LIMIT ?3`,
+    )
+    .bind(cursor.at, cursor.id, scan)
+    .all<SweepRow>();
+  const rows = results ?? [];
+  if (rows.length === 0) return 0;
+  const writes = rows
+    .filter((row) => row.act)
+    .map((row) =>
+      db
+        .prepare(
+          `DELETE FROM order_guest_access
+            WHERE order_public_id = ?1
+              AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.public_id = ?1)
+              AND NOT EXISTS (SELECT 1 FROM checkout_reservations r WHERE r.public_id = ?1)
+              AND NOT EXISTS (SELECT 1 FROM pending_payments p WHERE p.public_id = ?1)`,
+        )
+        .bind(row.id),
+    );
+  const done = await db.batch([...writes, advanceCursor(db, ORPHAN_CURSOR, rows[rows.length - 1])]);
+  return done.slice(0, writes.length).reduce((n, result) => n + (result.meta.changes ?? 0), 0);
 }
 
 /**

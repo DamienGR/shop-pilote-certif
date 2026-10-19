@@ -14,7 +14,7 @@ const MAX_BODY = 100_000; // same bound the page form enforces
  * POST /api/admin/pages/preview — render Markdown with the REAL storefront
  * renderer and return the fragment.
  *
- * The editor's Preview tab posts here instead of parsing Markdown in the
+ * The editor's Aperçu tab posts here instead of parsing Markdown in the
  * browser. That keeps markdown-it out of the admin JavaScript bundle and makes
  * preview/storefront parity structural rather than something two
  * implementations have to agree on.

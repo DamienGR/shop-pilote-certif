@@ -7,7 +7,7 @@ import type { DeepPartial, SiteConfig } from './config';
  * (shipping rates, allowed countries) replace wholesale.
  *
  * Store identity, feature switches, integrations, and provider credentials are
- * configured at runtime in Admin → Settings and do not belong in this file.
+ * configured at runtime in Admin → Réglages and do not belong in this file.
  */
 export const storeOverrides: DeepPartial<SiteConfig> = {
   // currency: 'usd',                // ISO 4217, lowercase
@@ -30,6 +30,6 @@ export const storeOverrides: DeepPartial<SiteConfig> = {
   // legal: { termsVersion: '2', vatRateBps: 2000 },
   //
   // Shipping (zones, rates, weight bands, free-over thresholds) is managed in
-  // Admin → Shipping. The block that used to live here is only the default for a
+  // Admin → Livraison. The block that used to live here is only the default for a
   // brand-new store; editing it after the first Admin save has no effect.
 };

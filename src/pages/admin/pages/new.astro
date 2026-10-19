@@ -1,12 +1,15 @@
 ---
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { t } from '../../../features/i18n';
 
 const error = Astro.url.searchParams.get('error');
 ---
 
-<AdminLayout title="New page" active="pages">
-  <a href="/admin/pages" class="text-sm text-gray-500 hover:text-brand">&larr; Back to pages</a>
-  <h1 class="mt-4 mb-6 font-serif text-3xl tracking-tight">New page</h1>
+<AdminLayout title={t('admin.pages.new.title')} active="pages">
+  <a href="/admin/pages" class="text-sm text-gray-500 hover:text-brand">
+    &larr; {t('admin.pages.backToList')}
+  </a>
+  <h1 class="mt-4 mb-6 font-serif text-3xl tracking-tight">{t('admin.pages.new.title')}</h1>
 
   {
     error && (
@@ -20,7 +23,7 @@ const error = Astro.url.searchParams.get('error');
       editor. Media can only be attached to a page that already has an id. */}
   <form method="POST" action="/api/admin/pages" class="max-w-xl">
     <label class="block text-xs uppercase tracking-widest text-gray-400">
-      Title
+      {t('admin.pages.field.title')}
       <input
         type="text"
         name="title"
@@ -32,15 +35,16 @@ const error = Astro.url.searchParams.get('error');
     </label>
 
     <label class="mt-4 block text-xs uppercase tracking-widest text-gray-400">
-      URL slug <span class="normal-case tracking-normal text-gray-400">(optional)</span>
+      {t('admin.pages.field.urlSlug')}
+      <span class="normal-case tracking-normal text-gray-400">({t('admin.common.optional')})</span>
       <input
         type="text"
         name="slug"
-        placeholder="about"
+        placeholder={t('admin.pages.new.slugPlaceholder')}
         class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm normal-case tracking-normal text-gray-900 focus:border-brand focus:outline-none"
       />
       <span class="mt-1 block normal-case tracking-normal text-gray-400">
-        Leave blank to build it from the title. The page will live at /pages/&lt;slug&gt;.
+        {t('admin.pages.new.slugHint')}
       </span>
     </label>
 
@@ -48,7 +52,7 @@ const error = Astro.url.searchParams.get('error');
       type="submit"
       class="mt-6 rounded-md bg-brand px-4 py-2 text-xs font-medium uppercase tracking-wider text-white hover:bg-brand-hover"
     >
-      Create draft
+      {t('admin.pages.new.submit')}
     </button>
   </form>
 </AdminLayout>
