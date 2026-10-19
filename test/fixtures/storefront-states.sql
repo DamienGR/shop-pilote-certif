@@ -90,12 +90,17 @@ WHERE p.slug = 'sample-tee'
   );
 
 -- A published content page, so the Markdown wrapper and the footer's page links
--- both render.
+-- both render. The quote is the draft banner of the legal pages (migration
+-- 0040), strong and code included: a merchant who publishes one before
+-- deleting it serves exactly this, and its contrast failed AA on the first
+-- deployed shop while this page had no quote (certification, étape 6).
 INSERT INTO pages (title, slug, body_markdown, published)
 SELECT 'About', 'about',
   '# About us' || char(10) || char(10) ||
   'A fixture page with a [link](/products) and a list:' || char(10) || char(10) ||
-  '- one' || char(10) || '- two',
+  '- one' || char(10) || '- two' || char(10) || char(10) ||
+  '> **Brouillon.** Complétez chaque `[À COMPLÉTER]` avant publication.' || char(10) || char(10) ||
+  '```' || char(10) || 'SIRET 000 000 000 00000' || char(10) || '```',
   1
 WHERE NOT EXISTS (SELECT 1 FROM pages WHERE slug = 'about');
 

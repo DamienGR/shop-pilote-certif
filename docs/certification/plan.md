@@ -610,7 +610,8 @@ invocations `exceededCpu`, qu'il regroupe déjà par statut, est le signal qui
 compte.
 
 Répétée en doublure le 2026-10-15 ; ce qu'elle a trouvé est corrigé dans
-`v0.3.6`, et la fiche de passage est [etape-6-commandes.md](etape-6-commandes.md).
+`v0.3.6`, et la fiche de passage, qui monte la boutique en `v0.3.8`, est
+[etape-6-commandes.md](etape-6-commandes.md).
 Le monitor y juge les invocations arrêtées et relève le p99 sans le juger ; la
 vitrine lit sa base en un appel par page (à chaud, la fiche produit passe de
 13 à 16 ms à 8 ms sur le Worker construit) ; `npm run test:cpu:remote` relève

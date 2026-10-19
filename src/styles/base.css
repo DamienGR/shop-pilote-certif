@@ -321,20 +321,23 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+/* Colours come from the theme: a fixed grey met AA on none of the four shipped
+   papers once a quote held code, and a fixed light chip is unreadable under a
+   dark theme's light text (certification, étape 6). */
 .markdown-content blockquote {
   border-left: 3px solid var(--color-line, #e5e5e5);
   padding-left: 1rem;
-  color: #6b7280;
+  color: var(--color-muted, #6b7280);
   font-style: italic;
 }
 .markdown-content code {
-  background: #f5f5f4;
+  background: var(--color-surface, #f5f5f4);
   border-radius: 0.25rem;
   padding: 0.125rem 0.375rem;
   font-size: 0.875em;
 }
 .markdown-content pre {
-  background: #f5f5f4;
+  background: var(--color-surface, #f5f5f4);
   border-radius: 0.375rem;
   padding: 1rem;
   overflow-x: auto;
