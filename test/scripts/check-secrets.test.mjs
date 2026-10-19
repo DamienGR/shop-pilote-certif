@@ -133,3 +133,27 @@ describe('check-secrets --history', () => {
     }
   });
 });
+
+describe('check-secrets', () => {
+  // Lighthouse copies --extra-headers into every report it writes, JSON and
+  // HTML: the certification's étape 6 found the preview's service token in all
+  // eight of its reports, about to be committed as evidence to a public repo.
+  it('finds an Access service token in a Lighthouse report, not its masked form', () => {
+    const repo = repository();
+    const report = (secret) =>
+      `{\n  "configSettings": {\n    "extraHeaders": {\n      "cf-access-client-id": "${'0'.repeat(32)}.access",\n      "cf-access-client-secret": "${secret}"\n    }\n  }\n}\n`;
+    try {
+      writeFileSync(join(repo.root, 'lighthouse.report.json'), report('<masqué>'));
+      repo.git('add', 'lighthouse.report.json');
+      repo.git('commit', '-qm', 'masked');
+      expect(repo.scan().status).toBe(0);
+
+      writeFileSync(join(repo.root, 'lighthouse.report.json'), report('3f9a'.repeat(16)));
+      const scan = repo.scan();
+      expect(scan.status).toBe(1);
+      expect(scan.stderr).toMatch(/lighthouse\.report\.json:5 {2}Cloudflare Access service token/);
+    } finally {
+      repo.dispose();
+    }
+  });
+});

@@ -81,6 +81,9 @@ const RULES = [
   { name: 'Anthropic API key', pattern: /\bsk-ant-[A-Za-z0-9_-]{20,}/ },
   { name: 'OpenNode API key', pattern: /\bopennode_[A-Za-z0-9]{20,}/ },
   { name: 'Private key block', pattern: /-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----/ },
+  // The header and its value, as Lighthouse writes them into every report it
+  // was handed --extra-headers for. A shell variable or `<masqué>` is not one.
+  { name: 'Cloudflare Access service token', pattern: /cf-access-client-secret["']?\s*[:=]\s*["']?[A-Za-z0-9]{32,}/i },
   // Signed: HS256, the shortest real signature, is 43 characters. A test's
   // stand-in assertion signed "sig" is not a credential, and the one cfada29
   // committed stays in the history every shop carries from v0.3.4 on.
