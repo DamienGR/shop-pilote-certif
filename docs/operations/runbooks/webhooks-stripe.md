@@ -32,7 +32,8 @@ Développeurs → Webhooks → l'endpoint `https://<domaine>/api/webhook`.
 ## 2. Réparer
 
 - **signature** : sur l'endpoint Stripe, révéler le secret de signature et le
-  saisir dans Admin → Settings → Payments (`stripe_webhook_secret`). Ne pas
+  saisir dans Admin → Réglages → Paiements → Carte (Stripe), champ « Secret de
+  signature du webhook » (`stripe_webhook_secret`). Ne pas
   « faire tourner » le secret pour l'occasion : chaque rotation recrée le
   problème tant que la saisie n'a pas suivi ;
 - **endpoint** : le recréer avec l'URL de production et les cinq événements,

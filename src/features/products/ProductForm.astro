@@ -4,6 +4,7 @@ import type { CategoryOption } from '../categories/db';
 import { getConfig, toMajorUnits, currencyDecimals } from '../../config';
 import { formatWeightValue, type WeightUnit } from '../shipping/weight';
 import { attachmentActive } from '../digitalDelivery/rollout.ts';
+import { t, formatNumber } from '../i18n';
 
 interface Props {
   action: string;
@@ -19,7 +20,7 @@ interface Props {
   /** Optional form id, so out-of-tree inputs (e.g. the variants editor) can submit
       with this form via the HTML `form="..."` attribute. */
   formId?: string;
-  /** Store-wide weight unit (Admin → Settings). Storage is always grams. */
+  /** Store-wide weight unit (Admin → Réglages). Storage is always grams. */
   weightUnit?: WeightUnit;
   /** True when every enabled zone prices by weight, so a blank weight would make
    *  this product unsellable. Shown as a requirement rather than discovered later. */
@@ -67,58 +68,58 @@ const inputClass =
   }
 
   <div>
-    <label class="block text-sm font-medium" for="name">Name</label>
+    <label class="block text-sm font-medium" for="name">{t('admin.common.name')}</label>
     <input id="name" name="name" type="text" required value={product?.name ?? ''} class={inputClass} />
   </div>
 
   <div>
     <label class="block text-sm font-medium" for="slug">
-      Slug <span class="text-faint">(URL — blank to auto-generate from name)</span>
+      Slug <span class="text-faint">{t('admin.products.form.slugHint')}</span>
     </label>
     <input
       id="slug"
       name="slug"
       type="text"
       value={product?.slug ?? ''}
-      placeholder="auto-from-name"
+      placeholder={t('admin.products.form.slugPlaceholder')}
       class={inputClass}
     />
   </div>
 
   <div>
     <label class="block text-sm font-medium" for="sku">
-      SKU <span class="text-faint">(your own reference — the key a catalogue import matches on)</span>
+      {t('admin.products.form.sku')} <span class="text-faint">{t('admin.products.form.skuHint')}</span>
     </label>
     <input
       id="sku"
       name="sku"
       type="text"
       value={product?.sku ?? ''}
-      placeholder="none"
+      placeholder={t('admin.products.form.skuPlaceholder')}
       class={inputClass}
     />
   </div>
 
   <div>
-    <label class="block text-sm font-medium" for="description">Description</label>
+    <label class="block text-sm font-medium" for="description">{t('admin.products.form.description')}</label>
     <textarea id="description" name="description" rows="3" class={inputClass}
       >{product?.description ?? ''}</textarea>
-      <p class="mt-1 text-xs text-gray-500">Plain text or Markdown — paragraphs, lists, links, and <code>/images/…</code> media render on the product page.</p>
+      <p class="mt-1 text-xs text-gray-500">{t('admin.products.form.descriptionHint.before')} <code>/images/…</code> {t('admin.products.form.descriptionHint.after')}</p>
   </div>
 
   <div class="grid grid-cols-2 gap-4">
     <div>
-      <label class="block text-sm font-medium" for="price">Price (USD)</label>
+      <label class="block text-sm font-medium" for="price">{t('admin.products.form.price', { devise: defaultCurrency.toUpperCase() })}</label>
       <input id="price" name="price" type="number" step={priceStep} min="0" required value={price} class={inputClass} />
     </div>
     <div>
-      <label class="block text-sm font-medium" for="stock">Stock</label>
+      <label class="block text-sm font-medium" for="stock">{t('admin.products.form.stock')}</label>
       <input id="stock" name="stock" type="number" step="1" min="0" value={product?.stock ?? 0} class={inputClass} />
     </div>
   </div>
 
   {attachmentActive() && <fieldset class="rounded-md border border-line p-4">
-    <legend class="px-1 text-sm font-medium">Shipping</legend>
+    <legend class="px-1 text-sm font-medium">{t('admin.products.form.shipping')}</legend>
     <label class="flex items-center gap-2 text-sm">
       <input
         name="requires_shipping"
@@ -126,14 +127,13 @@ const inputClass =
         checked={product ? product.requires_shipping === 1 : true}
         class="h-4 w-4"
       />
-      Requires shipping
+      {t('admin.products.form.requiresShipping')}
     </label>
     <p class="mt-1 text-xs text-muted">
-      Uncheck for digital goods (ebooks, gift cards). They are excluded from shipment weight
-      and never block checkout for a missing weight.
+      {t('admin.products.form.requiresShippingHint')}
     </p>
     <div class="mt-3">
-      <label class="block text-sm font-medium" for="weight">Weight ({weightUnit})</label>
+      <label class="block text-sm font-medium" for="weight">{t('admin.products.form.weight', { unite: weightUnit })}</label>
       <input
         id="weight"
         name="weight"
@@ -143,23 +143,24 @@ const inputClass =
         class={inputClass}
       />
       <p class="mt-1 text-xs text-muted">
-        Packed item weight, excluding the shared packaging allowance set in Shipping.
+        {t('admin.products.form.weightHint')}
         {weightRequired
-          ? ' Required: every shipping zone prices by weight, so this product cannot be sold without it.'
-          : ' Optional while a flat rate is available.'}
+          ? t('admin.products.form.weightRequired')
+          : t('admin.products.form.weightOptional')}
       </p>
     </div>
   </fieldset>}
 
   <fieldset class="rounded-md border border-line p-4">
-    <legend class="px-1 text-sm font-medium">Digital delivery</legend>
+    <legend class="px-1 text-sm font-medium">{t('admin.products.form.digital')}</legend>
     {product?.file_key && (
       <p class="mb-3 text-sm text-muted">
-        Attached: <strong>{product.file_name ?? 'download'}</strong>
-        {product.file_size_bytes != null && ` (${Math.ceil(product.file_size_bytes / 1024)} KB)`}
+        {t('admin.products.form.attached')} <strong>{product.file_name ?? t('admin.products.form.fileFallbackName')}</strong>
+        {product.file_size_bytes != null &&
+          ` (${t('admin.products.form.fileSize', { taille: formatNumber(Math.ceil(product.file_size_bytes / 1024)) })})`}
       </p>
     )}
-    <label class="block text-sm font-medium" for="deliverable">{product?.file_key ? 'Replace file' : 'Attach file'}</label>
+    <label class="block text-sm font-medium" for="deliverable">{product?.file_key ? t('admin.products.form.replaceFile') : t('admin.products.form.attachFile')}</label>
     <input
       id="deliverable"
       name="deliverable"
@@ -167,11 +168,11 @@ const inputClass =
       accept=".pdf,.zip,.epub,.mp3,.m4a,.txt"
       class="mt-1 block w-full text-sm text-muted"
     />
-    <p class="mt-1 text-xs text-muted">Private download after payment. PDF, ZIP, EPUB, MP3, M4A, or TXT; 25 MB maximum. For a download-only product, uncheck <strong>Requires shipping</strong> above.</p>
+    <p class="mt-1 text-xs text-muted">{t('admin.products.form.digitalHint.before')} <strong>{t('admin.products.form.requiresShipping')}</strong> {t('admin.products.form.digitalHint.after')}</p>
     {product?.file_key && (
       <label class="mt-3 flex items-center gap-2 text-sm">
         <input type="checkbox" name="remove_deliverable" class="h-4 w-4" />
-        Remove attachment from future purchases
+        {t('admin.products.form.removeFile')}
       </label>
     )}
   </fieldset>
@@ -180,7 +181,7 @@ const inputClass =
     showImage && (
       <div>
         <label class="block text-sm font-medium" for="image">
-          Image
+          {t('admin.products.form.image')}
         </label>
         <input id="image" name="image" type="file" accept="image/*" class="mt-1 block w-full text-sm text-muted file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-brand file:px-4 file:py-2 file:text-xs file:font-medium file:uppercase file:tracking-wider file:text-on-brand hover:file:bg-brand-hover" />
       </div>
@@ -190,7 +191,7 @@ const inputClass =
   {
     categoryOptions.length > 0 && (
       <fieldset>
-        <legend class="block text-sm font-medium">Categories</legend>
+        <legend class="block text-sm font-medium">{t('admin.products.form.categories')}</legend>
         <div class="mt-1 max-h-48 space-y-1 overflow-auto rounded-md border border-line p-2">
           {categoryOptions.map((c) => (
             <label
@@ -215,7 +216,7 @@ const inputClass =
 
   <label class="flex items-center gap-2 text-sm">
     <input name="active" type="checkbox" checked={product ? product.active === 1 : true} class="h-4 w-4" />
-    Active (visible in storefront)
+    {t('admin.products.form.active')}
   </label>
 
   <input type="hidden" name="currency" value={defaultCurrency} />
@@ -224,6 +225,6 @@ const inputClass =
     <button type="submit" class="rounded-md bg-brand px-5 py-2 font-medium text-on-brand hover:bg-brand-hover">
       {submitLabel}
     </button>
-    <a href="/admin/products" class="rounded-md border border-line px-5 py-2 hover:bg-surface">Cancel</a>
+    <a href="/admin/products" class="rounded-md border border-line px-5 py-2 hover:bg-surface">{t('admin.common.cancel')}</a>
   </div>
 </form>

@@ -7,6 +7,8 @@
 // interaction per filter without a JS framework — and the Apply button means it
 // still works with JS off.
 
+import { t, tn } from '../features/i18n';
+
 export interface SelectFilter {
   name: string;
   label: string;
@@ -26,10 +28,19 @@ interface Props {
   active: boolean;
   /** Result count, shown only while filtered so the empty case is explicable. */
   count?: number;
+  /** French singular noun for the count, pluralized with an -s ("produit"). */
   noun?: string;
 }
 
-const { action, selects, search, hidden = {}, active, count, noun = 'result' } = Astro.props;
+const {
+  action,
+  selects,
+  search,
+  hidden = {},
+  active,
+  count,
+  noun = t('admin.filterBar.result'),
+} = Astro.props;
 ---
 
 <form method="GET" action={action} class="mb-6 flex flex-wrap items-end gap-3" data-filter-bar>
@@ -45,7 +56,7 @@ const { action, selects, search, hidden = {}, active, count, noun = 'result' } =
   {
     search && (
       <label class="flex flex-col gap-1">
-        <span class="text-xs uppercase tracking-widest text-faint">Search</span>
+        <span class="text-xs uppercase tracking-widest text-faint">{t('admin.common.search')}</span>
         <input
           type="search"
           name={search.name}
@@ -81,7 +92,7 @@ const { action, selects, search, hidden = {}, active, count, noun = 'result' } =
     type="submit"
     class="rounded-md border border-line px-4 py-1.5 text-xs font-medium uppercase tracking-wider text-muted hover:border-brand hover:text-brand"
   >
-    Apply
+    {t('admin.filterBar.apply')}
   </button>
 
   {
@@ -90,7 +101,7 @@ const { action, selects, search, hidden = {}, active, count, noun = 'result' } =
         href={action}
         class="py-1.5 text-xs uppercase tracking-widest text-faint hover:text-brand"
       >
-        Clear
+        {t('admin.common.clear')}
       </a>
     )
   }
@@ -98,8 +109,7 @@ const { action, selects, search, hidden = {}, active, count, noun = 'result' } =
   {
     active && count !== undefined && (
       <span class="py-1.5 text-xs text-muted">
-        {count} {noun}
-        {count === 1 ? '' : 's'}
+        {tn('admin.filterBar.count.one', 'admin.filterBar.count.other', count, { nom: noun })}
       </span>
     )
   }

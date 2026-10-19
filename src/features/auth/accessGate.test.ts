@@ -9,7 +9,7 @@ describe('accessGateDecision', () => {
   it('fails closed when configured Access receives no assertion', () => {
     expect(accessGateDecision(null, 'https://team.cloudflareaccess.com', 'aud')).toEqual({
       action: 'deny',
-      message: 'Cloudflare Access authentication required.',
+      message: 'Authentification Cloudflare Access requise.',
     });
   });
 

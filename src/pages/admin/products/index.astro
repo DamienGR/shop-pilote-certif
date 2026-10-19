@@ -17,6 +17,7 @@ import {
   PRODUCT_STATUS_OPTIONS,
   PRODUCT_STOCK_OPTIONS,
 } from '../../../features/products/filter';
+import { t } from '../../../features/i18n';
 
 // Auth: /admin + /api/admin are gated by src/middleware.ts. The admin password is
 // set in the first-run setup wizard (hashed in D1); Cloudflare Access at the edge
@@ -58,14 +59,14 @@ const sortHref = (col: string) =>
 const arrow = (col: string) => (sort === col ? (dir === 'asc' ? ' ↑' : ' ↓') : '');
 ---
 
-<AdminLayout title="Products" active="products">
+<AdminLayout title={t('admin.products.list.title')} active="products">
   <div class="mb-8 flex items-center justify-between">
-    <h1 class="font-serif text-3xl tracking-tight">Products</h1>
+    <h1 class="font-serif text-3xl tracking-tight">{t('admin.products.list.title')}</h1>
     <a
       href="/admin/products/new"
       class="rounded-md bg-brand px-4 py-2 text-xs font-medium uppercase tracking-wider text-white hover:bg-brand-hover"
     >
-      New product
+      {t('admin.products.list.new')}
     </a>
   </div>
 
@@ -73,21 +74,21 @@ const arrow = (col: string) => (sort === col ? (dir === 'asc' ? ' ↑' : ' ↓')
     action="/admin/products"
     active={filtered}
     count={matchCount}
-    noun="product"
+    noun={t('admin.products.list.noun')}
     hidden={{ sort: sort ?? undefined, dir: dir ?? undefined }}
-    search={{ name: 'q', value: filters.q, placeholder: 'Product name' }}
+    search={{ name: 'q', value: filters.q, placeholder: t('admin.products.list.searchPlaceholder') }}
     selects={[
       {
         name: 'status',
-        label: 'Visibility',
-        anyLabel: 'All products',
+        label: t('admin.products.list.filter.visibility'),
+        anyLabel: t('admin.products.list.filter.anyVisibility'),
         value: filters.status,
         options: PRODUCT_STATUS_OPTIONS,
       },
       {
         name: 'stock',
-        label: 'Stock',
-        anyLabel: 'Any stock',
+        label: t('admin.products.list.filter.stock'),
+        anyLabel: t('admin.products.list.filter.anyStock'),
         value: filters.stock,
         options: PRODUCT_STOCK_OPTIONS,
       },
@@ -99,21 +100,21 @@ const arrow = (col: string) => (sort === col ? (dir === 'asc' ? ' ↑' : ' ↓')
     <thead>
       <tr class="border-b border-line text-xs uppercase tracking-widest text-gray-400">
         <th class="py-3 pr-4 font-normal">
-          <a href={sortHref('name')} class="hover:text-brand">Product{arrow('name')}</a>
+          <a href={sortHref('name')} class="hover:text-brand">{t('admin.products.list.column.product')}{arrow('name')}</a>
         </th>
         <th class="py-3 pr-4 font-normal">
-          <a href={sortHref('price')} class="hover:text-brand">Price{arrow('price')}</a>
+          <a href={sortHref('price')} class="hover:text-brand">{t('admin.products.list.column.price')}{arrow('price')}</a>
         </th>
         <th class="py-3 pr-4 font-normal">
-          <a href={sortHref('stock')} class="hover:text-brand">Stock{arrow('stock')}</a>
+          <a href={sortHref('stock')} class="hover:text-brand">{t('admin.products.list.column.stock')}{arrow('stock')}</a>
         </th>
         <th class="py-3 pr-4 font-normal">
-          <a href={sortHref('sold')} class="hover:text-brand">Sold{arrow('sold')}</a>
+          <a href={sortHref('sold')} class="hover:text-brand">{t('admin.products.list.column.sold')}{arrow('sold')}</a>
         </th>
         <th class="py-3 pr-4 font-normal">
-          <a href={sortHref('active')} class="hover:text-brand">Active{arrow('active')}</a>
+          <a href={sortHref('active')} class="hover:text-brand">{t('admin.products.list.column.active')}{arrow('active')}</a>
         </th>
-        <th class="py-3 text-right font-normal">Actions</th>
+        <th class="py-3 text-right font-normal">{t('admin.common.actions')}</th>
       </tr>
     </thead>
     <tbody>
@@ -134,12 +135,12 @@ const arrow = (col: string) => (sort === col ? (dir === 'asc' ? ' ↑' : ' ↓')
                 <span class="font-medium">{p.name}</span>
               </a>
             </td>
-            <td data-label="Price" class="py-3 pr-4 tabular-nums">{formatPrice(p.price_cents)}</td>
-            <td data-label="Stock" class="py-3 pr-4 tabular-nums">{p.stock}</td>
-            <td data-label="Sold" class="py-3 pr-4 tabular-nums">
+            <td data-label={t('admin.products.list.column.price')} class="py-3 pr-4 tabular-nums">{formatPrice(p.price_cents)}</td>
+            <td data-label={t('admin.products.list.column.stock')} class="py-3 pr-4 tabular-nums">{p.stock}</td>
+            <td data-label={t('admin.products.list.column.sold')} class="py-3 pr-4 tabular-nums">
               {p.sold > 0 ? p.sold : <span class="text-gray-300">0</span>}
             </td>
-            <td data-label="Active" class="py-3 pr-4">{p.active ? 'Yes' : <span class="text-gray-400">No</span>}</td>
+            <td data-label={t('admin.products.list.column.active')} class="py-3 pr-4">{p.active ? t('admin.common.yes') : <span class="text-gray-400">{t('admin.common.no')}</span>}</td>
             <td data-label="" class="py-3 text-right">
               <div class="flex justify-end gap-4 text-xs uppercase tracking-widest">
                 <a
@@ -148,23 +149,23 @@ const arrow = (col: string) => (sort === col ? (dir === 'asc' ? ' ↑' : ' ↓')
                   rel="noopener"
                   class="text-gray-500 hover:text-brand"
                 >
-                  View ↗
+                  {t('admin.common.view')} ↗
                 </a>
                 <a href={`/admin/products/${p.public_id}/edit`} class="text-accent hover:underline">
-                  Edit
+                  {t('admin.common.edit')}
                 </a>
                 <form
                   method="POST"
                   action={`/api/admin/products/${p.public_id}`}
                   onsubmit={`return confirm('${
                     menuRefs.has(p.id)
-                      ? 'This product is linked from your navigation. Deleting it hides that link on the storefront. Continue?'
-                      : 'Delete this product?'
+                      ? t('admin.products.list.confirmDeleteLinked')
+                      : t('admin.products.list.confirmDelete')
                   }')`}
                 >
                   <input type="hidden" name="_action" value="delete" />
                   <button type="submit" class="text-red-600 hover:underline">
-                    Delete
+                    {t('admin.common.delete')}
                   </button>
                 </form>
               </div>
@@ -178,7 +179,7 @@ const arrow = (col: string) => (sort === col ? (dir === 'asc' ? ' ↑' : ' ↓')
             <td colspan="6" class="py-8 text-center text-gray-400">
               {/* "No products yet" would be wrong — and confusing — when the
                   store has plenty and the filter simply excluded them all. */}
-              {filtered ? 'No products match these filters.' : 'No products yet.'}
+              {filtered ? t('admin.products.list.emptyFiltered') : t('admin.products.list.empty')}
             </td>
           </tr>
         )

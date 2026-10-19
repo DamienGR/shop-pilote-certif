@@ -51,7 +51,18 @@ describe('the thresholds', () => {
       'lignes D1 lues (plan gratuit)',
       'lignes D1 écrites (plan gratuit)',
     ]);
-    expect(failing(evaluateMonitor({ ...quiet, cpuP99Ms: 9 }, idle, { plan: 'free', hours: 24 }))).toEqual(['CPU p99 (plan gratuit)']);
+  });
+
+  // Cloudflare enforces 10 ms by isolate, tolerating an occasional overrun: a
+  // small shop's p99 is its cold starts, over the limit by construction. What
+  // the plan cannot absorb is an invocation it stopped (1102).
+  it('reports the CPU p99 without judging it, and fails on an invocation Cloudflare stopped', () => {
+    const coldStarts = evaluateMonitor({ ...quiet, cpuP99Ms: 36 }, idle, { plan: 'free', hours: 24 });
+    expect(failing(coldStarts)).toEqual([]);
+    expect(coldStarts.find((check) => check.name === 'CPU p99')).toMatchObject({ judged: false, value: 36 });
+    expect(failing(evaluateMonitor({ ...quiet, exceededResources: 1 }, idle, { plan: 'free', hours: 24 }))).toEqual([
+      'invocations arrêtées (plan gratuit)',
+    ]);
   });
 
   it('scales a short window up to a day before comparing it with a daily quota', () => {
@@ -60,7 +71,7 @@ describe('the thresholds', () => {
   });
 
   it('leaves the free quotas alone on the paid plan', () => {
-    const busy = { requests: 10 * FREE_PLAN.requestsPerDay, errors: 0, cpuP99Ms: 40 };
+    const busy = { requests: 10 * FREE_PLAN.requestsPerDay, errors: 0, exceededResources: 3, cpuP99Ms: 40 };
     expect(failing(evaluateMonitor(busy, { rowsRead: 1e9, rowsWritten: 1e7 }, { plan: 'paid', hours: 24 }))).toEqual([]);
   });
 
@@ -69,9 +80,10 @@ describe('the thresholds', () => {
       summariseWorker([
         { sum: { requests: 900, errors: 0 }, quantiles: { cpuTimeP99: 1500 }, dimensions: { status: 'success' } },
         { sum: { requests: 100, errors: 100 }, quantiles: { cpuTimeP99: 4200 }, dimensions: { status: 'scriptThrewException' } },
+        { sum: { requests: 2, errors: 2 }, quantiles: { cpuTimeP99: 11000 }, dimensions: { status: 'exceededResources' } },
       ]),
-    ).toEqual({ requests: 1000, errors: 100, cpuP99Ms: 4.2 });
-    expect(summariseWorker([])).toEqual({ requests: 0, errors: 0, cpuP99Ms: null });
+    ).toEqual({ requests: 1002, errors: 102, exceededResources: 2, cpuP99Ms: 11 });
+    expect(summariseWorker([])).toEqual({ requests: 0, errors: 0, exceededResources: 0, cpuP99Ms: null });
   });
 
   it('takes the busiest day of the window for D1', () => {

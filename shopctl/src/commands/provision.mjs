@@ -81,7 +81,7 @@ et reprend une exécution interrompue sans option particulière.
  * Generated here, never read back: `wrangler secret list` returns names, not
  * values, so a secret that already exists is KEPT rather than rotated. That is
  * not laziness. `SECRETS_KEK` encrypts the payment keys the merchant pasted in
- * Admin → Settings; regenerating it on a second provisioning run would leave
+ * Admin → Réglages; regenerating it on a second provisioning run would leave
  * every one of them undecryptable, and the shop would stop taking payments with
  * no error anyone could read.
  */

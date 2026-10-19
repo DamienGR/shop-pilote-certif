@@ -166,7 +166,10 @@ runbook in the same commit.
 Cloudflare's notification catalogue has no alert for a Worker's error rate,
 its CPU time or a D1 quota on the plans a shop runs on. It reads the GraphQL
 Analytics API (`CLOUDFLARE_API_TOKEN`, Account Analytics: Read), fails at 1 %
-errors or at 70 % of a Workers Free quota, and treats an unreachable or
+errors, at 70 % of a Workers Free quota, or on one invocation Cloudflare
+stopped for its limits (error 1102) — the CPU p99 is reported, not judged,
+because a cold start runs past 10 ms by construction and the plan tolerates it
+per isolate —, and treats an unreachable or
 refusing API as exit 5 — never as a quiet night. The endpoint follows
 `CLOUDFLARE_API_BASE_URL`, the variable wrangler honours, which is how the
 suite points it at its double.

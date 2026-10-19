@@ -24,7 +24,7 @@ let error =
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
   const email = String(form.get('email') ?? '');
-  // Bot challenge (if enabled in Settings → Bot protection): verify with the vault secret.
+  // Bot challenge (if enabled in Réglages → Protection anti-robots): verify with the vault secret.
   const turnstileEnabled = Astro.locals.settings?.turnstileEnabled === true;
   const tsSecret = turnstileEnabled
     ? await getSecret(env.DB, 'turnstile_secret_key')

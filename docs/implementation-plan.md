@@ -1200,7 +1200,9 @@ refuse une commande que la page ne permettait pas d'accepter.
 La frontière de traduction n'est pas « admin / storefront » mais « qui lit »
 ([ADR 0011](architecture/decisions/0011-langue-de-l-administration.md)).
 L'administration reste en anglais au pilote — c'est l'agence qui exploite
-(ADR 0002) —, `AdminLayout` garde donc `lang="en"` délibérément, et
+(ADR 0002) —, `AdminLayout` garde donc `lang="en"` délibérément (décision
+remplacée au jalon 10 par l'[ADR 0018](architecture/decisions/0018-administration-en-francais.md),
+qui passe toute l'administration en français), et
 `/payment-setup`, atteignable depuis le panier, est en français tout en nommant
 en anglais les écrans qui portent ces noms. Les montants et les dates restent
 formatés en `fr-FR` partout, admin comprise : une date au format américain dans
@@ -2858,3 +2860,43 @@ les tests d'exploitation et de restauration.
 - [ ] matrice des responsabilités agence/marchand ;
 - [ ] liste des sous-traitants techniques ;
 - [ ] modèle de recette et de procès-verbal de livraison.
+
+## 13. Après le pilote
+
+Pistes notées pendant le pilote et reportées après le MVP. Aucune n'est
+engagée : chacune demande sa propre décision, et un ADR quand elle en contredit
+un.
+
+### 13.1 Un compte Cloudflare payant mutualisé
+
+Notée le 2026-10-15, pendant la décision CPU de l'étape 6 (jalon 10). Si le plan
+Workers Free ne tient pas ses 10 ms de CPU par requête, passer chaque
+commerçant au plan Workers Paid sur son propre compte (ADR 0002) multiplie les
+abonnements. La piste : un compte de l'agence en Workers Paid qui héberge
+plusieurs boutiques.
+
+- Workers Paid se facture **par compte** (5 $ par mois au minimum, 10 millions
+  de requêtes et 30 millions de ms de CPU inclus), pas par Worker. La limite de
+  10 ms est par requête : regrouper des boutiques dans un même Worker n'y
+  change rien.
+- Chaque boutique garde son Worker, sa D1 et ses buckets : l'ADR 0001 tient, et
+  le code est prêt (la clé du limiteur de débit est préfixée par l'hôte,
+  `src/features/auth/rateLimit.ts`).
+- Le plafond est le nombre de crons : 250 par compte payant, et chaque
+  environnement porte celui de `wrangler.template.jsonc`. Environ 250 boutiques
+  si le staging disparaît à la mise en ligne, 125 s'il reste. Au-delà de
+  500 Workers par compte, Workers for Platforms (25 $ par mois). Au plan
+  gratuit, 5 crons : le compte de l'agence ne construit pas plus de cinq
+  stagings à la fois, quelle que soit la décision.
+- À trancher avant : un ADR qui restreint l'ADR 0002 à Stripe, Resend et au
+  nom de domaine, et simplifie l'ADR 0015 ; la sortie d'un client devient une
+  migration (sauvegarde puis restauration sur son compte, ADR 0005), et
+  `docs/operations/sortie-client.md` est à réécrire ; le domaine du commerçant
+  passe sur le compte de l'agence ou par Cloudflare for SaaS (100 noms
+  gratuits, puis 0,10 $ par mois chacun) ; un incident sur le compte touche
+  tout le parc, et la documentation ne montre pas de jeton D1 limité à une
+  seule base.
+
+Sources relevées le 2026-10-15 sur developers.cloudflare.com : tarifs et
+limites de Workers, limites de D1, rôles et permissions de Workers, offres de
+Cloudflare for SaaS.

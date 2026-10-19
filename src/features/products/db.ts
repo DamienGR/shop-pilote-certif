@@ -1,4 +1,4 @@
-import type { D1Database } from '@cloudflare/workers-types';
+import type { D1Database, D1PreparedStatement } from '@cloudflare/workers-types';
 import { withPublicId } from '../ids/publicId.ts';
 
 export interface Product {
@@ -50,6 +50,20 @@ export interface ProductInput extends ProductFields {
   slug: string;
 }
 
+/** listProducts, unexecuted — for a batched read (categories/db.ts says why). */
+export function listProductsStatement(
+  db: D1Database,
+  limit: number,
+  offset = 0,
+  orderBy = 'created_at DESC',
+): D1PreparedStatement {
+  return db
+    .prepare(
+      `SELECT * FROM products WHERE active = 1 ORDER BY ${orderBy} LIMIT ? OFFSET ?`,
+    )
+    .bind(limit, offset);
+}
+
 /** A page of active products for the storefront, newest first. */
 export async function listProducts(
   db: D1Database,
@@ -57,20 +71,17 @@ export async function listProducts(
   offset = 0,
   orderBy = 'created_at DESC',
 ): Promise<Product[]> {
-  const { results } = await db
-    .prepare(
-      `SELECT * FROM products WHERE active = 1 ORDER BY ${orderBy} LIMIT ? OFFSET ?`,
-    )
-    .bind(limit, offset)
-    .all<Product>();
+  const { results } = await listProductsStatement(db, limit, offset, orderBy).all<Product>();
   return results ?? [];
+}
+
+export function countProductsStatement(db: D1Database): D1PreparedStatement {
+  return db.prepare('SELECT COUNT(*) AS n FROM products WHERE active = 1');
 }
 
 /** Total active products (for pagination). */
 export async function countProducts(db: D1Database): Promise<number> {
-  const row = await db
-    .prepare('SELECT COUNT(*) AS n FROM products WHERE active = 1')
-    .first<{ n: number }>();
+  const row = await countProductsStatement(db).first<{ n: number }>();
   return row?.n ?? 0;
 }
 
@@ -237,15 +248,21 @@ export interface ProductImageRow {
   public_id: string | null;
 }
 
+export function listProductImagesStatement(
+  db: D1Database,
+  productId: number,
+): D1PreparedStatement {
+  return db
+    .prepare('SELECT * FROM product_images WHERE product_id = ? ORDER BY position, id')
+    .bind(productId);
+}
+
 /** All gallery images for a product, primary-ish first (by position). */
 export async function listProductImages(
   db: D1Database,
   productId: number,
 ): Promise<ProductImageRow[]> {
-  const { results } = await db
-    .prepare('SELECT * FROM product_images WHERE product_id = ? ORDER BY position, id')
-    .bind(productId)
-    .all<ProductImageRow>();
+  const { results } = await listProductImagesStatement(db, productId).all<ProductImageRow>();
   return results ?? [];
 }
 

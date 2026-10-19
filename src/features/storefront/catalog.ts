@@ -1,8 +1,9 @@
 import type { D1Database } from '@cloudflare/workers-types';
-import { listProducts, countProducts } from '../products/db';
-import { listCategories, childrenOf } from '../categories/db';
+import { listProducts } from '../products/db';
+import { childrenOf } from '../categories/db';
 import { orderByClause, parseStoreSortQuery, STORE_SORTS } from '../products/sort';
-import { MAX_PUBLIC_PAGE, paginate, queryHref } from '../../pagination';
+import { MAX_PUBLIC_PAGE, paginate, queryHref, requestedPage } from '../../pagination';
+import { readCatalogRows } from './reads';
 import { addCacheTags, productCacheTags } from '../cache/tags';
 import type { ImageDelivery } from '../products/image';
 import { buildProductCard } from './productCard';
@@ -127,14 +128,18 @@ export async function loadCatalogPage(
   );
   const order = orderByClause(sort, dir);
 
-  const [total, categories] = await Promise.all([countProducts(db), listCategories(db)]);
+  // One batch for the count, the categories and the page ASKED for; only a
+  // page past the end, clamped to the last one, costs a second read.
+  const asked = requestedPage(options.searchParams, MAX_PUBLIC_PAGE);
+  const read = await readCatalogRows(db, { pageSize: PAGE_SIZE, offset: (asked - 1) * PAGE_SIZE, order });
+  const { total, categories } = read;
   const { page, offset, totalPages } = paginate(
     options.searchParams,
     total,
     PAGE_SIZE,
     MAX_PUBLIC_PAGE,
   );
-  const products = await listProducts(db, PAGE_SIZE, offset, order);
+  const products = page === asked ? read.products : await listProducts(db, PAGE_SIZE, offset, order);
 
   addCacheTags(
     options.responseHeaders,

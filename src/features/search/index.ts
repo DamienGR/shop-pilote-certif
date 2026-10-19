@@ -17,7 +17,7 @@ import { getSetting } from '../settings/db';
 export type { SearchProvider, SearchResult } from './provider';
 
 /**
- * Effective search backend. The runtime setting (Admin → Settings → Search,
+ * Effective search backend. The runtime setting (Admin → Réglages → Recherche,
  * persisted in D1) overlays the build-time default (config.search.provider /
  * SEARCH_PROVIDER) — so an owner can switch to semantic search without a redeploy.
  * Falls back to the build-time default if the setting is unset or the table is
@@ -40,11 +40,15 @@ async function effectiveProvider(): Promise<'fts' | 'vector'> {
  * as not-ready and let it fall back to FTS (semantic search is a deployed concern).
  */
 async function vectorReady(): Promise<boolean> {
+  // The bindings first: they are free to look at, and a shop without them —
+  // every shop on keyword search — then never reads the setting. That read
+  // was one more D1 call on each product view (its related-products backfill)
+  // and each search, for an answer the bindings already gave (étape 6).
   return (
-    (await effectiveProvider()) === 'vector' &&
     !import.meta.env.DEV &&
     !!env.AI &&
-    !!env.VECTORIZE
+    !!env.VECTORIZE &&
+    (await effectiveProvider()) === 'vector'
   );
 }
 

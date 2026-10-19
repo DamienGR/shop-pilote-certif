@@ -170,7 +170,7 @@ autre jeton, sur B : Account Analytics et D1 en lecture, rien d'autre (plan
 - Sur B, à l'étape 9 : un second widget sur le domaine de production — les
   contenus et réglages de la production sont saisis sur B (ADR 0015).
 - Relever la clé de site. La clé secrète reste lisible dans le tableau de bord ;
-  les deux vont dans Admin → Réglages → Protection à l'étape 3.
+  les deux vont dans Admin → Réglages → Protection anti-robots à l'étape 3.
 - **Le staging porte les clés de test de Cloudflare**, pas celles du widget
   de A (décision de l'étape 3) : clé de site `1x00000000000000000000AA`, clé
   secrète `1x0000000000000000000000000000000AA`. Turnstile garde la connexion
@@ -251,7 +251,7 @@ Relevés à l'étape 1 — des identifiants, pas des secrets :
 | domaine de production | `cloudflare.productionDomain` | 2 |
 | adresse d'expédition | `email.from` | 2 |
 | nom d'équipe Access, AUD | `cloudflare.stagingAccessTeam` et `cloudflare.stagingAccessAud` | 2 |
-| clé de site Turnstile | Admin → Réglages → Protection | 3 |
+| clé de site Turnstile | Admin → Réglages → Protection anti-robots | 3 |
 | adresse de l'e-mail de test | secret `NIGHTLY_EMAIL_TO` de l'environnement `staging` (une variable s'afficherait en clair dans les journaux) | 3 |
 
 Secrets, créés au moment où leur destination existe :
@@ -263,7 +263,7 @@ Secrets, créés au moment où leur destination existe :
 | clé Stripe test restreinte, secret du webhook test | 3 | coffre, Admin → Réglages → Paiements |
 | clé Stripe test du nocturne | 3 | secret `STRIPE_TEST_SECRET_KEY` de `staging` |
 | clé Resend | 3 | coffre |
-| clé secrète Turnstile | 3 | Admin → Réglages → Protection |
+| clé secrète Turnstile | 3 | Admin → Réglages → Protection anti-robots |
 | jeton de service Access | 3 | secrets `CF_ACCESS_CLIENT_ID` et `CF_ACCESS_CLIENT_SECRET` de `staging` |
 | mot de passe admin de staging | 3, `/admin/setup` | secret `MINSHOP_ADMIN_PASSWORD` de `staging` |
 | jeton API de production (B), jeton de lecture de la production | 9 | `CLOUDFLARE_API_TOKEN_PRODUCTION` puis `shopctl repo` ; secret de dépôt `MONITOR_CLOUDFLARE_API_TOKEN` |

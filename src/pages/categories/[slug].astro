@@ -1,14 +1,8 @@
 ---
 import { env } from 'cloudflare:workers';
 import Layout from '../../layouts/Layout.astro';
-import {
-  getCategoryBySlug,
-  ancestors,
-  listCategories,
-  childrenOf,
-  productsInCategory,
-  countProductsInCategory,
-} from '../../features/categories/db';
+import { getCategoryBySlug, childrenOf, productsInCategory } from '../../features/categories/db';
+import { readCategoryRows } from '../../features/storefront/reads';
 import ProductCard from '#theme/ProductCard.astro';
 import { buildProductCard } from '../../features/storefront/productCard';
 import { getConfig } from '../../config';
@@ -17,6 +11,7 @@ import {
   MAX_PUBLIC_PAGE,
   paginate,
   queryHref,
+  requestedPage,
 } from '../../pagination';
 import Pagination from '../../components/Pagination.astro';
 import CatalogSort from '../../features/storefront/controls/CatalogSort.astro';
@@ -41,11 +36,15 @@ const { sort, dir } = parseStoreSortQuery(
 const order = orderByClause(sort, dir);
 
 const PAGE_SIZE = 24;
-const [trail, categories, total] = await Promise.all([
-  ancestors(env.DB, category.id),
-  listCategories(env.DB),
-  countProductsInCategory(env.DB, category.id),
-]);
+// One D1 batch for everything but the category itself (features/storefront/
+// reads.ts); only a page past the end, clamped to the last one, reads again.
+const asked = requestedPage(Astro.url.searchParams, MAX_PUBLIC_PAGE);
+const read = await readCategoryRows(env.DB, category.id, {
+  pageSize: PAGE_SIZE,
+  offset: (asked - 1) * PAGE_SIZE,
+  order,
+});
+const { trail, categories, total } = read;
 const subcats = childrenOf(categories, category.id);
 const { page, offset, totalPages } = paginate(
   Astro.url.searchParams,
@@ -53,7 +52,10 @@ const { page, offset, totalPages } = paginate(
   PAGE_SIZE,
   MAX_PUBLIC_PAGE,
 );
-const products = await productsInCategory(env.DB, category.id, PAGE_SIZE, offset, order);
+const products =
+  page === asked
+    ? read.products
+    : await productsInCategory(env.DB, category.id, PAGE_SIZE, offset, order);
 addCacheTags(Astro.response.headers, productCacheTags(products.map((product) => product.public_id)));
 // Presentation models are built here, where the store's image settings are
 // known; only the first card is the LCP image.

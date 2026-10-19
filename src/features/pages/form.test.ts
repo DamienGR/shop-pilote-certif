@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parsePageForm } from './form';
+import { NARROW_NBSP } from '../i18n';
 import { pageSlugify } from './slug';
 
 const form = (fields: Record<string, string>) => {
@@ -37,12 +38,12 @@ describe('parsePageForm', () => {
   });
 
   it('requires a title', () => {
-    expect(parsePageForm(form({ title: '   ' }))).toEqual({ error: 'Title is required.' });
+    expect(parsePageForm(form({ title: '   ' }))).toEqual({ error: 'Le titre est obligatoire.' });
   });
 
   it('rejects an over-long title', () => {
     const result = parsePageForm(form({ title: 'x'.repeat(121) }));
-    expect(result).toHaveProperty('error');
+    expect(result).toHaveProperty('error', 'Le titre ne doit pas dépasser 120 caractères.');
   });
 
   it('accepts a title at the limit', () => {
@@ -51,7 +52,11 @@ describe('parsePageForm', () => {
 
   it('rejects a body over 100,000 characters', () => {
     const result = parsePageForm(form({ title: 'A', body_markdown: 'x'.repeat(100_001) }));
-    expect(result).toHaveProperty('error');
+    // The limit reads the French way (`100 000`), not as the runtime's default locale.
+    expect(result).toHaveProperty(
+      'error',
+      `Le contenu de la page ne doit pas dépasser 100${NARROW_NBSP}000 caractères.`,
+    );
   });
 
   it('treats a present checkbox as published', () => {

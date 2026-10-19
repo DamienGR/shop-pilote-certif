@@ -1,7 +1,7 @@
 {
   "name": "minshop",
   "type": "module",
-  "version": "0.3.5",
+  "version": "0.3.8",
   "private": true,
   "repository": {
     "type": "git",
@@ -24,7 +24,7 @@
     "check": "npm run theme:sync && astro check",
     "test": "npm run theme:sync && vitest run",
     "test:watch": "vitest",
-    "test:integration": "npm run test:security && node --experimental-strip-types test/integration/remote-gates.mjs && node --experimental-strip-types --import ./test/helpers/register-workers-loader.mjs test/integration/settlement.mjs && node --experimental-strip-types test/integration/reservations.mjs && node --experimental-strip-types test/integration/refunds.mjs && node --experimental-strip-types test/integration/media.mjs && node --experimental-strip-types test/integration/menus.mjs && node --experimental-strip-types test/integration/guest-access.mjs && node --experimental-strip-types test/integration/terms.mjs && node --experimental-strip-types test/integration/shipping.mjs && bash test/integration/run-d1-integration.sh",
+    "test:integration": "npm run test:security && node --experimental-strip-types test/integration/remote-gates.mjs && node --experimental-strip-types --import ./test/helpers/register-workers-loader.mjs test/integration/settlement.mjs && node --experimental-strip-types test/integration/reservations.mjs && node --experimental-strip-types test/integration/refunds.mjs && node --experimental-strip-types test/integration/media.mjs && node --experimental-strip-types test/integration/menus.mjs && node --experimental-strip-types test/integration/guest-access.mjs && node --experimental-strip-types test/integration/history-reads.mjs && node --experimental-strip-types test/integration/terms.mjs && node --experimental-strip-types test/integration/shipping.mjs && bash test/integration/run-d1-integration.sh",
     "test:d1": "astro build && npm run test:integration",
     "test:storefront-equivalence": "astro build && bash test/integration/storefront-baselines.sh",
     "test:storefront-contract": "vitest run test/storefront",
@@ -33,6 +33,7 @@
     "test:security": "node --experimental-strip-types test/integration/security.mjs",
     "test:security:remote": "node --experimental-strip-types test/remote/security.mjs",
     "test:logs:remote": "node test/remote/logs.mjs",
+    "test:cpu:remote": "node test/remote/cpu.mjs",
     "test:load:remote": "node test/remote/load.mjs",
     "test:last-unit:remote": "node test/remote/last-unit.mjs",
     "test:stripe:remote": "node test/remote/stripe-webhook.mjs",

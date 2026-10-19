@@ -379,10 +379,17 @@ dépendaient du poste ne le font plus). Le déploiement applique la migration
 0044. Dans le relevé, les trois contrôles des limiteurs en `✓` : la recherche et
 le checkout disent dans combien de requêtes leur premier 429 est venu ; la
 connexion refuse au plus tard la sixième tentative, avec un `Retry-After` d'au
-plus un quart d'heure. Pendant ce quart d'heure, votre adresse ne peut plus se
-connecter à l'administration du staging : rien à faire qu'attendre.
+plus un quart d'heure. Pendant ce quart d'heure, le réseau qui a lancé la porte
+ne peut plus envoyer de mot de passe à l'administration du staging : rien à
+faire qu'attendre. Le compteur va par réseau, une adresse IPv4 ou un /64 IPv6,
+et ne touche pas aux sessions ouvertes. Une session d'administration encore
+valable entre donc sans rien demander, et un navigateur qui sort en IPv6 n'est
+pas bloqué par une porte lancée depuis un terminal WSL, qui ne sort qu'en IPv4.
+C'est ce qu'a vu le passage du 2026-10-15.
 
-Les deux fichiers dans une pull request de preuves, le jeton de service révoqué,
+`deploy` a rendu `wrangler.jsonc` pour le staging : `git restore wrangler.jsonc`
+avant la branche de preuves. Les deux fichiers dans une pull request de preuves,
+le jeton de service révoqué,
 puis le lien dans le thread : le rapport de sécurité ferme sa ligne d'après elle.
 
 ## Ce que le rapport de sécurité dira

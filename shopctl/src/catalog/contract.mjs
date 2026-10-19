@@ -14,7 +14,7 @@
  *
  * Column NAMES are English, like the manifest's keys and the database's columns,
  * and the prose around them is French, like every message the CLI prints. That
- * is the same boundary ADR 0011 draws: an identifier is read by the machine and
+ * is the same boundary ADR 0018 draws: an identifier is read by the machine and
  * by whoever maps a supplier export onto it, a sentence is read by the operator.
  *
  * Nothing here touches a database. The contract turns text into a DESIRED

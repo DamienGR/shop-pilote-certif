@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fr } from './messages';
+import { ADMIN_FRAGMENTS } from './admin';
 import { t, tn, type MessageKey } from './index';
 
 const entries = Object.entries(fr) as [MessageKey, string][];
@@ -56,6 +57,30 @@ describe('the French catalog', () => {
       expect(opens, key).toBe(closes);
       expect(value, key).not.toMatch(/\{\s*\}/);
     }
+  });
+});
+
+describe('the Admin fragments', () => {
+  const fragments = Object.entries(ADMIN_FRAGMENTS) as [string, Record<string, string>][];
+
+  it('prefix every key with admin.', () => {
+    // The prefix is what keeps the spread in `messages.ts` from silently
+    // replacing a storefront string with an Admin one of the same key.
+    for (const [name, fragment] of fragments) {
+      for (const key of Object.keys(fragment)) expect(key, name).toMatch(/^admin\.[a-z]/);
+    }
+  });
+
+  it('never define the same key twice, and lose none in the spread', () => {
+    const seen = new Map<string, string>();
+    for (const [name, fragment] of fragments) {
+      for (const key of Object.keys(fragment)) {
+        expect(seen.get(key), `${key} is in both ${seen.get(key)} and ${name}`).toBeUndefined();
+        seen.set(key, name);
+      }
+    }
+    const inCatalog = Object.keys(fr).filter((key) => key.startsWith('admin.'));
+    expect(inCatalog.length).toBe(seen.size);
   });
 });
 

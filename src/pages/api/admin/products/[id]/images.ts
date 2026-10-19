@@ -19,6 +19,7 @@ import { getStorage } from '../../../../../features/storage';
 import { parsePublicId } from '../../../../../features/ids/publicId';
 import { CACHE_TAG } from '../../../../../features/cache/tags';
 import { purgeCacheTags } from '../../../../../features/cache/purge';
+import { t } from '../../../../../features/i18n';
 
 export const prerender = false;
 
@@ -37,7 +38,7 @@ export const prerender = false;
 export const POST: APIRoute = async ({ request, params, redirect }) => {
   const publicId = parsePublicId(params.id, 'product');
   const product = publicId ? await getProductByPublicId(env.DB, publicId) : null;
-  if (!publicId || !product) return new Response('Not found', { status: 404 });
+  if (!publicId || !product) return new Response(t('admin.products.notFound'), { status: 404 });
   const id = product.id;
 
   const back = (msg?: string) =>
@@ -74,7 +75,7 @@ export const POST: APIRoute = async ({ request, params, redirect }) => {
   if (action === 'attach') {
     const mediaPublicId = parsePublicId(form.get('media_id'), 'media');
     const media = mediaPublicId ? await getMediaByPublicId(env.DB, mediaPublicId) : null;
-    if (!media) return back('Choose an image.');
+    if (!media) return back(t('admin.products.error.chooseImage'));
     const attached = await attachMediaToProduct(env.DB, id, media.id);
     if (!attached.ok) return back(attached.error);
     await syncPrimaryImage(env.DB, id);
@@ -102,7 +103,7 @@ export const POST: APIRoute = async ({ request, params, redirect }) => {
 
   const imagePublicId = parsePublicId(form.get('image_id'), 'productImage');
   const img = imagePublicId ? byPublicId.get(imagePublicId) : undefined;
-  if (!img) return back('Image not found.');
+  if (!img) return back(t('admin.products.error.imageNotFound'));
   const imageId = img.id;
 
   if (action === 'alt') {
@@ -137,5 +138,5 @@ export const POST: APIRoute = async ({ request, params, redirect }) => {
     return back();
   }
 
-  return back('Unknown action.');
+  return back(t('admin.products.error.unknownAction'));
 };

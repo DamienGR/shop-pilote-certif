@@ -1,6 +1,8 @@
+import { t } from '../i18n/index.ts';
+
 /** Supported carriers for fulfillment tracking. The French carriers lead: the
  *  store's default rates are named Colissimo, and a store that ships with them
- *  must not have to record its parcels as "Other". */
+ *  must not have to record its parcels as "Autre". */
 export const CARRIERS = [
   { code: 'colissimo', name: 'Colissimo' },
   { code: 'chronopost', name: 'Chronopost' },
@@ -11,7 +13,7 @@ export const CARRIERS = [
   { code: 'dhl', name: 'DHL' },
   { code: 'fedex', name: 'FedEx' },
   { code: 'usps', name: 'USPS' },
-  { code: 'other', name: 'Other' },
+  { code: 'other', name: t('admin.orders.carrier.other') },
 ] as const;
 
 export function carrierName(code: string | null): string {
@@ -19,7 +21,7 @@ export function carrierName(code: string | null): string {
 }
 
 /** The carrier as the customer's email names it: a listed carrier's name, or
- *  null for "other" and unknown codes — the admin's English "Other" is not
+ *  null for "other" and unknown codes — the admin's catch-all "Autre" is not
  *  something to show a customer, and the number speaks for itself. */
 export function shippedCarrierName(code: string | null): string | null {
   if (!code || code === 'other') return null;

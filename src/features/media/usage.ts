@@ -1,4 +1,7 @@
 import type { D1Database } from '@cloudflare/workers-types';
+// Explicit .ts: test/integration/media.mjs loads this module through Node's type
+// stripping, which does not resolve extensionless relative imports.
+import { t, tn } from '../i18n/index.ts';
 
 /** Everywhere one media item is currently used. Empty everywhere = deletable. */
 export interface MediaUsage {
@@ -125,22 +128,22 @@ export function usageLinks(usage: MediaUsage): UsageLink[] {
       href: `/admin/products/${p.public_id}/edit`,
       label: p.name,
       kind: 'product' as const,
-      title: `Edit ${p.name}`,
+      title: t('admin.media.usage.editProduct', { nom: p.name }),
     })),
     ...usage.pages.map((p) => ({
       href: `/admin/pages/${p.public_id}/edit`,
       label: p.title,
       kind: 'page' as const,
-      title: `Edit the ${p.title} page`,
+      title: t('admin.media.usage.editPage', { titre: p.title }),
     })),
     // The logo is a setting, not a row, so it links to where it is chosen.
     ...(usage.logo
       ? [
           {
             href: '/admin/settings',
-            label: 'Store logo',
+            label: t('admin.media.usage.logo'),
             kind: 'logo' as const,
-            title: 'Change the logo in Settings',
+            title: t('admin.media.usage.logoTitle'),
           },
         ]
       : []),
@@ -152,18 +155,21 @@ export function describeUsage(usage: MediaUsage): string {
   const parts: string[] = [];
   if (usage.products.length > 0) {
     parts.push(
-      `${usage.products.length} product${usage.products.length === 1 ? '' : 's'} (${usage.products
-        .map((p) => p.name)
-        .join(', ')})`,
+      tn('admin.media.usage.products.one', 'admin.media.usage.products.other', usage.products.length, {
+        noms: usage.products.map((p) => p.name).join(', '),
+      }),
     );
   }
   if (usage.pages.length > 0) {
     parts.push(
-      `${usage.pages.length} page${usage.pages.length === 1 ? '' : 's'} (${usage.pages
-        .map((p) => p.title)
-        .join(', ')})`,
+      tn('admin.media.usage.pages.one', 'admin.media.usage.pages.other', usage.pages.length, {
+        titres: usage.pages.map((p) => p.title).join(', '),
+      }),
     );
   }
-  if (usage.logo) parts.push('the store logo');
-  return parts.join(' and ');
+  if (usage.logo) parts.push(t('admin.media.usage.theLogo'));
+  // French lists take commas and one "et" before the last item.
+  const last = parts.pop();
+  if (last === undefined) return '';
+  return parts.length > 0 ? `${parts.join(', ')} ${t('admin.media.usage.and')} ${last}` : last;
 }

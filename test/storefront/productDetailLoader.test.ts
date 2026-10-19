@@ -36,15 +36,16 @@ const rows = {
 
 vi.mock('../../src/features/products/db', () => ({
   getProductBySlug: vi.fn(async () => rows.product),
-  listProductImages: vi.fn(async () => rows.images),
 }));
-vi.mock('../../src/features/products/variants', () => ({
-  listVariants: vi.fn(async () => rows.variants),
-  listExtras: vi.fn(async () => rows.extras),
-}));
-vi.mock('../../src/features/categories/db', () => ({
-  categoriesForProduct: vi.fn(async () => []),
-  relatedProducts: vi.fn(async () => []),
+// The page's other reads are one D1 batch (reads.ts).
+vi.mock('../../src/features/storefront/reads', () => ({
+  readProductPageRows: vi.fn(async () => ({
+    categories: [],
+    variants: rows.variants,
+    extras: rows.extras,
+    images: rows.images,
+    related: [],
+  })),
 }));
 vi.mock('../../src/features/search', () => ({
   getRelatedStored: vi.fn(async () => []),

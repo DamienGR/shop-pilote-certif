@@ -4,6 +4,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { formatDate, getConfig } from '../../../config';
 import { listPages } from '../../../features/pages/db';
 import { menuReferencesFor } from '../../../features/navigation/admin';
+import { t } from '../../../features/i18n';
 
 const pages = await listPages(env.DB);
 // Deleting a page that a menu links to silently shrinks the storefront nav.
@@ -20,37 +21,37 @@ const menuRefs = await menuReferencesFor(
 const timeZone = Astro.locals.settings?.timeZone ?? getConfig().timeZone;
 ---
 
-<AdminLayout title="Pages" active="pages">
+<AdminLayout title={t('admin.pages.title')} active="pages">
   <div class="mb-8 flex items-center justify-between">
-    <h1 class="font-serif text-3xl tracking-tight">Pages</h1>
+    <h1 class="font-serif text-3xl tracking-tight">{t('admin.pages.title')}</h1>
     <a
       href="/admin/pages/new"
       class="rounded-md bg-brand px-4 py-2 text-xs font-medium uppercase tracking-wider text-white hover:bg-brand-hover"
     >
-      New page
+      {t('admin.pages.list.newPage')}
     </a>
   </div>
 
   {
     pages.length === 0 ? (
       <p class="py-12 text-center text-sm text-gray-500">
-        No pages yet. Create one for About, Shipping, Returns, or Privacy, then add it to your
+        {t('admin.pages.list.empty.before')}
         {' '}
         <a href="/admin/navigation" class="underline hover:text-brand">
-          navigation
+          {t('admin.pages.list.empty.link')}
         </a>{' '}
-        so shoppers can find it.
+        {t('admin.pages.list.empty.after')}
       </p>
     ) : (
       <div class="sm:overflow-x-auto">
         <table class="admin-table w-full text-left text-sm sm:min-w-[40rem]">
           <thead>
             <tr class="border-b border-line text-xs uppercase tracking-widest text-gray-400">
-              <th class="py-3 pr-4 font-normal">Title</th>
-              <th class="py-3 pr-4 font-normal">URL</th>
-              <th class="py-3 pr-4 font-normal">Status</th>
-              <th class="py-3 pr-4 font-normal">Updated</th>
-              <th class="py-3 text-right font-normal">Actions</th>
+              <th class="py-3 pr-4 font-normal">{t('admin.pages.field.title')}</th>
+              <th class="py-3 pr-4 font-normal">{t('admin.pages.list.col.url')}</th>
+              <th class="py-3 pr-4 font-normal">{t('admin.common.status')}</th>
+              <th class="py-3 pr-4 font-normal">{t('admin.pages.list.col.updated')}</th>
+              <th class="py-3 text-right font-normal">{t('admin.common.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -61,15 +62,17 @@ const timeZone = Astro.locals.settings?.timeZone ?? getConfig().timeZone;
                     {page.title}
                   </a>
                 </td>
-                <td data-label="URL" class="py-3 pr-4 text-gray-500">/pages/{page.slug}</td>
-                <td data-label="Status" class="py-3 pr-4">
+                <td data-label={t('admin.pages.list.col.url')} class="py-3 pr-4 text-gray-500">
+                  /pages/{page.slug}
+                </td>
+                <td data-label={t('admin.common.status')} class="py-3 pr-4">
                   {page.published ? (
-                    <span class="text-gray-600">Published</span>
+                    <span class="text-gray-600">{t('admin.pages.status.published')}</span>
                   ) : (
-                    <span class="text-gray-400">Draft</span>
+                    <span class="text-gray-400">{t('admin.pages.status.draft')}</span>
                   )}
                 </td>
-                <td data-label="Updated" class="py-3 pr-4 text-gray-500">
+                <td data-label={t('admin.pages.list.col.updated')} class="py-3 pr-4 text-gray-500">
                   {formatDate(page.updated_at, { dateStyle: 'medium' }, timeZone)}
                 </td>
                 <td class="py-3 text-right">
@@ -81,22 +84,22 @@ const timeZone = Astro.locals.settings?.timeZone ?? getConfig().timeZone;
                         rel="noopener"
                         class="text-xs uppercase tracking-widest text-gray-500 hover:text-brand"
                       >
-                        View
+                        {t('admin.common.view')}
                       </a>
                     )}
                     <a
                       href={`/admin/pages/${page.public_id}/edit`}
                       class="text-xs uppercase tracking-widest text-gray-500 hover:text-brand"
                     >
-                      Edit
+                      {t('admin.common.edit')}
                     </a>
                     <form
                       method="POST"
                       action={`/api/admin/pages/${page.public_id}`}
                       onsubmit={`return confirm('${
                         menuRefs.has(page.id)
-                          ? 'This page is linked from your navigation. Deleting it hides that link on the storefront. Continue?'
-                          : 'Delete this page?'
+                          ? t('admin.pages.list.confirmDeleteLinked')
+                          : t('admin.pages.list.confirmDelete')
                       }')`}
                     >
                       <input type="hidden" name="_action" value="delete" />
@@ -104,7 +107,7 @@ const timeZone = Astro.locals.settings?.timeZone ?? getConfig().timeZone;
                         type="submit"
                         class="text-xs uppercase tracking-widest text-red-600 hover:text-red-700"
                       >
-                        Delete
+                        {t('admin.common.delete')}
                       </button>
                     </form>
                   </span>

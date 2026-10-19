@@ -1,4 +1,5 @@
 import type { D1Database } from '@cloudflare/workers-types';
+import { t } from '../i18n/index.ts';
 import type { MenuItem, MenuLocation, MenuTargetType } from './db.ts';
 
 /**
@@ -91,16 +92,16 @@ export function unavailableReason(item: MenuItem): string | null {
   // targetExists, not an empty label: a custom label outlives its target, so a
   // deleted page labelled "Company" still renders text and would otherwise be
   // reported as a draft — sending the merchant to un-draft a page that is gone.
-  if (!item.targetExists) return 'Target no longer exists';
+  if (!item.targetExists) return t('admin.navigation.unavailable.missing');
   switch (item.targetType) {
     case 'page':
-      return 'Draft — hidden on the storefront';
+      return t('admin.navigation.unavailable.draft');
     case 'product':
-      return 'Inactive — hidden on the storefront';
+      return t('admin.navigation.unavailable.inactive');
     case 'category':
-      return 'Target no longer exists';
+      return t('admin.navigation.unavailable.missing');
     default:
-      return 'Unavailable';
+      return t('admin.navigation.unavailable.other');
   }
 }
 
@@ -145,9 +146,9 @@ export async function menuReferencesFor(
 }
 
 export const TARGET_TYPE_LABELS: Record<MenuTargetType, string> = {
-  home: 'Home',
-  catalog: 'Catalog',
-  page: 'Page',
-  product: 'Product',
-  category: 'Category',
+  home: t('admin.navigation.type.home'),
+  catalog: t('admin.navigation.type.catalog'),
+  page: t('admin.navigation.type.page'),
+  product: t('admin.navigation.type.product'),
+  category: t('admin.navigation.type.category'),
 };

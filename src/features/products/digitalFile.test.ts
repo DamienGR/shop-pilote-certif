@@ -6,7 +6,7 @@ describe('digital deliverables', () => {
   it('requires an allowed MIME and matching extension', () => {
     expect(validateDigitalFile(new File(['pdf'], 'guide.pdf', { type: 'application/pdf' }))).toBeNull();
     expect(validateDigitalFile(new File(['pdf'], 'guide.zip', { type: 'application/pdf' }))).toMatch(/PDF/);
-    expect(validateDigitalFile(new File([], 'empty.pdf', { type: 'application/pdf' }))).toMatch(/non-empty/);
+    expect(validateDigitalFile(new File([], 'empty.pdf', { type: 'application/pdf' }))).toMatch(/vide/);
   });
 
   it('uploads under an immutable unique key with private metadata', async () => {

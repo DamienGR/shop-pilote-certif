@@ -1,9 +1,11 @@
+import { t } from '../i18n/index.ts';
+
 /**
  * Page layout presets — THE single source of truth.
  *
  * ── Adding a preset ──────────────────────────────────────────────────────────
  * Add one entry below. That is the whole change:
- *   • the editor's Layout dropdown is generated from this object
+ *   • the editor's "Mise en page" dropdown is generated from this object
  *   • validation accepts it automatically (the union is derived from the keys)
  *   • the storefront and the admin preview both apply it
  *   • no CSS is needed — `measure` and `titleAlign` are emitted as custom
@@ -32,20 +34,20 @@ export interface PageLayoutPreset {
 
 export const PAGE_LAYOUTS = {
   standard: {
-    label: 'Standard',
-    hint: 'Narrow column, left-aligned title. Best for policies, shipping, and returns.',
+    label: t('admin.pages.layout.standard.label'),
+    hint: t('admin.pages.layout.standard.hint'),
     measure: '48rem',
     titleAlign: 'left',
   },
   editorial: {
-    label: 'Editorial',
-    hint: 'Narrow column, centred title. Best for About and brand-story pages.',
+    label: t('admin.pages.layout.editorial.label'),
+    hint: t('admin.pages.layout.editorial.hint'),
     measure: '48rem',
     titleAlign: 'center',
   },
   wide: {
-    label: 'Wide',
-    hint: 'Full width, left-aligned title. Best for size charts, tables, and image grids.',
+    label: t('admin.pages.layout.wide.label'),
+    hint: t('admin.pages.layout.wide.hint'),
     measure: '72rem',
     titleAlign: 'left',
   },

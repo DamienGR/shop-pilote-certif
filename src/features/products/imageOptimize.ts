@@ -17,7 +17,7 @@ import { getSetting } from '../settings/db';
  */
 export async function optimizeUpload(file: File): Promise<File> {
   const cfg = getConfig().images;
-  // Settings → Features toggle (D1 `image_optimize`) wins over the build-time default.
+  // Réglages → Général toggle (D1 `image_optimize`) wins over the build-time default.
   const override = await getSetting(env.DB, 'image_optimize');
   const optimize = override == null ? cfg.optimizeOnUpload : override === '1';
   // Feature off, or the IMAGES binding isn't declared (free-plan default) → store as-is.

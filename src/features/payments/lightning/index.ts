@@ -20,7 +20,7 @@ export async function getLightningBackend(): Promise<LightningBackend> {
     const url = s.lnbitsUrl;
     const key = await getSecret(env.DB, 'lnbits_api_key');
     if (!url || !key) {
-      throw new Error('LNbits not configured: set the URL + invoice/read key in Settings → Payments.');
+      throw new Error('LNbits not configured: set the URL + invoice/read key in Admin → Réglages → Paiements.');
     }
     return createLnbitsBackend(url, key);
   }
@@ -29,7 +29,7 @@ export async function getLightningBackend(): Promise<LightningBackend> {
   const url = s.phoenixdUrl;
   const pw = await getSecret(env.DB, 'phoenixd_password');
   if (!url || !pw) {
-    throw new Error('phoenixd not configured: set the URL + password in Settings → Payments.');
+    throw new Error('phoenixd not configured: set the URL + password in Admin → Réglages → Paiements.');
   }
   return createPhoenixdBackend(url, pw);
 }

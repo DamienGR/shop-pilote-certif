@@ -5,6 +5,7 @@ import type { StorageProvider } from '../storage';
 import { createMediaRecord, type Media } from './db.ts';
 import { readImageDimensions } from './dimensions.ts';
 import { sniffImageMime, SNIFF_BYTES } from './sniff.ts';
+import { t } from '../i18n/index.ts';
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 
@@ -27,10 +28,10 @@ const ALLOWED = new Map([
  */
 export function validateUploadMetadata(file: File): string | null {
   if (!ALLOWED.has(file.type)) {
-    return 'Image must be JPEG, PNG, WebP, or GIF.';
+    return t('admin.media.error.type');
   }
   if (file.size > MAX_BYTES) {
-    return 'Image must be 5 MB or smaller.';
+    return t('admin.media.error.size');
   }
   return null;
 }
@@ -52,7 +53,7 @@ export async function validateUpload(file: File): Promise<string | null> {
   const declared = validateUploadMetadata(file);
   if (declared) return declared;
   const header = new Uint8Array(await file.slice(0, SNIFF_BYTES).arrayBuffer());
-  return sniffImageMime(header) === file.type ? null : 'Image must be JPEG, PNG, WebP, or GIF.';
+  return sniffImageMime(header) === file.type ? null : t('admin.media.error.type');
 }
 
 /**

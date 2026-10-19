@@ -85,7 +85,7 @@ declare namespace Cloudflare {
     CF_ACCESS_TEAM_DOMAIN?: string; // https://<team>.cloudflareaccess.com
     CF_ACCESS_AUD?: string; // the Access application's Audience (AUD) tag
     // Cloudflare Turnstile (bot protection on admin login + customer sign-in) is configured
-    // in Admin → Settings → Bot protection: enabled + sitekey are D1 settings, the
+    // in Admin → Réglages → Protection anti-robots: enabled + sitekey are D1 settings, the
     // secret is in the encrypted vault. No env vars.
     //
     // ALL provider keys (Stripe, OpenNode, Lightning, Resend, Turnstile) and their

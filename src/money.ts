@@ -15,14 +15,23 @@ import { LOCALE } from './features/i18n/locale.ts';
  * multiples of 10. Add an override map here if you ever sell in those.
  */
 
+// One answer per currency for the isolate's life. Building an Intl.NumberFormat
+// to read a constant cost a formatter per price shown — every card, every
+// formatMoney() — and was the storefront's costliest line of its own after D1
+// (certification, étape 6: about 0.4 ms of a warm catalogue render).
+const decimalsByCurrency = new Map<string, number>();
+
 /** Decimal places a currency uses (2 USD, 0 JPY, 3 BHD). */
 export function currencyDecimals(currency: string): number {
-  return (
-    new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency.toUpperCase(),
-    }).resolvedOptions().maximumFractionDigits ?? 2
-  );
+  const code = currency.toUpperCase();
+  let decimals = decimalsByCurrency.get(code);
+  if (decimals === undefined) {
+    decimals =
+      new Intl.NumberFormat('en-US', { style: 'currency', currency: code }).resolvedOptions()
+        .maximumFractionDigits ?? 2;
+    decimalsByCurrency.set(code, decimals);
+  }
+  return decimals;
 }
 
 /** Minor units per major unit (100 USD, 1 JPY, 1000 BHD). */

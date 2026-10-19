@@ -124,6 +124,11 @@ test('le menu replié s’ouvre au clavier et ses liens sont atteignables', asyn
 
   const disclosure = page.locator('[data-nav-disclosure]');
   const summary = disclosure.locator('summary');
+  // No disclosure at all is a shop whose header menu is empty: StoreNav draws
+  // nothing then, at any width. Said apart, because "not at this width" on
+  // both projects read as a theme decision when it was a missing menu — the
+  // certification's rehearsal skipped this test for that reason (étape 6).
+  test.skip((await disclosure.count()) === 0, 'menu d’en-tête vide : aucun lien dans Admin → Navigation');
   // VISIBILITY, not presence. The disclosure exists in the markup at every
   // width — that is what makes it work with CSS off — but above its breakpoint
   // it is display:none, and focusing a hidden summary does nothing. Skipping on

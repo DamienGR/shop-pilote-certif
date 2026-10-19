@@ -44,7 +44,7 @@ export const HUMAN_CHECKLIST = [
   ['membres de l\'équipe invités sur chaque compte', 'Un compte à un seul accès est un point de défaillance unique.'],
   ['compte Stripe activé, en mode test puis en mode live', 'L\'activation Stripe demande des pièces justificatives et prend des jours ouvrés.'],
   ['nom d\'hôte de preview dans une zone du compte de l\'agence, derrière une application Access', 'cloudflare.stagingDomain ferme workers.dev ; sans application Access sur ce nom, la preview est publique. Son nom d\'équipe et son AUD vont dans cloudflare.stagingAccessTeam et cloudflare.stagingAccessAud.'],
-  ['un widget Turnstile sur les noms d\'hôte de la boutique', 'Ses deux clés se saisissent dans Admin → Réglages → Protection.'],
+  ['un widget Turnstile sur les noms d\'hôte de la boutique', 'Ses deux clés se saisissent dans Admin → Réglages → Protection anti-robots.'],
   ['domaine de production dans une zone du compte du commerçant', 'Le domaine personnalisé d\'un Worker demande une zone active sur le compte qui porte ce Worker.'],
   ['domaine d\'expédition vérifié chez le fournisseur d\'e-mail', 'Sans SPF/DKIM alignés, les confirmations de commande partent en spam.'],
   ['GitHub Pro au minimum sur le compte qui porte le dépôt de la boutique, ou un dépôt public (`shopctl repo --public`)', 'Un dépôt privé n\'a pas de secrets d\'environnement sous GitHub Free ; les relecteurs obligatoires y demandent Enterprise. Un dépôt public a les deux sous tous les plans, et publie le socle avec son historique.'],

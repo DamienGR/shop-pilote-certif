@@ -125,7 +125,7 @@ export interface SiteConfig {
   };
   /**
    * Cloudflare Turnstile bot protection on admin login + customer sign-in. OFF by default,
-   * configured in Admin → Settings → Bot protection (enabled + sitekey in D1, the
+   * configured in Admin → Réglages → Protection anti-robots (enabled + sitekey in D1, the
    * secret in the vault). The value here is just the build-time default.
    */
   turnstile: {
@@ -171,8 +171,8 @@ export interface SiteConfig {
     };
   };
   /**
-   * Order-confirmation / login email — configured at runtime in Admin → Settings →
-   * Email (enabled, provider, from-address all live in D1; the Resend key in the
+   * Order-confirmation / login email — configured at runtime in Admin → Réglages →
+   * E-mail (enabled, provider, from-address all live in D1; the Resend key in the
    * vault). The values here are only build-time DEFAULTS, overlaid by those D1
    * settings. Unconfigured = no-op, so checkout still succeeds.
    * - 'resend': plain HTTPS API, Workers FREE plan. `from` must be on a
@@ -266,7 +266,7 @@ function defaultConfig(): SiteConfig {
       enabled: false, // true ONLY after activating Stripe Tax in the Dashboard
     },
     turnstile: {
-      // Build-time default; Admin → Settings → Bot protection overlays this at
+      // Build-time default; Admin → Réglages → Protection anti-robots overlays this at
       // runtime (turnstile_enabled in D1, with the sitekey + secret).
       enabled: false,
     },
@@ -277,7 +277,7 @@ function defaultConfig(): SiteConfig {
       topK: 20,
     },
     payments: {
-      // Build-time defaults; Admin → Settings → Payments overlays the rail + node
+      // Build-time defaults; Admin → Réglages → Paiements overlays the rail + node
       // choice at runtime (payment_provider / lightning_backend in D1).
       provider: 'stripe', // 'stripe' (cards) | 'lightning' (self-hosted BTC) | 'opennode'
       lightning: {
@@ -287,7 +287,7 @@ function defaultConfig(): SiteConfig {
       },
     },
     email: {
-      // Defaults; Admin → Settings → Email overlays enabled/provider/from at runtime.
+      // Defaults; Admin → Réglages → E-mail overlays enabled/provider/from at runtime.
       enabled: true, // sends once a provider key is configured (else no-op)
       provider: 'resend', // 'resend' (free-plan friendly) | 'cloudflare' (paid plan)
       from: 'onboarding@resend.dev', // Resend test sender; set a verified domain in admin for real customers

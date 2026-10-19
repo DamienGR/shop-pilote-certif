@@ -8,6 +8,7 @@ import {
   flattenTree,
   productCounts,
 } from '../../../features/categories/db';
+import { t } from '../../../features/i18n';
 
 const rows = flattenTree(buildTree(await listCategories(env.DB)));
 const counts = await productCounts(env.DB);
@@ -16,14 +17,14 @@ const counts = await productCounts(env.DB);
 const menuRefs = await menuReferencesFor(env.DB, 'category', rows.map((r) => r.id));
 ---
 
-<AdminLayout title="Categories" active="categories">
+<AdminLayout title={t('admin.categories.title')} active="categories">
   <div class="mb-8 flex items-center justify-between">
-    <h1 class="font-serif text-3xl tracking-tight">Categories</h1>
+    <h1 class="font-serif text-3xl tracking-tight">{t('admin.categories.title')}</h1>
     <a
       href="/admin/categories/new"
       class="rounded-md bg-brand px-4 py-2 text-xs font-medium uppercase tracking-wider text-white hover:bg-brand-hover"
     >
-      New category
+      {t('admin.categories.new')}
     </a>
   </div>
 
@@ -31,10 +32,10 @@ const menuRefs = await menuReferencesFor(env.DB, 'category', rows.map((r) => r.i
     <table class="admin-table w-full text-left text-sm sm:min-w-[40rem]">
     <thead>
       <tr class="border-b border-line text-xs uppercase tracking-widest text-gray-400">
-        <th class="py-3 pr-4 font-normal">Name</th>
-        <th class="py-3 pr-4 font-normal">Slug</th>
-        <th class="py-3 pr-4 font-normal">Products</th>
-        <th class="py-3 text-right font-normal">Actions</th>
+        <th class="py-3 pr-4 font-normal">{t('admin.common.name')}</th>
+        <th class="py-3 pr-4 font-normal">{t('admin.categories.column.slug')}</th>
+        <th class="py-3 pr-4 font-normal">{t('admin.categories.column.products')}</th>
+        <th class="py-3 text-right font-normal">{t('admin.common.actions')}</th>
       </tr>
     </thead>
     <tbody>
@@ -51,25 +52,25 @@ const menuRefs = await menuReferencesFor(env.DB, 'category', rows.map((r) => r.i
                 {c.name}
               </a>
             </td>
-            <td data-label="Slug" class="py-3 pr-4 text-gray-500">{c.slug}</td>
-            <td data-label="Products" class="py-3 pr-4 tabular-nums text-gray-500">{counts.get(c.id) ?? 0}</td>
+            <td data-label={t('admin.categories.column.slug')} class="py-3 pr-4 text-gray-500">{c.slug}</td>
+            <td data-label={t('admin.categories.column.products')} class="py-3 pr-4 tabular-nums text-gray-500">{counts.get(c.id) ?? 0}</td>
             <td data-label="" class="py-3 text-right">
               <div class="flex justify-end gap-4 text-xs uppercase tracking-widest">
                 <a href={`/admin/categories/${c.public_id}/edit`} class="text-accent hover:underline">
-                  Edit
+                  {t('admin.common.edit')}
                 </a>
                 <form
                   method="POST"
                   action={`/api/admin/categories/${c.public_id}`}
                   onsubmit={`return confirm('${
                     menuRefs.has(c.id)
-                      ? 'This category is linked from your navigation. Deleting it hides that link on the storefront. Sub-categories move up to its parent. Continue?'
-                      : 'Delete this category? Sub-categories move up to its parent.'
+                      ? t('admin.categories.confirmDeleteLinked')
+                      : t('admin.categories.confirmDelete')
                   }')`}
                 >
                   <input type="hidden" name="_action" value="delete" />
                   <button type="submit" class="text-red-600 hover:underline">
-                    Delete
+                    {t('admin.common.delete')}
                   </button>
                 </form>
               </div>
@@ -81,7 +82,7 @@ const menuRefs = await menuReferencesFor(env.DB, 'category', rows.map((r) => r.i
         rows.length === 0 && (
           <tr>
             <td colspan="4" class="py-8 text-center text-gray-400">
-              No categories yet.
+              {t('admin.categories.empty')}
             </td>
           </tr>
         )

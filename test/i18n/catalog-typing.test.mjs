@@ -54,12 +54,13 @@ describe('the typed message catalog', () => {
 
     expect(result.ok).toBe(false);
     // TS2739/TS2740: "is missing the following properties from type
-    // 'LocaleCatalog'". The named key proves it is reporting the real gap and
-    // not just failing to resolve the import — tsc lists the first few and
-    // counts the rest, so assert on one it always names.
+    // 'LocaleCatalog'". A named catalog key proves it is reporting the real gap
+    // and not just failing to resolve the import. tsc lists the first few and
+    // counts the rest, and which few depends on its own ordering of the type
+    // (the Admin fragments came first once they were spread in), so the
+    // assertion is on the shape of a key rather than on one key.
     expect(result.output).toContain('missing-key.ts');
-    expect(result.output).toContain('is missing the following properties');
-    expect(result.output).toContain('shell.nav.primary');
+    expect(result.output).toMatch(/is missing the following properties from type 'LocaleCatalog': "[a-z]+\.[\w.]+"/);
   }, 60_000);
 
   it('rejects a call site that invents a key', async () => {

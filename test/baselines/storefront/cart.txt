@@ -110,7 +110,7 @@ cache-control: private, no-store
 <button type="submit" name="method" value="demo" class="flex w-full items-center justify-between gap-3 rounded-lg px-5 py-3 text-left transition bg-brand text-on-brand hover:bg-brand-hover">
 <span>
 <span class="block text-sm font-medium">Commande de démonstration</span>
-<span class="block text-xs text-on-brand/70">Simulé — enregistre une vraie commande de test, sans débit</span>
+<span class="block text-xs text-on-brand">Simulé — enregistre une vraie commande de test, sans débit</span>
 </span>
 <span aria-hidden="true" class="text-on-brand/80">&rarr;</span>
 </button>

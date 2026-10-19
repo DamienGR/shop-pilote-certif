@@ -1,4 +1,5 @@
 import type { D1Database } from '@cloudflare/workers-types';
+import { tn } from '../i18n/index.ts';
 import { findMediaByKeys, pageMediaClaimStatements } from '../media/db.ts';
 import { extractMediaKeys } from './markdown.ts';
 import { type Page } from './db.ts';
@@ -100,13 +101,11 @@ export async function savePageBody(
 export function saveWarning(result: SaveResult): string {
   if (result.unresolved.length === 0 && !result.publishRefused) return '';
   const count = Math.max(result.unresolved.length, 1);
-  const images = `${count} image${count === 1 ? '' : 's'}`;
-  const is = count === 1 ? 'is' : 'are';
   if (result.publishRefused) {
-    return `Changes saved, but this page was not published because ${images} ${is} missing from the media library.`;
+    return tn('admin.pages.save.publishRefused.one', 'admin.pages.save.publishRefused.other', count);
   }
   if (result.published === 1) {
-    return `Changes saved and live, but ${images} ${is} missing from the media library and will render broken.`;
+    return tn('admin.pages.save.liveBroken.one', 'admin.pages.save.liveBroken.other', count);
   }
-  return `Draft saved, but ${images} ${is} missing from the media library.`;
+  return tn('admin.pages.save.draftMissing.one', 'admin.pages.save.draftMissing.other', count);
 }

@@ -37,6 +37,7 @@ import { indexProduct, unindexProduct } from '../../../../features/search';
 import { parsePublicId } from '../../../../features/ids/publicId';
 import { CACHE_TAG } from '../../../../features/cache/tags';
 import { purgeCacheTags } from '../../../../features/cache/purge';
+import { t } from '../../../../features/i18n';
 
 export const prerender = false;
 
@@ -87,13 +88,13 @@ async function resolveVariantFormIds(
   };
 
   if (!translate('v_id', variants, 'variant') || !translate('v_remove', variants, 'variant')) {
-    return 'One of the variants no longer exists — reload and try again.';
+    return t('admin.products.error.variantGone');
   }
   if (!translate('e_id', extras, 'extra') || !translate('e_remove', extras, 'extra')) {
-    return 'One of the add-ons no longer exists — reload and try again.';
+    return t('admin.products.error.extraGone');
   }
   if (!translate('v_image', images, 'productImage')) {
-    return 'One of the variant photos no longer exists — reload and try again.';
+    return t('admin.products.error.variantPhotoGone');
   }
   return null;
 }
@@ -103,7 +104,7 @@ async function resolveVariantFormIds(
 export const POST: APIRoute = async ({ request, params, redirect, locals }) => {
   const publicId = parsePublicId(params.id, 'product');
   const existing = publicId ? await getProductByPublicId(env.DB, publicId) : null;
-  if (!publicId || !existing) return new Response('Not found', { status: 404 });
+  if (!publicId || !existing) return new Response(t('admin.products.notFound'), { status: 404 });
   const id = existing.id;
 
   const form = await request.formData();

@@ -12,6 +12,7 @@
  * demo store should configure.
  */
 
+import { t } from '../i18n/index.ts';
 import { toGrams, type WeightParseResult, type WeightUnit } from './weight.ts';
 
 const SHIPPO_BASE = 'https://api.goshippo.com';
@@ -87,11 +88,11 @@ export function parseParcelForm(
   const width = parseDimension(fields.width);
   const height = parseDimension(fields.height);
   if (length == null || width == null || height == null) {
-    return { error: 'Enter the parcel’s length, width, and height as positive numbers.' };
+    return { error: t('admin.shipping.labelPurchase.parcelDimensions') };
   }
   const weight: WeightParseResult = toGrams(fields.weight, unit);
   if (weight.status !== 'ok' || weight.grams <= 0) {
-    return { error: 'Enter the packed parcel weight as a positive number.' };
+    return { error: t('admin.shipping.labelPurchase.parcelWeight') };
   }
   return { parcel: { length, width, height, weightGrams: weight.grams } };
 }
@@ -214,6 +215,9 @@ export function carrierCodeFor(provider: string): string {
   return 'other';
 }
 
+// Every error here reaches the operator, now or later: the order route shows it
+// and also keeps it in `shipping_labels.error`, which the order page lists in
+// the label history. That column is an Admin note, not a log, so it is French.
 async function shippo(
   token: string,
   path: string,
@@ -231,16 +235,16 @@ async function shippo(
     });
   } catch {
     // The request may or may not have arrived — ambiguous by definition.
-    return { ok: false, error: 'Shippo is unreachable right now.', uncertain: true };
+    return { ok: false, error: t('admin.shipping.labelPurchase.unreachable'), uncertain: true };
   }
-  if (res.status === 401) return { ok: false, error: 'Shippo rejected the API token.' };
+  if (res.status === 401) return { ok: false, error: t('admin.shipping.labelPurchase.tokenRejected') };
   let json: unknown;
   try {
     json = await res.json();
   } catch {
     return {
       ok: false,
-      error: `Shippo answered ${res.status} with an unreadable body.`,
+      error: t('admin.shipping.labelPurchase.unreadable', { statut: res.status }),
       uncertain: res.ok || res.status >= 500,
     };
   }
@@ -248,7 +252,7 @@ async function shippo(
     const detail = (json as { detail?: string }).detail;
     return {
       ok: false,
-      error: detail || `Shippo answered ${res.status}.`,
+      error: detail || t('admin.shipping.labelPurchase.answered', { statut: res.status }),
       // 4xx = judged and refused; 5xx = who knows what committed first.
       uncertain: res.status >= 500,
     };
@@ -274,7 +278,7 @@ export async function fetchLabelRates(
   const rates = parseRates(shipment);
   if (!shipment.object_id || rates.length === 0) {
     const why = (shipment.messages ?? []).map((m) => m.text).filter(Boolean).join(' ');
-    return { ok: false, error: why || 'No carrier offered a rate for this parcel and address.' };
+    return { ok: false, error: why || t('admin.shipping.labelPurchase.noRate') };
   }
   return { ok: true, value: { shipmentId: shipment.object_id, rates } };
 }
@@ -287,7 +291,7 @@ export async function getShipmentRates(
   const result = await shippo(token, `/shipments/${encodeURIComponent(shipmentId)}`);
   if (!result.ok) return result;
   const rates = parseRates(result.value as ShippoShipment);
-  if (rates.length === 0) return { ok: false, error: 'That rate list has expired. Fetch rates again.' };
+  if (rates.length === 0) return { ok: false, error: t('admin.shipping.labelPurchase.ratesExpired') };
   return { ok: true, value: rates };
 }
 
@@ -324,7 +328,7 @@ export async function purchaseLabel(
     const definite = tx.status === 'ERROR';
     return {
       ok: false,
-      error: why || 'Shippo could not purchase that label.',
+      error: why || t('admin.shipping.labelPurchase.notPurchased'),
       uncertain: !definite,
     };
   }
@@ -385,7 +389,7 @@ export async function findTransactionForRate(
   const results = (result.value as { results?: unknown }).results;
   if (!Array.isArray(results)) {
     // A 200 without the documented shape is not an answer — change nothing.
-    return { ok: false, error: 'Shippo answered with an unexpected shape; reconciliation is inconclusive.' };
+    return { ok: false, error: t('admin.shipping.labelPurchase.reconcileShape') };
   }
   const matches = (results as ShippoTransactionListItem[]).filter((tx) => {
     const txRate = typeof tx.rate === 'string' ? tx.rate : tx.rate?.object_id;
@@ -414,7 +418,7 @@ export async function findTransactionForRate(
     const label = toLabel(success);
     return label
       ? { ok: true, value: { state: 'purchased', label } }
-      : { ok: false, error: 'Shippo reports a purchased label but its record is incomplete; reconcile in the dashboard.' };
+      : { ok: false, error: t('admin.shipping.labelPurchase.reconcilePurchasedIncomplete') };
   }
   if (matches.some((tx) => tx.status === 'QUEUED' || tx.status === 'WAITING' || tx.status === 'REFUNDPENDING')) {
     return { ok: true, value: { state: 'pending' } };
@@ -423,16 +427,16 @@ export async function findTransactionForRate(
   if (refunded) {
     const onlySettled = matches.every((tx) => tx.status === 'REFUNDED' || tx.status === 'ERROR');
     if (!onlySettled) {
-      return { ok: false, error: 'Shippo returned conflicting transaction states; reconciliation is inconclusive.' };
+      return { ok: false, error: t('admin.shipping.labelPurchase.reconcileConflicting') };
     }
     const label = toLabel(refunded);
     return label
       ? { ok: true, value: { state: 'refunded', label } }
-      : { ok: false, error: 'Shippo reports a refunded label but its record is incomplete; reconcile in the dashboard.' };
+      : { ok: false, error: t('admin.shipping.labelPurchase.reconcileRefundedIncomplete') };
   }
   if (matches.every((tx) => tx.status === 'ERROR')) {
     return { ok: true, value: { state: 'none' } };
   }
   // A status this code does not know is not a license to reopen.
-  return { ok: false, error: 'Shippo reported a transaction status this version does not recognize; reconcile in the dashboard.' };
+  return { ok: false, error: t('admin.shipping.labelPurchase.reconcileUnknownStatus') };
 }

@@ -47,6 +47,7 @@ import { onDemandImageDeliveryAvailable } from '../../features/products/image';
 import { catalogIsOrphaned } from '../../features/navigation/db';
 import { CACHE_TAG } from '../../features/cache/tags';
 import { purgeCacheTags } from '../../features/cache/purge';
+import { t, tn } from '../../features/i18n';
 
 const capabilities: RuntimeCapabilities = {
   vault: vaultReady(),
@@ -84,9 +85,9 @@ if (Astro.request.method === 'POST') {
     const disabled = String(form.get('disabled')) === '1';
     const current = await getStoreSettings(env.DB);
     if (!isPaymentMethod(method)) {
-      validationError = 'Unknown payment method.';
+      validationError = t('admin.settings.error.unknownPaymentMethod');
     } else if (!disabled && !isMethodAvailable(method, current, capabilities.vault)) {
-      validationError = 'Configure this payment method before enabling it.';
+      validationError = t('admin.settings.error.configureMethodFirst');
     } else {
       await setPaymentMethodDisabled(env.DB, method, disabled);
     }
@@ -107,16 +108,16 @@ if (Astro.request.method === 'POST') {
         const stripeSecret = await getSecret(env.DB, 'stripe_secret_key');
         const stripeWebhook = await getSecret(env.DB, 'stripe_webhook_secret');
         if (!stripeSecret || !stripeWebhook) {
-          prerequisiteError = 'Configure Stripe before enabling this Stripe-only feature.';
+          prerequisiteError = t('admin.settings.error.stripeFirst');
         }
       } else if (on && feature === 'accounts_enabled') {
         if (!env.AUTH_SECRET) {
-          prerequisiteError = 'Set AUTH_SECRET before enabling customer accounts.';
+          prerequisiteError = t('admin.settings.error.authSecretFirst');
         } else if (!(await getEmailProvider())) {
-          prerequisiteError = 'Enable and configure email before enabling customer accounts.';
+          prerequisiteError = t('admin.settings.error.emailFirst');
         }
       } else if (on && feature === 'image_optimize' && !env.IMAGES) {
-        prerequisiteError = 'Add the IMAGES binding and redeploy before enabling image optimization.';
+        prerequisiteError = t('admin.settings.error.imagesBindingFirst');
       }
       if (prerequisiteError) {
         validationError = prerequisiteError;
@@ -137,7 +138,7 @@ if (Astro.request.method === 'POST') {
     if (zone) {
       await setSetting(env.DB, 'time_zone', zone);
     } else {
-      validationError = 'Enter a valid IANA time zone, such as UTC or America/New_York.';
+      validationError = t('admin.settings.error.timeZone');
     }
   } else if (action === 'save_logo') {
     const key = String(form.get('logo_image_key') ?? '').trim();
@@ -148,7 +149,7 @@ if (Astro.request.method === 'POST') {
       // One guarded statement, sourced from `media`: checking first and writing
       // second leaves a window where the file is deleted between the two, which
       // would persist a key that renders a broken logo on every page.
-      validationError = 'That image is no longer in the media library.';
+      validationError = t('admin.settings.error.logoMissing');
     }
   } else if (action === 'save_home') {
     // The selector submits public IDs (page:page_… / product:prod_…); resolve
@@ -175,7 +176,7 @@ if (Astro.request.method === 'POST') {
       // Draft pages and inactive products are not valid targets — the same rule
       // the storefront resolves by, so the setting cannot point somewhere that
       // would silently fall back.
-      validationError = 'Choose a published page or an active product.';
+      validationError = t('admin.settings.error.homeTarget');
     }
   } else if (action === 'save_announcement') {
     // The message doubles as the on/off switch: empty deletes the row (setSetting
@@ -189,7 +190,7 @@ if (Astro.request.method === 'POST') {
       (href.startsWith('/') && !href.startsWith('//')) ||
       /^https?:\/\//i.test(href);
     if (!safeHref) {
-      validationError = 'The announcement link must be a path like /sale or an http(s) URL.';
+      validationError = t('admin.settings.error.announcementHref');
     } else {
       await setSetting(env.DB, 'announcement', message);
       await setSetting(env.DB, 'announcement_href', message ? href : '');
@@ -198,22 +199,21 @@ if (Astro.request.method === 'POST') {
     const delivery = String(form.get('image_delivery') ?? '');
     if (delivery === 'cloudflare') {
       if (!onDemandImageDeliveryAvailable(getConfig().images.baseUrl)) {
-        validationError =
-          'Connect an HTTPS R2 custom domain and set IMAGE_BASE_URL before enabling on-demand images.';
+        validationError = t('admin.settings.error.onDemandImages');
       } else {
         await setSetting(env.DB, 'image_delivery', 'cloudflare');
       }
     } else if (delivery === 'original') {
       await setSetting(env.DB, 'image_delivery', null);
     } else {
-      validationError = 'Choose a valid image delivery method.';
+      validationError = t('admin.settings.error.imageDelivery');
     }
   } else if (action === 'set_search') {
     // Runtime search backend. 'vector' needs the AI + VECTORIZE bindings; the
     // search dispatcher falls back to keyword (FTS5) at query time if they're absent.
     const provider = String(form.get('provider') ?? '');
     if (provider === 'vector' && !semanticSearchAvailable(capabilities)) {
-      validationError = 'Add the AI and VECTORIZE bindings before enabling semantic search.';
+      validationError = t('admin.settings.error.semanticBindings');
     } else if (provider === 'fts' || provider === 'vector') {
       await setSetting(env.DB, 'search_provider', provider);
     }
@@ -236,8 +236,8 @@ if (Astro.request.method === 'POST') {
     if (requestedEnabled && !ready) {
       validationError =
         provider === 'cloudflare'
-          ? 'Add the EMAIL binding and redeploy before enabling Cloudflare Email.'
-          : 'Add a Resend API key before enabling email.';
+          ? t('admin.settings.error.emailBinding')
+          : t('admin.settings.error.resendKey');
     }
   } else if (action === 'save_turnstile') {
     const requestedEnabled = String(form.get('turnstile_enabled')) === '1';
@@ -248,7 +248,7 @@ if (Astro.request.method === 'POST') {
     const ready = !!siteKey && !!secret;
     await setSetting(env.DB, 'turnstile_enabled', requestedEnabled && ready ? '1' : null);
     if (requestedEnabled && !ready) {
-      validationError = 'Add both the Turnstile site key and secret before enabling bot protection.';
+      validationError = t('admin.settings.error.turnstileKeys');
     }
   } else if (action === 'save_default') {
     const prov = String(form.get('payment_provider') ?? '');
@@ -259,7 +259,7 @@ if (Astro.request.method === 'POST') {
       !isMethodAvailable(prov, current, capabilities.vault) ||
       disabled.has(prov)
     ) {
-      validationError = 'Choose an enabled, configured payment method as the default.';
+      validationError = t('admin.settings.error.defaultMethod');
     } else {
       await setSetting(
         env.DB,
@@ -272,7 +272,7 @@ if (Astro.request.method === 'POST') {
   } else if (action === 'save_lightning') {
     const requestedBackend = String(form.get('lightning_backend') ?? '');
     if (requestedBackend !== 'lnbits' && requestedBackend !== 'phoenixd') {
-      validationError = 'Choose a valid Lightning backend.';
+      validationError = t('admin.settings.error.lightningBackend');
     } else {
       const backend = requestedBackend;
       const urlField = backend === 'lnbits' ? 'lnbits_url' : 'phoenixd_url';
@@ -314,7 +314,7 @@ if (Astro.request.method === 'POST') {
   // Invalid timezone: render the form with the error and retain the saved zone.
   if (!validationError) {
     // No-JS path: Post/Redirect/Get with a one-time flash banner.
-    Astro.cookies.set('flash', 'Settings updated', {
+    Astro.cookies.set('flash', t('admin.settings.flash.updated'), {
       path: '/admin/settings',
       maxAge: 15,
       httpOnly: true,
@@ -348,7 +348,7 @@ const homeProducts = await listProducts(env.DB, HOME_PRODUCT_CHOICES, 0, 'name C
 const homeChoice = settings.homePage ?? '';
 // The list is bounded, so a store with more products than that could render a
 // selector with NO option matching the current choice. The browser would then
-// show the first option — "Product list (default)" — and saving the form would
+// show the first option — "Liste des produits (par défaut)" — and saving the form would
 // silently clear a perfectly valid setting. Pull the chosen one in explicitly.
 const chosenProductId = homeChoice.startsWith('product:') ? Number(homeChoice.slice(8)) : null;
 if (chosenProductId && !homeProducts.some((p) => p.id === chosenProductId)) {
@@ -360,7 +360,7 @@ if (chosenProductId && !homeProducts.some((p) => p.id === chosenProductId)) {
   if (chosen) homeProducts.unshift(chosen);
 }
 // A stored choice with no matching option — deactivated product, unpublished or
-// deleted page. The select falls back to showing "Product list (default)", which
+// deleted page. The select falls back to showing "Liste des produits (par défaut)", which
 // is what the storefront renders too, so say why rather than letting the setting
 // look like it vanished on its own.
 const homeChoiceMissing =
@@ -401,38 +401,38 @@ const reindexProcessed =
 const baseFeatureRows: { key: string; label: string; desc: string; on: boolean }[] = [
   {
     key: 'cart_enabled',
-    label: 'Cart & checkout',
-    desc: 'Add to cart and checkout. Off makes the store a browse-only catalog.',
+    label: t('admin.settings.feature.cart.label'),
+    desc: t('admin.settings.feature.cart.desc'),
     on: settings.cartEnabled,
   },
   {
     key: 'buy_now_enabled',
-    label: 'Buy now',
-    desc: 'Express instant-checkout button on product pages — works even with the cart off.',
+    label: t('admin.settings.feature.buyNow.label'),
+    desc: t('admin.settings.feature.buyNow.desc'),
     on: settings.buyNowEnabled,
   },
   {
     key: 'discounts_enabled',
-    label: 'Discount codes',
-    desc: 'Show the promo-code field at checkout. Codes are created in the Stripe Dashboard.',
+    label: t('admin.settings.feature.discounts.label'),
+    desc: t('admin.settings.feature.discounts.desc'),
     on: settings.discountsEnabled ?? cfg.discounts.enabled,
   },
   {
     key: 'tax_enabled',
-    label: 'Automatic tax',
-    desc: 'Charge sales tax / VAT via Stripe Tax — activate Stripe Tax in the Dashboard first.',
+    label: t('admin.settings.feature.tax.label'),
+    desc: t('admin.settings.feature.tax.desc'),
     on: settings.taxEnabled ?? cfg.tax.enabled,
   },
   {
     key: 'accounts_enabled',
-    label: 'Customer accounts',
-    desc: 'Passwordless (magic-link) customer login. Needs AUTH_SECRET + email configured.',
+    label: t('admin.settings.feature.accounts.label'),
+    desc: t('admin.settings.feature.accounts.desc'),
     on: settings.accountsEnabled ?? cfg.features.accounts,
   },
   {
     key: 'image_optimize',
-    label: 'Optimize images on upload',
-    desc: 'WebP-downscale product images via Cloudflare Images. Needs the IMAGES binding.',
+    label: t('admin.settings.feature.imageOptimize.label'),
+    desc: t('admin.settings.feature.imageOptimize.desc'),
     on: settings.imageOptimize ?? cfg.images.optimizeOnUpload,
   },
 ];
@@ -442,10 +442,10 @@ const featureRows = baseFeatureRows.map((row) => ({
 }));
 
 const paymentMethods: { m: PaymentMethod; label: string }[] = [
-  { m: 'stripe', label: 'Card (Stripe)' },
-  { m: 'lightning', label: 'Lightning' },
-  { m: 'opennode', label: 'Bitcoin (OpenNode)' },
-  { m: 'demo', label: 'Demo checkout' },
+  { m: 'stripe', label: t('admin.settings.payments.method.stripe') },
+  { m: 'lightning', label: t('admin.settings.payments.method.lightning') },
+  { m: 'opennode', label: t('admin.settings.payments.method.opennode') },
+  { m: 'demo', label: t('admin.settings.payments.method.demo') },
 ];
 const pmRows = paymentMethods.map((r) => {
   const installed = isMethodAvailable(r.m, settings, capabilities.vault);
@@ -482,7 +482,7 @@ const email = {
   fromName: settings.emailFromName ?? '',
   fromPlaceholder: cfg.email.from,
   notifyTo: settings.emailNotifyTo ?? '',
-  notifyPlaceholder: cfg.email.notifyTo || 'you@yourdomain.com',
+  notifyPlaceholder: cfg.email.notifyTo || t('admin.settings.email.notifyPlaceholder'),
 };
 const resendStoredInD1 = inD1('resend_api_key');
 const resendReady = !!(await getSecret(env.DB, 'resend_api_key'));
@@ -506,18 +506,18 @@ const turnstileReady =
 
 // Jump sub-nav targets.
 const sections = [
-  { id: 'general', label: 'General' },
-  { id: 'images', label: 'Images' },
-  { id: 'payments', label: 'Payments' },
-  { id: 'email', label: 'Email' },
-  { id: 'turnstile', label: 'Bot protection' },
-  { id: 'search', label: 'Search' },
-  { id: 'build-time', label: 'Build-time' },
+  { id: 'general', label: t('admin.settings.section.general') },
+  { id: 'images', label: t('admin.settings.section.images') },
+  { id: 'payments', label: t('admin.settings.section.payments') },
+  { id: 'email', label: t('admin.settings.section.email') },
+  { id: 'turnstile', label: t('admin.settings.section.turnstile') },
+  { id: 'search', label: t('admin.settings.section.search') },
+  { id: 'build-time', label: t('admin.settings.section.buildTime') },
 ];
 ---
 
-<AdminLayout title="Settings" active="settings">
-  <h1 class="mb-4 font-serif text-3xl tracking-tight">Settings</h1>
+<AdminLayout title={t('admin.settings.title')} active="settings">
+  <h1 class="mb-4 font-serif text-3xl tracking-tight">{t('admin.settings.title')}</h1>
 
   {/* Sticky jump sub-nav — scales the single page without splitting into routes. */}
   <nav
@@ -549,16 +549,16 @@ const sections = [
 
   {/* ── General: store identity + storefront features (runtime) ───────────── */}
   <section id="general" class="scroll-mt-16">
-    <h2 class="mb-2 text-lg font-bold">General</h2>
+    <h2 class="mb-2 text-lg font-bold">{t('admin.settings.section.general')}</h2>
     <p class="mb-4 text-sm text-gray-500">
-      Store identity and storefront features — apply immediately, no redeploy.
+      {t('admin.settings.general.intro')}
     </p>
 
     <form method="POST" class="mb-4 rounded-lg border border-gray-200 bg-white p-4">
       <input type="hidden" name="_action" value="save_store" />
       <div class="flex flex-wrap items-end gap-3">
         <label class="flex flex-col gap-1 text-xs uppercase tracking-widest text-gray-400">
-          Store name
+          {t('admin.settings.general.storeName')}
           <input
             type="text"
             name="store_name"
@@ -567,14 +567,14 @@ const sections = [
           />
         </label>
         <label class="flex flex-col gap-1 text-xs uppercase tracking-widest text-gray-400">
-          Store time zone
+          {t('admin.settings.general.timeZone')}
           <input
             type="text"
             name="time_zone"
             value={timeZone}
             required
             list="tz-list"
-            placeholder="Search e.g. America/New_York"
+            placeholder={t('admin.settings.general.timeZonePlaceholder')}
             class="w-64 rounded-md border border-gray-300 px-3 py-2 text-sm normal-case tracking-normal text-gray-900 focus:border-brand focus:outline-none"
           />
           <datalist id="tz-list">
@@ -583,27 +583,27 @@ const sections = [
         </label>
       </div>
       <p class="mt-3 text-xs text-gray-400">
-        The time zone controls stored UTC date display. Use an IANA name such as
-        <code>UTC</code> or <code>America/New_York</code>.
+        {t('admin.settings.general.timeZoneHint')} <code>UTC</code>
+        {t('admin.settings.general.timeZoneHintOr')} <code>Europe/Paris</code>.
       </p>
       <button
         type="submit"
         class="mt-4 rounded-md bg-brand px-4 py-2 text-xs font-medium uppercase tracking-wider text-white hover:bg-brand-hover"
       >
-        Save
+        {t('admin.common.save')}
       </button>
     </form>
 
     <form method="POST" class="mb-4 rounded-lg border border-gray-200 bg-white p-4">
       <input type="hidden" name="_action" value="save_logo" />
-      <p class="mb-3 text-xs uppercase tracking-widest text-gray-400">Logo</p>
+      <p class="mb-3 text-xs uppercase tracking-widest text-gray-400">{t('admin.settings.logo.heading')}</p>
       <div class="flex flex-wrap items-center gap-4">
         <div
           class="flex h-14 w-40 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-gray-50 px-2"
         >
           {
             logoUrl ? (
-              <img src={logoUrl} alt="Current logo" class="max-h-10 max-w-full object-contain" />
+              <img src={logoUrl} alt={t('admin.settings.logo.currentAlt')} class="max-h-10 max-w-full object-contain" />
             ) : (
               <span class="font-serif text-lg tracking-tight text-gray-500">{storeName}</span>
             )
@@ -611,7 +611,7 @@ const sections = [
         </div>
         {/* Carries the chosen key; the picker writes it and submits. */}
         <input type="hidden" name="logo_image_key" value={settings.logoImageKey ?? ''} data-logo-key />
-        <MediaPicker id="logo" label={settings.logoImageKey ? 'Replace logo' : 'Choose logo'} />
+        <MediaPicker id="logo" label={settings.logoImageKey ? t('admin.settings.logo.replace') : t('admin.settings.logo.choose')} />
         {
           settings.logoImageKey && (
             <button
@@ -619,31 +619,30 @@ const sections = [
               data-logo-remove
               class="rounded-md border border-gray-300 px-4 py-2 text-xs font-medium uppercase tracking-wider text-gray-700 hover:border-brand hover:text-brand"
             >
-              Remove logo
+              {t('admin.settings.logo.remove')}
             </button>
           )
         }
       </div>
       <p class="mt-3 text-xs text-gray-400">
-        Replaces the store name in the header. Removing it restores the text name. Saving
-        purges affected storefront pages; a 10-minute TTL bounds a transient purge failure.
+        {t('admin.settings.logo.hint')} {t('admin.settings.purgeNote')}
       </p>
     </form>
 
     <form method="POST" class="mb-4 rounded-lg border border-gray-200 bg-white p-4">
       <input type="hidden" name="_action" value="save_home" />
-      <p class="mb-3 text-xs uppercase tracking-widest text-gray-400">Home page</p>
+      <p class="mb-3 text-xs uppercase tracking-widest text-gray-400">{t('admin.settings.home.heading')}</p>
       <div class="flex flex-wrap items-end gap-3">
         <label class="flex flex-col gap-1 text-xs uppercase tracking-widest text-gray-400">
-          <span class="sr-only">What / shows</span>
+          <span class="sr-only">{t('admin.settings.home.selectLabel')}</span>
           <select
             name="home_page"
             class="w-80 rounded-md border border-gray-300 px-3 py-2 text-sm normal-case tracking-normal text-gray-900 focus:border-brand focus:outline-none"
           >
-            <option value="" selected={homeChoice === ''}>Product list (default)</option>
+            <option value="" selected={homeChoice === ''}>{t('admin.settings.home.default')}</option>
             {
               homePages.length > 0 && (
-                <optgroup label="Page">
+                <optgroup label={t('admin.settings.home.groupPage')}>
                   {homePages.map((p) => (
                     <option value={`page:${p.public_id}`} selected={homeChoice === `page:${p.id}`}>
                       {p.title}
@@ -654,7 +653,7 @@ const sections = [
             }
             {
               homeProducts.length > 0 && (
-                <optgroup label="Product">
+                <optgroup label={t('admin.settings.home.groupProduct')}>
                   {homeProducts.map((p) => (
                     <option value={`product:${p.public_id}`} selected={homeChoice === `product:${p.id}`}>
                       {p.name}
@@ -669,35 +668,27 @@ const sections = [
       {
         homeChoiceMissing && (
           <p class="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            The page or product this was set to is no longer published or active, so the home
-            page is showing the product list. Pick a new one to update the setting.
+            {t('admin.settings.home.missing')}
           </p>
         )
       }
       {
         catalogOrphaned && (
           <p class="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            Your product list moved to <code>/products</code> when you set a custom home page,
-            and no menu links to it — shoppers currently have no way to reach your catalog. Add
-            a Catalog item in{' '}
-            <a href="/admin/navigation" class="underline hover:text-brand">
-              Navigation
-            </a>
-            .
+            {t('admin.settings.home.orphaned.before')} <code>/products</code>{' '}
+            {t('admin.settings.home.orphaned.middle')}{' '}
+            <a href="/admin/navigation" class="underline hover:text-brand">{t('admin.settings.home.orphaned.link')}</a>.
           </p>
         )
       }
       <p class="mt-3 text-xs text-gray-400">
-        Only published pages and active products are listed. If the one you pick is later
-        unpublished or deleted, the home page falls back to the product list rather than
-        breaking. Saving purges affected storefront pages; a 10-minute TTL bounds a
-        transient purge failure.
+        {t('admin.settings.home.hint')} {t('admin.settings.purgeNote')}
       </p>
       <button
         type="submit"
         class="mt-4 rounded-md bg-brand px-4 py-2 text-xs font-medium uppercase tracking-wider text-white hover:bg-brand-hover"
       >
-        Save
+        {t('admin.common.save')}
       </button>
     </form>
 
@@ -705,37 +696,35 @@ const sections = [
       <input type="hidden" name="_action" value="save_announcement" />
       <div class="flex flex-wrap items-end gap-3">
         <label class="flex flex-col gap-1 text-xs uppercase tracking-widest text-gray-400">
-          Announcement bar
+          {t('admin.settings.announcement.label')}
           <input
             type="text"
             name="announcement"
             value={announcement}
             maxlength="200"
-            placeholder="e.g. Free shipping on orders over $50"
+            placeholder={t('admin.settings.announcement.placeholder')}
             class="w-80 max-w-full rounded-md border border-gray-300 px-3 py-2 text-sm normal-case tracking-normal text-gray-900 focus:border-brand focus:outline-none"
           />
         </label>
         <label class="flex flex-col gap-1 text-xs uppercase tracking-widest text-gray-400">
-          Link (optional)
+          {t('admin.settings.announcement.link')}
           <input
             type="text"
             name="announcement_href"
             value={announcementHref}
-            placeholder="e.g. /categories/sale"
+            placeholder={t('admin.settings.announcement.linkPlaceholder')}
             class="w-56 max-w-full rounded-md border border-gray-300 px-3 py-2 text-sm normal-case tracking-normal text-gray-900 focus:border-brand focus:outline-none"
           />
         </label>
       </div>
       <p class="mt-3 text-xs text-gray-400">
-        Shown above the header on every storefront page. Leave the message empty to hide the
-        bar. Storefront pages are cached briefly, so a change can take about a minute to
-        appear everywhere.
+        {t('admin.settings.announcement.hint')}
       </p>
       <button
         type="submit"
         class="mt-4 rounded-md bg-brand px-4 py-2 text-xs font-medium uppercase tracking-wider text-white hover:bg-brand-hover"
       >
-        Save
+        {t('admin.common.save')}
       </button>
     </form>
 
@@ -746,19 +735,18 @@ const sections = [
         (forms always re-render converted from grams). */}
     <div class="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-4">
       <a href="/admin/shipping" class="group block">
-        <p class="font-medium group-hover:text-brand">Shipping</p>
+        <p class="font-medium group-hover:text-brand">{t('admin.settings.shipping.title')}</p>
         <p class="text-xs text-gray-500">
-          {effectiveShipping.enabled ? 'On' : 'Off'} ·{' '}
-          {effectiveShipping.zones.length}{' '}
-          {effectiveShipping.zones.length === 1 ? 'zone' : 'zones'} · zones, rates, and
-          free-shipping thresholds <span aria-hidden="true" class="text-brand">&rarr;</span>
+          {effectiveShipping.enabled ? t('admin.settings.shipping.on') : t('admin.settings.shipping.off')} ·{' '}
+          {tn('admin.settings.shipping.zones.one', 'admin.settings.shipping.zones.other', effectiveShipping.zones.length)} ·{' '}
+          {t('admin.settings.shipping.summary')} <span aria-hidden="true" class="text-brand">&rarr;</span>
         </p>
       </a>
       <form method="POST" class="mt-4 border-t border-gray-100 pt-4">
         <input type="hidden" name="_action" value="save_weight_unit" />
         <div class="flex flex-wrap items-end gap-3">
           <label class="flex flex-col gap-1 text-xs uppercase tracking-widest text-gray-400">
-            Weight unit
+            {t('admin.settings.weightUnit.label')}
             <select
               name="weight_unit"
               class="w-24 rounded-md border border-gray-300 px-3 py-2 text-sm normal-case tracking-normal text-gray-900 focus:border-brand focus:outline-none"
@@ -772,13 +760,13 @@ const sections = [
           </label>
         </div>
         <p class="mt-3 text-xs text-gray-400">
-          Product and rate weights are entered in this unit; stored values are always grams.
+          {t('admin.settings.weightUnit.hint')}
         </p>
         <button
           type="submit"
           class="mt-4 rounded-md bg-brand px-4 py-2 text-xs font-medium uppercase tracking-wider text-white hover:bg-brand-hover"
         >
-          Save
+          {t('admin.common.save')}
         </button>
       </form>
     </div>
@@ -787,18 +775,17 @@ const sections = [
         card is one token field, and nothing label-related renders anywhere else
         until the token exists. */}
     <div class="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-4">
-      <p class="font-medium">Shipping labels (Shippo)</p>
+      <p class="font-medium">{t('admin.settings.shippo.title')}</p>
       <p class="mt-1 text-xs text-gray-500">
-        Buy carrier labels from the order page using the recorded address and weight — tracking
-        is filled in and the shipped email sent automatically. A
-        <code class="text-[11px]">shippo_test_…</code> token buys fake labels for trying it out.
+        {t('admin.settings.shippo.intro')}
+        <code class="text-[11px]">shippo_test_…</code> {t('admin.settings.shippo.introAfter')}
       </p>
       <form method="POST" class="mt-3 space-y-3">
         <input type="hidden" name="_action" value="save_shippo" />
-        <SecretField name="shippo_api_key" label="API token" hint="shippo_live_… or shippo_test_…" storedInD1={inD1('shippo_api_key')} vault={vault} />
+        <SecretField name="shippo_api_key" label={t('admin.settings.shippo.token')} hint={t('admin.settings.shippo.tokenHint')} storedInD1={inD1('shippo_api_key')} vault={vault} />
         {vault && (
           <button type="submit" class="mt-1 rounded-md bg-brand px-4 py-2 text-xs font-medium uppercase tracking-wider text-white hover:bg-brand-hover">
-            Save
+            {t('admin.common.save')}
           </button>
         )}
       </form>
@@ -824,7 +811,7 @@ const sections = [
                     type="submit"
                     role="switch"
                     aria-checked={f.on ? 'true' : 'false'}
-                    aria-label={`${f.on ? 'Disable' : 'Enable'} ${f.label}`}
+                    aria-label={t(f.on ? 'admin.settings.toggle.disable' : 'admin.settings.toggle.enable', { nom: f.label })}
                     class={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
                       f.on ? 'bg-brand' : 'bg-gray-300'
                     }`}
@@ -838,7 +825,7 @@ const sections = [
                 </form>
               ) : (
                 <span class="shrink-0 text-xs uppercase tracking-widest text-gray-400">
-                  Unavailable
+                  {t('admin.settings.unavailable')}
                 </span>
               )
             }
@@ -850,16 +837,15 @@ const sections = [
 
   {/* ── Images (runtime delivery selector) ───────────────────────────────── */}
   <section id="images" class="mt-10 scroll-mt-16">
-    <h2 class="mb-2 text-lg font-bold">Images</h2>
+    <h2 class="mb-2 text-lg font-bold">{t('admin.settings.section.images')}</h2>
     <p class="mb-4 text-sm text-gray-500">
-      Choose how product images are delivered. This affects existing and new uploads without
-      changing the files stored in R2.
+      {t('admin.settings.images.intro')}
     </p>
 
     <form method="POST" class="mb-10 rounded-lg border border-gray-200 bg-white p-4">
       <input type="hidden" name="_action" value="set_image_delivery" />
       <fieldset class="space-y-3">
-        <legend class="sr-only">Image delivery</legend>
+        <legend class="sr-only">{t('admin.settings.images.legend')}</legend>
         <label class="flex cursor-pointer items-start gap-3 rounded-md border border-line p-3">
           <input
             type="radio"
@@ -869,9 +855,9 @@ const sections = [
             class="mt-1 accent-brand"
           />
           <span>
-            <span class="block font-medium">Original images</span>
+            <span class="block font-medium">{t('admin.settings.images.original.title')}</span>
             <span class="block text-xs text-gray-500">
-              Serve uploaded files unchanged. No transformation usage or additional setup.
+              {t('admin.settings.images.original.desc')}
             </span>
           </span>
         </label>
@@ -892,22 +878,21 @@ const sections = [
           />
           <span>
             <span class="block font-medium">
-              Cloudflare on-demand
+              {t('admin.settings.images.cloudflare.title')}
               {!onDemandImagesReady && (
                 <span class="ml-2 text-xs uppercase tracking-widest text-amber-700">
-                  Unavailable
+                  {t('admin.settings.unavailable')}
                 </span>
               )}
             </span>
             <span class={onDemandImagesReady ? 'block text-xs text-gray-500' : 'block text-xs text-amber-700'}>
               {onDemandImagesReady
-                ? 'Responsive AVIF/WebP delivery with automatic format negotiation and original-image fallback.'
-                : 'Connect an HTTPS R2 custom domain, set IMAGE_BASE_URL, and enable Transformations for the storefront zone.'}
+                ? t('admin.settings.images.cloudflare.desc')
+                : t('admin.settings.images.cloudflare.setup')}
             </span>
             {onDemandImagesReady && (
               <span class="mt-1 block text-xs text-amber-700">
-                Uses your Cloudflare Image Transformations quota. Each unique source-and-parameter
-                combination counts as a unique transformation.
+                {t('admin.settings.images.cloudflare.quota')}
               </span>
             )}
           </span>
@@ -919,34 +904,34 @@ const sections = [
           type="submit"
           class="rounded-md bg-brand px-4 py-2 text-xs font-medium uppercase tracking-wider text-white hover:bg-brand-hover"
         >
-          Save image delivery
+          {t('admin.settings.images.save')}
         </button>
         <p class="text-xs text-gray-400">
-          Saving purges affected public pages; a 10-minute TTL bounds a transient purge failure.
+          {t('admin.settings.purgeNote')}
         </p>
       </div>
       <p class="mt-3 text-xs text-gray-400">
-        This controls delivery. <strong class="font-medium text-gray-500">Optimize images on upload</strong>
-        in General is a separate option that changes newly stored source files.
+        {t('admin.settings.images.note.before')}
+        <strong class="font-medium text-gray-500">{t('admin.settings.feature.imageOptimize.label')}</strong>
+        {t('admin.settings.images.note.after')}
       </p>
     </form>
   </section>
 
   {/* ── Payments (keys + config grouped per method) ──────────────────────── */}
   <section id="payments" class="mt-10 scroll-mt-16">
-    <h2 class="mb-2 text-lg font-bold">Payments</h2>
+    <h2 class="mb-2 text-lg font-bold">{t('admin.settings.section.payments')}</h2>
     <p class="mb-4 text-sm text-gray-500">
-      Each method's config and keys are grouped together below. A method goes live once its key
-      (and, for Lightning, its node URL) is set; Demo is always available. Keys are stored
-      encrypted in D1 — write-only, never shown again.
+      {t('admin.settings.payments.intro')}
     </p>
 
     {
       !vault && (
         <p class="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          Keys are encrypted under a <code>SECRETS_KEK</code> Worker secret, which isn't set — so the
-          key fields are disabled and only Demo can take orders. Set it
-          (<code>openssl rand -base64 32 | wrangler secret put SECRETS_KEK</code>), then redeploy.
+          {t('admin.settings.payments.noVault.before')} <code>SECRETS_KEK</code>{' '}
+          {t('admin.settings.payments.noVault.middle')}{' '}
+          <code>openssl rand -base64 32 | wrangler secret put SECRETS_KEK</code>{' '}
+          {t('admin.settings.payments.noVault.after')}
         </p>
       )
     }
@@ -955,7 +940,7 @@ const sections = [
     <form method="POST" class="mb-6 rounded-lg border border-gray-200 bg-white p-4">
       <input type="hidden" name="_action" value="save_default" />
       <label class="flex flex-col gap-1 text-xs uppercase tracking-widest text-gray-400">
-        Default rail
+        {t('admin.settings.payments.default.label')}
         <select
           name="payment_provider"
           class="w-48 rounded-md border border-gray-300 px-3 py-2 text-sm normal-case tracking-normal text-gray-900 focus:border-brand focus:outline-none"
@@ -967,21 +952,21 @@ const sections = [
                 selected={payments.provider === row.m}
                 disabled={!row.enabled}
               >
-                {row.label}{row.enabled ? '' : ' — unavailable'}
+                {row.enabled ? row.label : t('admin.settings.payments.default.optionUnavailable', { nom: row.label })}
               </option>
             ))
           }
         </select>
       </label>
       <p class="mt-3 text-xs text-gray-400">
-        The enabled, configured method offered first at checkout.
+        {t('admin.settings.payments.default.hint')}
       </p>
       <button
         type="submit"
         disabled={!pmRows.some((row) => row.enabled)}
         class="mt-4 rounded-md bg-brand px-4 py-2 text-xs font-medium uppercase tracking-wider text-white hover:bg-brand-hover disabled:cursor-not-allowed disabled:bg-gray-300"
       >
-        Save
+        {t('admin.common.save')}
       </button>
     </form>
 
@@ -990,20 +975,20 @@ const sections = [
       <div class="rounded-lg border border-gray-200 bg-white p-4">
         <div class="mb-3 flex items-center justify-between gap-3">
           <div>
-            <p class="font-medium">Card (Stripe)</p>
+            <p class="font-medium">{t('admin.settings.payments.method.stripe')}</p>
             <p class={pmMap.stripe.installed ? 'text-xs text-gray-500' : 'text-xs text-amber-700'}>
-              {pmMap.stripe.installed ? 'Live' : 'Add both Stripe keys to go live'}
+              {pmMap.stripe.installed ? t('admin.settings.payments.live') : t('admin.settings.payments.stripe.notLive')}
             </p>
           </div>
-          {pmMap.stripe.installed && <MethodToggle method="stripe" enabled={pmMap.stripe.enabled} label="Card (Stripe)" />}
+          {pmMap.stripe.installed && <MethodToggle method="stripe" enabled={pmMap.stripe.enabled} label={t('admin.settings.payments.method.stripe')} />}
         </div>
         <form method="POST" class="space-y-3 border-t border-gray-100 pt-3">
           <input type="hidden" name="_action" value="save_stripe" />
-          <SecretField name="stripe_secret_key" label="Secret key" hint="sk_live_… or sk_test_…" storedInD1={inD1('stripe_secret_key')} vault={vault} />
-          <SecretField name="stripe_webhook_secret" label="Webhook signing secret" hint="whsec_…" storedInD1={inD1('stripe_webhook_secret')} vault={vault} />
+          <SecretField name="stripe_secret_key" label={t('admin.settings.payments.stripe.secretKey')} hint={t('admin.settings.payments.stripe.secretKeyHint')} storedInD1={inD1('stripe_secret_key')} vault={vault} />
+          <SecretField name="stripe_webhook_secret" label={t('admin.settings.payments.stripe.webhookSecret')} hint="whsec_…" storedInD1={inD1('stripe_webhook_secret')} vault={vault} />
           {vault && (
             <button type="submit" class="mt-1 rounded-md bg-brand px-4 py-2 text-xs font-medium uppercase tracking-wider text-white hover:bg-brand-hover">
-              Save
+              {t('admin.common.save')}
             </button>
           )}
         </form>
@@ -1013,17 +998,17 @@ const sections = [
       <div class="rounded-lg border border-gray-200 bg-white p-4">
         <div class="mb-3 flex items-center justify-between gap-3">
           <div>
-            <p class="font-medium">Lightning</p>
+            <p class="font-medium">{t('admin.settings.payments.method.lightning')}</p>
             <p class={pmMap.lightning.installed ? 'text-xs text-gray-500' : 'text-xs text-amber-700'}>
-              {pmMap.lightning.installed ? 'Live' : 'Pick a node, set its URL + key to go live'}
+              {pmMap.lightning.installed ? t('admin.settings.payments.live') : t('admin.settings.payments.lightning.notLive')}
             </p>
           </div>
-          {pmMap.lightning.installed && <MethodToggle method="lightning" enabled={pmMap.lightning.enabled} label="Lightning" />}
+          {pmMap.lightning.installed && <MethodToggle method="lightning" enabled={pmMap.lightning.enabled} label={t('admin.settings.payments.method.lightning')} />}
         </div>
         <form method="POST" class="space-y-3 border-t border-gray-100 pt-3">
           <input type="hidden" name="_action" value="save_lightning" />
           <label class="flex w-fit flex-col gap-1 text-xs uppercase tracking-widest text-gray-400">
-            Backend
+            {t('admin.settings.payments.lightning.backend')}
             <select name="lightning_backend" data-lightning-backend class="w-40 rounded-md border border-gray-300 px-3 py-2 text-sm normal-case tracking-normal text-gray-900 focus:border-brand focus:outline-none">
               <option value="phoenixd" selected={payments.lightningBackend === 'phoenixd'}>phoenixd</option>
               <option value="lnbits" selected={payments.lightningBackend === 'lnbits'}>LNbits</option>
@@ -1036,10 +1021,10 @@ const sections = [
             class="space-y-3 rounded-md border border-gray-100 bg-gray-50 p-3"
           >
             <label class="flex flex-col gap-1 text-xs uppercase tracking-widest text-gray-400">
-              LNbits URL
+              {t('admin.settings.payments.lightning.lnbitsUrl')}
               <input type="url" name="lnbits_url" value={payments.lnbitsUrl} required={payments.lightningBackend === 'lnbits'} data-lightning-required-when="lnbits" placeholder="https://lnbits.example.com" class="w-64 max-w-full rounded-md border border-gray-300 px-3 py-2 text-sm normal-case tracking-normal text-gray-900 focus:border-brand focus:outline-none" />
             </label>
-            <SecretField name="lnbits_api_key" label="LNbits invoice/read key" hint="invoice/read key (not admin)" storedInD1={inD1('lnbits_api_key')} vault={vault} required={payments.lightningBackend === 'lnbits'} requiredWhen="lnbits" />
+            <SecretField name="lnbits_api_key" label={t('admin.settings.payments.lightning.lnbitsKey')} hint={t('admin.settings.payments.lightning.lnbitsKeyHint')} storedInD1={inD1('lnbits_api_key')} vault={vault} required={payments.lightningBackend === 'lnbits'} requiredWhen="lnbits" />
           </div>
 
           <div
@@ -1048,14 +1033,14 @@ const sections = [
             class="space-y-3 rounded-md border border-gray-100 bg-gray-50 p-3"
           >
             <label class="flex flex-col gap-1 text-xs uppercase tracking-widest text-gray-400">
-              phoenixd URL
+              {t('admin.settings.payments.lightning.phoenixdUrl')}
               <input type="url" name="phoenixd_url" value={payments.phoenixdUrl} required={payments.lightningBackend === 'phoenixd'} data-lightning-required-when="phoenixd" placeholder="https://ln.example.com" class="w-64 max-w-full rounded-md border border-gray-300 px-3 py-2 text-sm normal-case tracking-normal text-gray-900 focus:border-brand focus:outline-none" />
             </label>
-            <SecretField name="phoenixd_password" label="phoenixd password" hint="http-password-limited-access" storedInD1={inD1('phoenixd_password')} vault={vault} required={payments.lightningBackend === 'phoenixd'} requiredWhen="phoenixd" />
+            <SecretField name="phoenixd_password" label={t('admin.settings.payments.lightning.phoenixdPassword')} hint="http-password-limited-access" storedInD1={inD1('phoenixd_password')} vault={vault} required={payments.lightningBackend === 'phoenixd'} requiredWhen="phoenixd" />
           </div>
           {vault && (
             <button type="submit" class="mt-1 rounded-md bg-brand px-4 py-2 text-xs font-medium uppercase tracking-wider text-white hover:bg-brand-hover">
-              Save
+              {t('admin.common.save')}
             </button>
           )}
         </form>
@@ -1065,22 +1050,22 @@ const sections = [
       <div class="rounded-lg border border-gray-200 bg-white p-4">
         <div class="mb-3 flex items-center justify-between gap-3">
           <div>
-            <p class="font-medium">Bitcoin (OpenNode)</p>
+            <p class="font-medium">{t('admin.settings.payments.method.opennode')}</p>
             <p class={pmMap.opennode.installed ? 'text-xs text-gray-500' : 'text-xs text-amber-700'}>
-              {pmMap.opennode.installed ? 'Live' : 'Add the API key to go live'}
+              {pmMap.opennode.installed ? t('admin.settings.payments.live') : t('admin.settings.payments.opennode.notLive')}
             </p>
           </div>
-          {pmMap.opennode.installed && <MethodToggle method="opennode" enabled={pmMap.opennode.enabled} label="Bitcoin (OpenNode)" />}
+          {pmMap.opennode.installed && <MethodToggle method="opennode" enabled={pmMap.opennode.enabled} label={t('admin.settings.payments.method.opennode')} />}
         </div>
         <form method="POST" class="space-y-3 border-t border-gray-100 pt-3">
           <input type="hidden" name="_action" value="save_opennode" />
           <label class="flex flex-col gap-1 text-xs uppercase tracking-widest text-gray-400">
-            API URL
-            <input type="url" name="opennode_api_url" value={payments.opennodeApiUrl} placeholder="(blank = live)" class="w-64 max-w-full rounded-md border border-gray-300 px-3 py-2 text-sm normal-case tracking-normal text-gray-900 focus:border-brand focus:outline-none" />
+            {t('admin.settings.payments.opennode.apiUrl')}
+            <input type="url" name="opennode_api_url" value={payments.opennodeApiUrl} placeholder={t('admin.settings.payments.opennode.apiUrlPlaceholder')} class="w-64 max-w-full rounded-md border border-gray-300 px-3 py-2 text-sm normal-case tracking-normal text-gray-900 focus:border-brand focus:outline-none" />
           </label>
-          <SecretField name="opennode_api_key" label="API key" hint="from the OpenNode dashboard" storedInD1={inD1('opennode_api_key')} vault={vault} />
+          <SecretField name="opennode_api_key" label={t('admin.settings.payments.opennode.apiKey')} hint={t('admin.settings.payments.opennode.apiKeyHint')} storedInD1={inD1('opennode_api_key')} vault={vault} />
           <button type="submit" class="mt-1 rounded-md bg-brand px-4 py-2 text-xs font-medium uppercase tracking-wider text-white hover:bg-brand-hover">
-            Save
+            {t('admin.common.save')}
           </button>
         </form>
       </div>
@@ -1089,14 +1074,14 @@ const sections = [
       <div class="rounded-lg border border-gray-200 bg-white p-4">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <p class="font-medium">Demo checkout</p>
+            <p class="font-medium">{t('admin.settings.payments.method.demo')}</p>
             <p class="text-xs text-gray-500">
               {pmMap.demo.installed
-                ? 'Reserves stock and places a real, demo-tagged order (no charge). Offered while no real payment method is live.'
-                : 'Withdrawn: a real payment method is live. Use its test mode to try a checkout.'}
+                ? t('admin.settings.payments.demo.available')
+                : t('admin.settings.payments.demo.withdrawn')}
             </p>
           </div>
-          {pmMap.demo.installed && <MethodToggle method="demo" enabled={pmMap.demo.enabled} label="Demo checkout" />}
+          {pmMap.demo.installed && <MethodToggle method="demo" enabled={pmMap.demo.enabled} label={t('admin.settings.payments.method.demo')} />}
         </div>
       </div>
     </div>
@@ -1105,12 +1090,12 @@ const sections = [
 
   {/* ── Email (runtime config + vault key) ───────────────────────────────── */}
   <section id="email" class="mt-10 scroll-mt-16">
-    <h2 class="mb-2 text-lg font-bold">Email</h2>
+    <h2 class="mb-2 text-lg font-bold">{t('admin.settings.section.email')}</h2>
     <p class="mb-4 text-sm text-gray-500">
-      Order-confirmation and customer-login email. <strong>Resend</strong> works on the Workers
-      free plan; <strong>Cloudflare</strong> uses the <code>send_email</code> binding (paid plan).
-      Sending to real customers needs a verified sender domain. Off or unconfigured = no-op (the
-      on-page order confirmation still shows).
+      {t('admin.settings.email.intro.before')} <strong>Resend</strong>{' '}
+      {t('admin.settings.email.intro.resend')} <strong>Cloudflare</strong>{' '}
+      {t('admin.settings.email.intro.cloudflare')} <code>send_email</code>{' '}
+      {t('admin.settings.email.intro.after')}
     </p>
 
     <form method="POST" class="mb-4 space-y-4 rounded-lg border border-gray-200 bg-white p-4">
@@ -1124,16 +1109,16 @@ const sections = [
           disabled={email.provider === 'cloudflare' && !emailBindingReady}
           class="size-4"
         />
-        <span class="font-medium">Send email</span>
+        <span class="font-medium">{t('admin.settings.email.enabled')}</span>
         {
           email.provider === 'cloudflare' && !emailBindingReady && (
-            <span class="text-xs uppercase tracking-widest text-gray-400">Unavailable</span>
+            <span class="text-xs uppercase tracking-widest text-gray-400">{t('admin.settings.unavailable')}</span>
           )
         }
       </label>
       <div class="flex flex-wrap gap-4">
         <label class="flex flex-col gap-1 text-xs uppercase tracking-widest text-gray-400">
-          Provider
+          {t('admin.settings.email.provider')}
           <select
             name="email_provider"
             data-email-provider
@@ -1145,12 +1130,12 @@ const sections = [
               selected={email.provider === 'cloudflare'}
               disabled={!emailBindingReady && email.provider !== 'cloudflare'}
             >
-              Cloudflare — {emailBindingReady ? 'Workers Paid plan' : 'unavailable (EMAIL binding missing)'}
+              {emailBindingReady ? t('admin.settings.email.cloudflarePaid') : t('admin.settings.email.cloudflareUnavailable')}
             </option>
           </select>
         </label>
         <label class="flex flex-col gap-1 text-xs uppercase tracking-widest text-gray-400">
-          From address
+          {t('admin.settings.email.from')}
           <input
             type="email"
             name="email_from"
@@ -1160,7 +1145,7 @@ const sections = [
           />
         </label>
         <label class="flex flex-col gap-1 text-xs uppercase tracking-widest text-gray-400">
-          From name
+          {t('admin.settings.email.fromName')}
           <input
             type="text"
             name="email_from_name"
@@ -1170,7 +1155,7 @@ const sections = [
           />
         </label>
         <label class="flex flex-col gap-1 text-xs uppercase tracking-widest text-gray-400">
-          New-order alerts to
+          {t('admin.settings.email.notifyTo')}
           <input
             type="email"
             name="email_notify_to"
@@ -1178,25 +1163,28 @@ const sections = [
             placeholder={email.notifyPlaceholder}
             class="w-64 rounded-md border border-gray-300 px-3 py-2 text-sm normal-case tracking-normal text-gray-900 focus:border-brand focus:outline-none"
           />
-          <span class="normal-case tracking-normal text-gray-400">Owner gets a "new order" email here. Blank = off.</span>
+          <span class="normal-case tracking-normal text-gray-400">{t('admin.settings.email.notifyHint')}</span>
         </label>
       </div>
 
       {/* Resend API key — shown only for the Resend provider. JS toggles it live as
           the dropdown changes; the SSR `hidden` reflects the saved provider. */}
       <div data-email-when="resend" hidden={email.provider !== 'resend'}>
-        <SecretField name="resend_api_key" label="Resend API key" hint="re_…" storedInD1={resendStoredInD1} vault={vault} />
+        <SecretField name="resend_api_key" label={t('admin.settings.email.resendKey')} hint="re_…" storedInD1={resendStoredInD1} vault={vault} />
       </div>
 
       {/* Cloudflare note — paid-plan requirement (+ binding warning if not wired). */}
       <div data-email-when="cloudflare" hidden={email.provider !== 'cloudflare'}>
         <p class={`rounded-md border px-3 py-2 text-xs ${emailBindingReady ? 'border-gray-200 bg-gray-50 text-gray-600' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
-          Cloudflare email requires a <strong>Workers Paid plan</strong> and an onboarded sender domain
+          {t('admin.settings.email.cloudflareNote.before')}{' '}
+          <strong>{t('admin.settings.email.cloudflareNote.plan')}</strong>{' '}
+          {t('admin.settings.email.cloudflareNote.after')}
           (<code>wrangler email sending enable &lt;domain&gt;</code>).
           {!emailBindingReady && (
             <>
-              {' '}The <code>send_email</code> binding isn't declared in <code>wrangler.jsonc</code> yet, so
-              nothing will send until you add it and redeploy.
+              {' '}{t('admin.settings.email.cloudflareNote.missing.before')} <code>send_email</code>{' '}
+              {t('admin.settings.email.cloudflareNote.missing.middle')} <code>wrangler.jsonc</code>{' '}
+              {t('admin.settings.email.cloudflareNote.missing.after')}
             </>
           )}
         </p>
@@ -1206,19 +1194,19 @@ const sections = [
         type="submit"
         class="rounded-md bg-brand px-4 py-2 text-xs font-medium uppercase tracking-wider text-white hover:bg-brand-hover"
       >
-        Save
+        {t('admin.common.save')}
       </button>
     </form>
 
     {/* Send a test email using the SAVED config (save first, then test). Posts to its
         own endpoint, so the section-save handler ignores it. */}
     <form method="POST" action="/api/admin/email/test" data-email-test class="mb-10 flex flex-wrap items-center gap-2">
-      <label class="text-xs uppercase tracking-widest text-gray-400">Send test email to</label>
+      <label class="text-xs uppercase tracking-widest text-gray-400">{t('admin.settings.email.test.label')}</label>
       <input
         type="email"
         name="test_to"
         required
-        placeholder="you@example.com"
+        placeholder={t('admin.settings.email.test.placeholder')}
         class="w-60 max-w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand focus:outline-none"
       />
       <button
@@ -1226,7 +1214,7 @@ const sections = [
         disabled={!email.enabled || !selectedEmailReady}
         class="rounded-md border border-line px-4 py-2 text-xs font-medium uppercase tracking-wider text-gray-700 hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:text-gray-300"
       >
-        Send test
+        {t('admin.settings.email.test.button')}
       </button>
       <span data-email-test-result class="text-xs font-medium"></span>
     </form>
@@ -1234,11 +1222,11 @@ const sections = [
 
   {/* ── Bot protection (Turnstile) ───────────────────────────────────────── */}
   <section id="turnstile" class="mt-10 scroll-mt-16">
-    <h2 class="mb-2 text-lg font-bold">Bot protection</h2>
+    <h2 class="mb-2 text-lg font-bold">{t('admin.settings.section.turnstile')}</h2>
     <p class="mb-4 text-sm text-gray-500">
-      Cloudflare Turnstile challenge on admin login and customer account sign-in.
-      Off by default. Needs a <a href="https://dash.cloudflare.com/?to=/:account/turnstile" class="text-accent underline">Turnstile widget</a>
-      (sitekey + secret). Cloudflare's always-pass test keys work for local trials.
+      {t('admin.settings.turnstile.intro.before')}{' '}
+      <a href="https://dash.cloudflare.com/?to=/:account/turnstile" class="text-accent underline">{t('admin.settings.turnstile.intro.link')}</a>
+      {t('admin.settings.turnstile.intro.after')}
     </p>
 
     <form method="POST" class="mb-10 space-y-4 rounded-lg border border-gray-200 bg-white p-4">
@@ -1252,17 +1240,17 @@ const sections = [
           disabled={!vault}
           class="size-4"
         />
-        <span class="font-medium">Enable Turnstile</span>
+        <span class="font-medium">{t('admin.settings.turnstile.enable')}</span>
         {
           !vault ? (
-            <span class="text-xs uppercase tracking-widest text-gray-400">Unavailable</span>
+            <span class="text-xs uppercase tracking-widest text-gray-400">{t('admin.settings.unavailable')}</span>
           ) : !turnstileReady ? (
-            <span class="text-xs text-amber-700">Add both keys before enabling</span>
+            <span class="text-xs text-amber-700">{t('admin.settings.turnstile.needKeys')}</span>
           ) : null
         }
       </label>
       <label class="flex flex-col gap-1 text-xs uppercase tracking-widest text-gray-400">
-        Site key (public)
+        {t('admin.settings.turnstile.siteKey')}
         <input
           type="text"
           name="turnstile_site_key"
@@ -1272,38 +1260,39 @@ const sections = [
         />
       </label>
       {/* Secret key (encrypted vault) — part of this section's single save. */}
-      <SecretField name="turnstile_secret_key" label="Secret key" hint="0x4AAAAAAA…" storedInD1={turnstileSecretInD1} vault={vault} />
+      <SecretField name="turnstile_secret_key" label={t('admin.settings.turnstile.secretKey')} hint="0x4AAAAAAA…" storedInD1={turnstileSecretInD1} vault={vault} />
       <button
         type="submit"
         class="rounded-md bg-brand px-4 py-2 text-xs font-medium uppercase tracking-wider text-white hover:bg-brand-hover"
       >
-        Save
+        {t('admin.common.save')}
       </button>
     </form>
   </section>
 
   {/* ── Search (runtime toggle) ──────────────────────────────────────────── */}
   <section id="search" class="mt-10 scroll-mt-16">
-    <h2 class="mb-2 text-lg font-bold">Search</h2>
+    <h2 class="mb-2 text-lg font-bold">{t('admin.settings.section.search')}</h2>
     <p class="mb-4 text-sm text-gray-500">
-      Keyword search (SQLite FTS5) works out of the box. Switch on semantic search to also
-      match by meaning using Workers AI + Vectorize — applies immediately, no redeploy.
+      {t('admin.settings.search.intro')}
     </p>
     <div class="mb-10 overflow-hidden rounded-lg border border-gray-200 bg-white">
       <div class="flex items-center justify-between gap-4 px-4 py-4">
         <div class="min-w-0">
-          <p class="font-medium">Semantic search</p>
+          <p class="font-medium">{t('admin.settings.search.semantic')}</p>
           {
             vectorBindingsReady ? (
               <p class="text-xs text-gray-500">
                 {searchProvider === 'vector'
-                  ? 'On — results are ranked by meaning (hybrid with keyword). Reindex after turning on or after bulk product changes.'
-                  : 'Off — using keyword search (FTS5). Turn on to also match by meaning.'}
+                  ? t('admin.settings.search.on')
+                  : t('admin.settings.search.off')}
               </p>
             ) : (
               <p class="text-xs text-amber-700">
-                Needs the <code>AI</code> + <code>VECTORIZE</code> bindings (declared in{' '}
-                <code>wrangler.jsonc</code>). Search stays on keyword until they're present.
+                {t('admin.settings.search.needsBindings.before')} <code>AI</code>{' '}
+                {t('admin.settings.search.needsBindings.and')} <code>VECTORIZE</code>{' '}
+                ({t('admin.settings.search.needsBindings.declared')} <code>wrangler.jsonc</code>).{' '}
+                {t('admin.settings.search.needsBindings.after')}
               </p>
             )
           }
@@ -1321,7 +1310,7 @@ const sections = [
                 type="submit"
                 role="switch"
                 aria-checked={searchProvider === 'vector' ? 'true' : 'false'}
-                aria-label={`${searchProvider === 'vector' ? 'Disable' : 'Enable'} semantic search`}
+                aria-label={t(searchProvider === 'vector' ? 'admin.settings.toggle.disable' : 'admin.settings.toggle.enable', { nom: t('admin.settings.search.semantic') })}
                 class={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
                   searchProvider === 'vector' ? 'bg-brand' : 'bg-gray-300'
                 }`}
@@ -1334,7 +1323,7 @@ const sections = [
               </button>
             </form>
           ) : (
-            <span class="shrink-0 text-xs uppercase tracking-widest text-gray-400">Unavailable</span>
+            <span class="shrink-0 text-xs uppercase tracking-widest text-gray-400">{t('admin.settings.unavailable')}</span>
           )
         }
       </div>
@@ -1349,14 +1338,14 @@ const sections = [
                 class="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-hover"
               >
                 <span data-reindex-label>
-                  {reindexCursor !== '' ? 'Continue reindex' : 'Reindex all products'}
+                  {reindexCursor !== '' ? t('admin.settings.search.reindexContinue') : t('admin.settings.search.reindexAll')}
                 </span>
               </button>
             </form>
             <span class="text-xs text-gray-400" data-reindex-status aria-live="polite">
               {reindexCursor !== ''
-                ? `${reindexProcessed} products complete. Continue with the next batch.`
-                : 'Embeds every product into Vectorize in small batches. Run once after turning this on, or to backfill.'}
+                ? tn('admin.settings.search.reindexProgress.one', 'admin.settings.search.reindexProgress.other', reindexProcessed)
+                : t('admin.settings.search.reindexHint')}
             </span>
           </div>
         )
@@ -1366,29 +1355,31 @@ const sections = [
 
   {/* ── Build-time config (needs a redeploy) ─────────────────────────────── */}
   <section id="build-time" class="mt-10 scroll-mt-16">
-    <h2 class="mb-2 text-lg font-bold">Build-time</h2>
+    <h2 class="mb-2 text-lg font-bold">{t('admin.settings.section.buildTime')}</h2>
     <p class="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-      The settings below are <strong>build-time</strong> (kept in code so the template clones
-      cleanly). Change the value shown, then redeploy with <code>npm run deploy</code>.
+      {t('admin.settings.buildTime.intro.before')}{' '}
+      <strong>{t('admin.settings.buildTime.intro.strong')}</strong>{' '}
+      {t('admin.settings.buildTime.intro.after')} <code>npm run deploy</code>.
     </p>
     <dl class="divide-y divide-gray-100 overflow-hidden rounded-lg border border-gray-200 bg-white">
       <div class="grid grid-cols-3 gap-4 px-4 py-4">
-        <dt class="font-medium">Currency</dt>
+        <dt class="font-medium">{t('admin.settings.buildTime.currency')}</dt>
         <dd class="col-span-2">
-          <p class="mb-1">{currency.toUpperCase()} — e.g. {formatPrice(2500)}</p>
+          <p class="mb-1">{t('admin.settings.buildTime.currencyExample', { devise: currency.toUpperCase(), montant: formatPrice(2500) })}</p>
           <p class="text-sm text-gray-500">
-            Override <code>currency</code> in <code>src/store.config.ts</code>. Drives all price formatting,
-            the new-product default, and checkout.
+            {t('admin.settings.buildTime.currencyHint')} <code>currency</code>{' '}
+            {t('admin.settings.buildTime.currencyHintIn')} <code>src/store.config.ts</code>.
           </p>
         </dd>
       </div>
       <div class="grid grid-cols-3 gap-4 px-4 py-4">
-        <dt class="font-medium">Favicon</dt>
+        <dt class="font-medium">{t('admin.settings.buildTime.favicon')}</dt>
         <dd class="col-span-2 flex items-start gap-3">
-          <img src="/favicon.svg" alt="Current favicon" width="40" height="40" class="h-10 w-10 rounded" />
+          <img src="/favicon.svg" alt={t('admin.settings.buildTime.faviconAlt')} width="40" height="40" class="h-10 w-10 rounded" />
           <p class="text-sm text-gray-500">
-            Replace <code>public/favicon.svg</code> and regenerate <code>public/favicon.ico</code>
-            for clients that still request the legacy icon.
+            {t('admin.settings.buildTime.faviconHint.before')} <code>public/favicon.svg</code>{' '}
+            {t('admin.settings.buildTime.faviconHint.middle')} <code>public/favicon.ico</code>{' '}
+            {t('admin.settings.buildTime.faviconHint.after')}
           </p>
         </dd>
       </div>
@@ -1413,9 +1404,24 @@ const sections = [
     })();
   </script>
 
-  <script is:inline>
+  <script
+    is:inline
+    define:vars={{
+      reindexText: {
+        running: t('admin.settings.search.reindexRunning'),
+        starting: t('admin.settings.search.reindexStarting'),
+        count: t('admin.settings.search.reindexCount'),
+        doneOne: t('admin.settings.search.reindexDone.one'),
+        doneOther: t('admin.settings.search.reindexDone.other'),
+        failed: t('admin.settings.search.reindexFailed'),
+        all: t('admin.settings.search.reindexAll'),
+        resume: t('admin.settings.search.reindexContinue'),
+      },
+    }}
+  >
     // Reindex in bounded Worker requests. The server also carries the cursor
     // through redirects, so without JS the same form becomes a Continue button.
+    // Strings come in through define:vars (reindexText), never an import.
     (function () {
       if (!window.fetch) return;
       var form = document.querySelector('[data-reindex-form]');
@@ -1428,8 +1434,8 @@ const sections = [
         var cursor = form.querySelector('input[name="cursor"]');
         var processed = form.querySelector('input[name="processed"]');
         if (button) button.disabled = true;
-        if (label) label.textContent = 'Reindexing…';
-        if (status) status.textContent = 'Starting…';
+        if (label) label.textContent = reindexText.running;
+        if (status) status.textContent = reindexText.starting;
 
         function nextBatch() {
           return fetch(form.action, {
@@ -1442,19 +1448,26 @@ const sections = [
           })
             .then(function (response) {
               return response.json().then(function (data) {
-                if (!response.ok) throw new Error(data.error || 'Reindex failed');
+                if (!response.ok) throw new Error(data.error || reindexText.failed);
                 return data;
               });
             })
             .then(function (data) {
-              if (status) status.textContent = data.processed + ' / ' + data.total + ' products';
+              if (status)
+                status.textContent = reindexText.count
+                  .replace('{traites}', data.processed)
+                  .replace('{total}', data.total);
               if (data.done) {
                 if (cursor) cursor.value = '';
                 if (processed) processed.value = '0';
                 if (button) button.disabled = false;
-                if (label) label.textContent = 'Reindex all products';
+                if (label) label.textContent = reindexText.all;
                 if (status) {
-                  status.textContent = 'Reindexed ' + data.processed + ' products ✓';
+                  // French plural: 0 and 1 take the singular, as tn() does.
+                  status.textContent = (Math.abs(data.processed) < 2
+                    ? reindexText.doneOne
+                    : reindexText.doneOther
+                  ).replace('{count}', data.processed);
                   status.className = 'text-xs font-medium text-green-600';
                 }
                 return;
@@ -1467,9 +1480,9 @@ const sections = [
 
         nextBatch().catch(function (error) {
           if (button) button.disabled = false;
-          if (label) label.textContent = 'Continue reindex';
+          if (label) label.textContent = reindexText.resume;
           if (status) {
-            status.textContent = error && error.message ? error.message : 'Reindex failed';
+            status.textContent = error && error.message ? error.message : reindexText.failed;
             status.className = 'text-xs font-medium text-red-600';
           }
         });
@@ -1504,7 +1517,13 @@ const sections = [
     })();
   </script>
 
-  <script is:inline>
+  <script
+    is:inline
+    define:vars={{
+      savedText: t('admin.settings.inlineSave.saved'),
+      saveFailedText: t('admin.settings.inlineSave.failed'),
+    }}
+  >
     // Inline saves (progressive enhancement). Without JS each section form POSTs
     // normally (303 + flash). With JS we submit in the background, then re-fetch the
     // page and swap just this section's freshly-rendered markup — so chips, inputs,
@@ -1563,11 +1582,11 @@ const sections = [
                 if (!fresh) { location.reload(); return; }
                 section.replaceWith(fresh);
                 bind(fresh);
-                if (!isToggle) toast(fresh, 'Saved ✓', false);
+                if (!isToggle) toast(fresh, savedText, false);
               })
               .catch(function () {
                 if (btn) btn.disabled = false;
-                toast(form, 'Save failed — try again', true);
+                toast(form, saveFailedText, true);
               });
           });
         });
@@ -1576,7 +1595,17 @@ const sections = [
     })();
   </script>
 
-  <script is:inline>
+  <script
+    is:inline
+    define:vars={{
+      emailTestText: {
+        sending: t('admin.settings.email.test.sending'),
+        sent: t('admin.settings.email.test.sent'),
+        failed: t('admin.settings.email.test.failed'),
+        requestFailed: t('admin.settings.email.test.requestFailed'),
+      },
+    }}
+  >
     // Email section: live-toggle the provider-specific block (Resend key vs the
     // Cloudflare note) as the dropdown changes, and send a test email inline.
     // Delegated from document so it survives the inline-save section swap.
@@ -1602,7 +1631,7 @@ const sections = [
         var btn = form.querySelector('button[type="submit"]');
         var out = form.querySelector('[data-email-test-result]');
         if (btn) btn.disabled = true;
-        if (out) { out.textContent = 'Sending…'; out.className = 'text-xs font-medium text-gray-500'; }
+        if (out) { out.textContent = emailTestText.sending; out.className = 'text-xs font-medium text-gray-500'; }
         fetch(form.action, {
           method: 'POST',
           body: new FormData(form),
@@ -1611,12 +1640,12 @@ const sections = [
           .then(function (r) { return r.json(); })
           .then(function (d) {
             if (out) {
-              out.textContent = d.message || (d.ok ? 'Sent.' : 'Failed.');
+              out.textContent = d.message || (d.ok ? emailTestText.sent : emailTestText.failed);
               out.className = 'text-xs font-medium ' + (d.ok ? 'text-green-600' : 'text-red-600');
             }
           })
           .catch(function () {
-            if (out) { out.textContent = 'Request failed.'; out.className = 'text-xs font-medium text-red-600'; }
+            if (out) { out.textContent = emailTestText.requestFailed; out.className = 'text-xs font-medium text-red-600'; }
           })
           .then(function () { if (btn) btn.disabled = false; });
       });
@@ -1626,7 +1655,7 @@ const sections = [
 
 <script>
   // The logo picker sets the hidden key and submits, so choosing an image saves
-  // in one step. "Remove logo" clears the field first, and setSetting treats an
+  // in one step. "Retirer le logo" clears the field first, and setSetting treats an
   // empty value as a delete — restoring the text store name.
   document.addEventListener('media:selected', (event) => {
     const field = document.querySelector<HTMLInputElement>('[data-logo-key]');

@@ -64,14 +64,14 @@ describe('validateUpload', () => {
   });
 
   it('rejects files over 5 MB', async () => {
-    expect(await validateUpload(paddedPng(5 * 1024 * 1024 + 1))).toMatch(/5 MB/);
+    expect(await validateUpload(paddedPng(5 * 1024 * 1024 + 1))).toMatch(/5 Mo/);
     expect(await validateUpload(paddedPng(5 * 1024 * 1024))).toBeNull();
   });
 
   it('checks the size before reading any bytes', async () => {
     // The oversized file is refused on its declared size, so an upload that
     // could never be stored never costs a read.
-    expect(validateUploadMetadata(file('image/png', 5 * 1024 * 1024 + 1))).toMatch(/5 MB/);
+    expect(validateUploadMetadata(file('image/png', 5 * 1024 * 1024 + 1))).toMatch(/5 Mo/);
     expect(validateUploadMetadata(file('image/svg+xml', 1024))).toMatch(/JPEG|PNG|WebP|GIF/);
   });
 });

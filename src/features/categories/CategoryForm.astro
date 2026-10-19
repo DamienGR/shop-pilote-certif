@@ -1,5 +1,6 @@
 ---
 import type { Category, CategoryOption } from './db';
+import { t } from '../i18n';
 
 interface Props {
   action: string;
@@ -25,21 +26,21 @@ const inputClass =
   }
 
   <div>
-    <label class="block text-sm font-medium" for="name">Name</label>
+    <label class="block text-sm font-medium" for="name">{t('admin.common.name')}</label>
     <input id="name" name="name" type="text" required value={category?.name ?? ''} class={inputClass} />
   </div>
 
   <div>
     <label class="block text-sm font-medium" for="slug">
-      Slug <span class="text-faint">(URL — blank to auto-generate from name)</span>
+      {t('admin.categories.column.slug')} <span class="text-faint">{t('admin.categories.form.slugHint')}</span>
     </label>
-    <input id="slug" name="slug" type="text" value={category?.slug ?? ''} placeholder="auto-from-name" class={inputClass} />
+    <input id="slug" name="slug" type="text" value={category?.slug ?? ''} placeholder={t('admin.categories.form.slugPlaceholder')} class={inputClass} />
   </div>
 
   <div>
-    <label class="block text-sm font-medium" for="parent_id">Parent category</label>
+    <label class="block text-sm font-medium" for="parent_id">{t('admin.categories.form.parent')}</label>
     <select id="parent_id" name="parent_id" class={inputClass}>
-      <option value="">— none (top level) —</option>
+      <option value="">{t('admin.categories.form.noParent')}</option>
       {
         // Values are cat_ public IDs — resolved back to row ids server-side.
         parentOptions.map((o) => (
@@ -55,6 +56,6 @@ const inputClass =
     <button type="submit" class="rounded-md bg-brand px-5 py-2 font-medium text-on-brand hover:bg-brand-hover">
       {submitLabel}
     </button>
-    <a href="/admin/categories" class="rounded-md border border-line px-5 py-2 hover:bg-surface">Cancel</a>
+    <a href="/admin/categories" class="rounded-md border border-line px-5 py-2 hover:bg-surface">{t('admin.common.cancel')}</a>
   </div>
 </form>

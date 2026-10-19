@@ -28,6 +28,7 @@ import { addCacheTags, responseCacheTags } from './features/cache/tags';
 import { normalizeSearchQuery } from './features/search/query';
 import { isForbiddenFormOrigin } from './features/auth/formOrigin';
 import { logSafe } from './features/observability/logSafe.ts';
+import { t } from './features/i18n';
 import {
   SECURITY_HEADERS,
   DEFAULT_REFERRER_POLICY,
@@ -178,7 +179,7 @@ async function gate(context: APIContext, next: MiddlewareNext): Promise<Response
     if (await verifySession(session, signingKey, cred.tagSource, Date.now() / 1000)) return next();
     // Not authenticated: humans go to the login form, API callers get 401.
     if (path.startsWith('/api/')) {
-      return new Response('Authentication required.', { status: 401 });
+      return new Response(t('admin.shell.gate.authRequired'), { status: 401 });
     }
     return context.redirect('/admin/login', 303);
   }
@@ -211,7 +212,7 @@ async function gate(context: APIContext, next: MiddlewareNext): Promise<Response
       context.locals.adminEmail = identity.email;
       return next();
     }
-    return new Response('Invalid Access token.', { status: 403 });
+    return new Response(t('admin.shell.gate.invalidAccessToken'), { status: 403 });
   }
 
   // 4. Bootstrap (first run): no admin password and no Access configuration. The
@@ -221,7 +222,7 @@ async function gate(context: APIContext, next: MiddlewareNext): Promise<Response
   //    Cloudflare Access, to close this window. See README → Admin auth.)
   if (path === '/admin/setup') return next();
   if (path.startsWith('/api/')) {
-    return new Response('Admin not set up yet — complete /admin/setup first.', { status: 401 });
+    return new Response(t('admin.shell.gate.notSetUp'), { status: 401 });
   }
   return context.redirect('/admin/setup', 303);
 }

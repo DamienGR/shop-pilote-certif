@@ -112,7 +112,7 @@ cat <<EOF
 
 ✓ Instance '$SLUG' deployed.  (metadata: $META)
 
-  Payment keys: paste them in the dashboard (Settings → Payment keys) — they're
+  Payment keys: paste them in the dashboard (Réglages → Paiements) — they're
   stored encrypted in D1 under the SECRETS_KEK just set. Or set them as Worker
   secrets instead (they take a back seat to D1 values):
     npx wrangler secret put STRIPE_SECRET_KEY      --name $SLUG

@@ -21,14 +21,14 @@ npx wrangler d1 execute minshop-<slug>-production-db --remote --command \
 (Rendre d'abord la configuration de production si la commande refuse le nom
 de la base : voir [mot de passe admin](mot-de-passe-admin.md), étape 2.)
 
-Puis, dans Admin → Settings → Email, le bouton d'envoi d'un e-mail de test :
+Puis, dans Admin → Réglages → E-mail, le bouton « Envoyer le test » :
 il dit si le fournisseur accepte le message et, sinon, pourquoi.
 
 ## 2. Diagnostiquer
 
 | Constat | Cause probable | Remède |
 |---|---|---|
-| e-mail de test refusé, « unauthorized » | clé Resend révoquée ou expirée | nouvelle clé dans Admin → Settings → Email |
+| e-mail de test refusé, « unauthorized » | clé Resend révoquée ou expirée | nouvelle clé dans Admin → Réglages → E-mail, champ « Clé d'API Resend » |
 | test accepté, rien n'arrive | domaine d'envoi non vérifié, SPF ou DKIM cassé après un changement DNS | Resend → Domains : revérifier, corriger les enregistrements |
 | rebonds en série dans Resend | adresses invalides, ou réputation du domaine | ne rien renvoyer en masse ; examiner les rebonds un par un |
 | lignes `pending` qui ne bougent pas | le balayage ne tourne pas : aucune commande n'a encore enregistré `store_url`, ou le cron est désactivé | une commande réelle l'enregistre ; vérifier les déclencheurs du Worker |

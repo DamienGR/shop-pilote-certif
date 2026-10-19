@@ -1,5 +1,5 @@
 import { LOCALE } from '../i18n/locale.ts';
-import type { D1Database } from '@cloudflare/workers-types';
+import type { D1Database, D1PreparedStatement } from '@cloudflare/workers-types';
 import type { Product } from '../products/db';
 import { withPublicId } from '../ids/publicId.ts';
 
@@ -32,10 +32,20 @@ export interface CategoryFields {
   parent_id: number | null;
 }
 
+/**
+ * The `…Statement` builders below are the same reads as their async twins,
+ * unexecuted, so a storefront page can send them in ONE `db.batch()`
+ * (features/storefront/reads.ts). On Workers every D1 call costs CPU of its
+ * own — serialising, the binding's fetch, its trace span — and a product page
+ * made seven of them: batched, its warm CPU fell by about 40 % (certification,
+ * étape 6). The twins call the builders, so each query is still written once.
+ */
+export function listCategoriesStatement(db: D1Database): D1PreparedStatement {
+  return db.prepare('SELECT * FROM categories ORDER BY name');
+}
+
 export async function listCategories(db: D1Database): Promise<Category[]> {
-  const { results } = await db
-    .prepare('SELECT * FROM categories ORDER BY name')
-    .all<Category>();
+  const { results } = await listCategoriesStatement(db).all<Category>();
   return results ?? [];
 }
 
@@ -118,8 +128,8 @@ export async function descendantIds(db: D1Database, id: number): Promise<number[
 }
 
 /** Ancestor chain from root down to the category itself (for breadcrumbs). */
-export async function ancestors(db: D1Database, id: number): Promise<Category[]> {
-  const { results } = await db
+export function ancestorsStatement(db: D1Database, id: number): D1PreparedStatement {
+  return db
     .prepare(
       `WITH RECURSIVE up(id, name, slug, parent_id, created_at, depth) AS (
          SELECT id, name, slug, parent_id, created_at, 0 FROM categories WHERE id = ?1
@@ -129,8 +139,11 @@ export async function ancestors(db: D1Database, id: number): Promise<Category[]>
        )
        SELECT id, name, slug, parent_id, created_at FROM up ORDER BY depth DESC`,
     )
-    .bind(id)
-    .all<Category>();
+    .bind(id);
+}
+
+export async function ancestors(db: D1Database, id: number): Promise<Category[]> {
+  const { results } = await ancestorsStatement(db, id).all<Category>();
   return results ?? [];
 }
 
@@ -145,15 +158,21 @@ export async function productCounts(db: D1Database): Promise<Map<number, number>
 }
 
 /** Categories assigned to a product. */
-export async function categoriesForProduct(db: D1Database, productId: number): Promise<Category[]> {
-  const { results } = await db
+export function categoriesForProductStatement(
+  db: D1Database,
+  productId: number,
+): D1PreparedStatement {
+  return db
     .prepare(
       `SELECT c.* FROM categories c
        JOIN product_categories pc ON pc.category_id = c.id
        WHERE pc.product_id = ? ORDER BY c.name`,
     )
-    .bind(productId)
-    .all<Category>();
+    .bind(productId);
+}
+
+export async function categoriesForProduct(db: D1Database, productId: number): Promise<Category[]> {
+  const { results } = await categoriesForProductStatement(db, productId).all<Category>();
   return results ?? [];
 }
 
@@ -186,12 +205,12 @@ export async function categoriesForProducts(
 }
 
 /** Active products sharing a category with the given product (excludes itself). */
-export async function relatedProducts(
+export function relatedProductsStatement(
   db: D1Database,
   productId: number,
   limit = 4,
-): Promise<Product[]> {
-  const { results } = await db
+): D1PreparedStatement {
+  return db
     .prepare(
       `SELECT DISTINCT p.* FROM products p
          JOIN product_categories pc ON pc.product_id = p.id
@@ -202,8 +221,15 @@ export async function relatedProducts(
         ORDER BY p.created_at DESC
         LIMIT ?2`,
     )
-    .bind(productId, limit)
-    .all<Product>();
+    .bind(productId, limit);
+}
+
+export async function relatedProducts(
+  db: D1Database,
+  productId: number,
+  limit = 4,
+): Promise<Product[]> {
+  const { results } = await relatedProductsStatement(db, productId, limit).all<Product>();
   return results ?? [];
 }
 
@@ -256,14 +282,14 @@ export async function setProductCategories(
 }
 
 /** A page of active products in a category, including descendant categories. */
-export async function productsInCategory(
+export function productsInCategoryStatement(
   db: D1Database,
   categoryId: number,
   limit: number,
   offset = 0,
   orderBy = 'created_at DESC',
-): Promise<Product[]> {
-  const { results } = await db
+): D1PreparedStatement {
+  return db
     .prepare(
       `WITH RECURSIVE sub(id) AS (
          SELECT id FROM categories WHERE id = ?1
@@ -276,17 +302,26 @@ export async function productsInCategory(
        ORDER BY ${orderBy}
        LIMIT ?2 OFFSET ?3`,
     )
-    .bind(categoryId, limit, offset)
-    .all<Product>();
+    .bind(categoryId, limit, offset);
+}
+
+export async function productsInCategory(
+  db: D1Database,
+  categoryId: number,
+  limit: number,
+  offset = 0,
+  orderBy = 'created_at DESC',
+): Promise<Product[]> {
+  const { results } = await productsInCategoryStatement(db, categoryId, limit, offset, orderBy).all<Product>();
   return results ?? [];
 }
 
 /** Total active products in a category + its descendants (for pagination). */
-export async function countProductsInCategory(
+export function countProductsInCategoryStatement(
   db: D1Database,
   categoryId: number,
-): Promise<number> {
-  const row = await db
+): D1PreparedStatement {
+  return db
     .prepare(
       `WITH RECURSIVE sub(id) AS (
          SELECT id FROM categories WHERE id = ?1
@@ -297,8 +332,14 @@ export async function countProductsInCategory(
        JOIN product_categories pc ON pc.product_id = p.id
        WHERE pc.category_id IN (SELECT id FROM sub) AND p.active = 1`,
     )
-    .bind(categoryId)
-    .first<{ n: number }>();
+    .bind(categoryId);
+}
+
+export async function countProductsInCategory(
+  db: D1Database,
+  categoryId: number,
+): Promise<number> {
+  const row = await countProductsInCategoryStatement(db, categoryId).first<{ n: number }>();
   return row?.n ?? 0;
 }
 

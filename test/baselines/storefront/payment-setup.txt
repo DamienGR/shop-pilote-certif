@@ -76,7 +76,7 @@ cache-control: private, no-store
 <div class="mx-auto max-w-xl py-8">
 <a href="/cart" class="text-xs uppercase tracking-widest text-faint hover:text-brand">&larr; Retour au panier</a>
 <h1 class="mt-4 font-serif text-3xl tracking-tight">Configurer les paiements</h1>
-<p class="mt-3 text-muted">Ce moyen de paiement n’est pas encore configuré. Activez un vrai canal (carte ou Lightning) dans Admin → Settings → Payments, ou continuez avec la commande de démonstration pour essayer la boutique.</p>
+<p class="mt-3 text-muted">Ce moyen de paiement n’est pas encore configuré. Activez un vrai canal (carte ou Lightning) dans Admin → Réglages → Paiements, ou continuez avec la commande de démonstration pour essayer la boutique.</p>
 <div class="mt-8 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">En attendant, la <strong class="font-semibold">commande de démonstration</strong> fonctionne dès maintenant : elle enregistre une vraie commande marquée « demo », pour voir le parcours complet sans débiter personne.</div>
 </div>
 </main>

@@ -11,8 +11,9 @@ a mal tourné, une base D1 supprimée.
 Une base qui reçoit encore des écritures pendant qu'on la répare mélange deux
 états. Si les commandes continuent d'arriver :
 
-- couper l'encaissement : Admin → Settings, désactiver « Cart & checkout » et
-  « Buy now » ; la vitrine reste lisible, plus rien ne passe en caisse ;
+- couper l'encaissement : Admin → Réglages → Général, désactiver « Panier et
+  tunnel de commande » et « Achat immédiat » ; la vitrine reste lisible,
+  plus rien ne passe en caisse ;
 - noter l'heure exacte : c'est la borne de tout ce qui suit.
 
 ## 2. Choisir le point de retour

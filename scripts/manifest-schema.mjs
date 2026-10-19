@@ -140,7 +140,7 @@ export const MANIFEST_SPEC = {
   },
   features: {
     kind: 'section',
-    description: 'Feature switches decided at build time. Runtime toggles live in Admin → Settings.',
+    description: 'Feature switches decided at build time. Runtime toggles live in Admin → Réglages.',
     fields: {
       customerAccounts: { schema: { type: 'boolean' }, description: 'Customer accounts on the storefront.' },
       semanticSearch: { schema: { type: 'boolean' }, description: 'Vector search. Out of scope for the pilot (plan §2.2).' },
@@ -389,7 +389,7 @@ export const CROSS_FIELD_RULES = [
           if (pattern.test(value)) {
             return {
               path,
-              message: `contains ${what}. Credentials belong in the platform secret store or Admin → Settings, never in a committed file.`,
+              message: `contains ${what}. Credentials belong in the platform secret store or Admin → Réglages, never in a committed file.`,
             };
           }
         }

@@ -13,7 +13,7 @@ import { paymentMethodCopy } from '../features/payments/labels';
 import { t, tn } from '../features/i18n';
 import { catalogPath } from '../features/settings/home';
 
-// Cart switched off in Settings → browse-only catalog, no cart page.
+// Cart switched off in Réglages → Général (browse-only catalog), no cart page.
 if (!(Astro.locals.settings?.cartEnabled ?? true)) return Astro.redirect('/', 302);
 
 // Show only the methods that can actually take a payment right now — the
@@ -233,7 +233,9 @@ const terms = await readTermsGate(env.DB, getConfig().legal);
                   >
                     <span>
                       <span class="block text-sm font-medium">{copy.label}</span>
-                      <span class={`block text-xs ${primary ? 'text-on-brand/70' : 'text-muted'}`}>
+                      {/* Full on-brand: at 70 % the hint fell under AA on atelier and
+                          studio (certification, étape 6). Its size already ranks it. */}
+                      <span class={`block text-xs ${primary ? 'text-on-brand' : 'text-muted'}`}>
                         {copy.hint}
                       </span>
                     </span>

@@ -1,6 +1,6 @@
 # ADR 0011 — Langue de l'administration
 
-- **Statut** : Accepté
+- **Statut** : Remplacé par [ADR 0018](0018-administration-en-francais.md)
 - **Date** : 2026-08-30
 - **Jalon** : 3
 

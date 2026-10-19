@@ -291,7 +291,7 @@ try {
     assert.equal(await deleteMediaRecord(db, m.id), 'media/vanishing.png');
     const result = await attachMediaToProduct(db, 903, m.id);
     assert.equal(result.ok, false);
-    assert.match(result.error, /no longer in the media library/);
+    assert.match(result.error, /n’est plus dans la médiathèque/);
     const rows = await db
       .prepare('SELECT COUNT(*) c FROM product_images WHERE product_id = 903')
       .first();
@@ -304,7 +304,7 @@ try {
     assert.equal((await attachMediaToProduct(db, 904, m.id)).ok, true);
     const second = await attachMediaToProduct(db, 904, m.id);
     assert.equal(second.ok, false);
-    assert.match(second.error, /already in this product/);
+    assert.match(second.error, /déjà dans la galerie de ce produit/);
   });
 
   await check('attaching appends at the next gallery position', async () => {

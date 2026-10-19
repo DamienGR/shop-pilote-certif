@@ -1,3 +1,4 @@
+import { formatNumber, t } from '../i18n/index.ts';
 import { normalizePageLayout, type PageLayout } from './layouts.ts';
 
 const MAX_TITLE = 120;
@@ -19,14 +20,14 @@ export interface PageFields {
  */
 export function parsePageForm(form: FormData): { data: PageFields } | { error: string } {
   const title = String(form.get('title') ?? '').trim();
-  if (!title) return { error: 'Title is required.' };
+  if (!title) return { error: t('admin.pages.form.titleRequired') };
   if (title.length > MAX_TITLE) {
-    return { error: `Title must be ${MAX_TITLE} characters or fewer.` };
+    return { error: t('admin.pages.form.titleTooLong', { max: MAX_TITLE }) };
   }
 
   const body = String(form.get('body_markdown') ?? '');
   if (body.length > MAX_BODY) {
-    return { error: `Page content must be ${MAX_BODY.toLocaleString()} characters or fewer.` };
+    return { error: t('admin.pages.form.bodyTooLong', { max: formatNumber(MAX_BODY) }) };
   }
 
   return {
