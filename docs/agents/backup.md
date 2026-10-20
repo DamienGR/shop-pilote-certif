@@ -60,6 +60,20 @@ goes. The wrangler double keeps `--local` apart from the account the way
 wrangler does (`.wrangler/state` in the tree), so the suite can tell the two
 targets apart.
 
+A restore into ANOTHER environment or account is the client exit and the
+timed drill of certification step 8, and two things do not follow the rows
+there. **R2 objects go back by binding**, into the target's own buckets: the
+archive names the buckets it was taken from, and written to those names a
+staging archive restored into production lands in staging's bucket, or fails
+on an account where that bucket does not exist. **The vault does not travel**:
+provider keys are sealed in `settings` with the `SECRETS_KEK` of the Worker
+that wrote them, which never leaves it. `restore` reports them (`vault` in the
+JSON) and, when Turnstile is on with a key it cannot open — the admin login
+then fails closed, and the admin is where keys are re-entered — prints the
+one statement that turns it off. It never writes that statement itself: the
+fail-closed login is the security gate's, and a restore is not an exception
+to it.
+
 What CI takes does not stay on the runner. `backup --upload` copies the sealed
 files into the environment's private `-backups` bucket (manifest last, so a
 half-copied archive has no manifest), and `backup pull <id>` brings one back and

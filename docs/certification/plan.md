@@ -584,18 +584,23 @@ portes de sécurité sur un déploiement réel).
 
 ### Étape 6 — Accessibilité, navigateurs, performance
 
-- [ ] porte navigateur contre l'URL de staging — §8.5 (`BASE_URL=… npm run
-  test:browser:remote`) ;
+- [x] porte navigateur contre l'URL de staging — §8.5 (`BASE_URL=… npm run
+  test:browser:remote`). Rouge en `v0.3.8` sur le contraste de la page CGV,
+  verte en `v0.3.9` : 85 passés, 5 sautés avec leur raison ;
 - [ ] parcours d'achat à la main sur Chrome et Firefox desktop, Safari sur
-  iPhone, Chrome sur Android ;
-- [ ] Lighthouse mobile sur l'accueil, une catégorie, une fiche produit, le
-  panier : ≥ 90 en performance, accessibilité et SEO ; LCP, CLS, INP relevés ;
-- [ ] charge de quinze minutes : aucune erreur Worker, consommation du plan
+  iPhone, Chrome sur Android. Une commande payée sur quatre (#6) : trois achats
+  restent à faire, avec leur navigateur, sa version et leur numéro ;
+- [x] Lighthouse mobile sur l'accueil, une catégorie, une fiche produit, le
+  panier : ≥ 90 en performance, accessibilité et SEO ; LCP, CLS, INP relevés.
+  100 / 100 / 92 partout (le SEO plafonne derrière Access), LCP 1,0 à 1,6 s,
+  CLS 0, INP 24 ms ;
+- [x] charge de quinze minutes : aucune erreur Worker, consommation du plan
   Workers Free relevée (`npm run test:load:remote -- --json charge.json`,
-  puis `shopctl monitor --env staging --hours 1`) ;
-- [ ] cinq checkouts concurrents sur la dernière unité : une seule commande
+  puis `shopctl monitor --env staging --hours 1`). 6 528 requêtes, 0 erreur ;
+  monitor vert, aucune invocation arrêtée ;
+- [x] cinq checkouts concurrents sur la dernière unité : une seule commande
   (`npm run test:last-unit:remote -- --product <slug>`, stock mis à 1 dans
-  l'administration avant).
+  l'administration avant). Une session, quatre `409`, aucune survente.
 
 Le CPU, constaté à l'étape 3 : sur le staging, l'administration prend 13 à
 43 ms de CPU par requête, la connexion 35 ms, `GET /` 26 ms à froid, le cron
@@ -623,18 +628,121 @@ La charge déclenche les limiteurs de débit si elle vient d'une seule adresse :
 le scénario doit les contourner explicitement ou les compter comme attendus,
 pas les désactiver.
 
-Produit : le **rapport de performance**.
+Passée en réel le 2026-10-19, en `v0.3.8` montée depuis `v0.3.5` (pull request
+#15 de la boutique, migration 0045), puis en `v0.3.9` pour la porte
+navigateur (#17). La boutique a tenu sous la charge et sur la dernière unité ;
+sept défauts : quatre corrigés dans le socle ou la fiche, un dit dans la
+fiche, un réglé sur le jeton du monitor, un laissé ouvert (le `trap` de
+l'intégration D1 laisse un `wrangler dev` en vie).
+
+- **La prose des pages de contenu tombait sous AA.** Le bandeau « Brouillon »
+  des pages légales (migration 0040) est une citation avec du gras et du code,
+  et le socle figeait la citation en `#6b7280` et le code sur `#f5f5f4` :
+  4,37:1 sur le papier d'atelier. Le `Nightly` de l'étape 5 l'avait vu ; la
+  porte du socle ne le pouvait pas, sa page de contenu n'ayant pas de citation.
+  Le jeu d'essai porte désormais le bandeau, la porte échouait alors sur les
+  quatre thèmes ; la prose prend ses couleurs du thème en `v0.3.9`.
+- **Lighthouse recopie le jeton de service dans ses rapports**, JSON et HTML.
+  La fiche les masque, et `check:secrets` refuse le secret depuis `v0.3.9`.
+  Sous WSL, il laissait aussi ses profils Chrome, cookies d'Access compris,
+  dans la boutique : il tourne désormais depuis un dossier jetable.
+- **`wrangler tail` perd des événements sans le dire** : 37 sur 46 à froid,
+  42 % sous la charge. Observability complète ce qui manque.
+- **Le jeton du monitor manquait « Account Settings : Read »**, dont
+  `wrangler whoami` a besoin. Le jeton de lecture de la production, documenté
+  sans ce droit, est à vérifier à l'étape 9.
+
+Le CPU : à chaud, la vitrine tient sous 10 ms en médiane (3 à 6 ms) ; à froid,
+la première requête d'une route coûte 35 à 53 ms ; aucune invocation arrêtée.
+Les trois issues, plan gratuit sous dérogation, Workers Paid ou cache de
+Workers, sont posées dans le rapport ; le choix reste à faire.
+
+Preuves dans `client/certification/etape-6/` de `pilote-certif` (pull request
+#18).
+
+Produit : le **rapport de performance**,
+[`rapport-performance.md`](rapport-performance.md) : quatre lignes sur cinq
+tenues, celle des parcours d'achat ouverte, et la décision sur le CPU posée.
 
 ### Étape 7 — Isolation de deux boutiques déployées
 
 Crée : la boutique `canari-certif` en staging sur A.
 
-- [ ] deux Workers répondant sur deux origines, deux bases, six buckets ;
-- [ ] un produit créé dans l'une n'apparaît pas dans l'autre ;
-- [ ] `catalog import` lancé depuis l'arbre de l'une vers l'autre : refus ;
-- [ ] `shopctl destroy --env staging --confirm canari-certif` : tout part,
+- [x] deux Workers répondant sur deux origines, deux bases, six buckets. La
+  canari en 200 sur workers.dev, le pilote en 200 avec le jeton et 302 sans ;
+  deux bases, six buckets, deux namespaces de sessions, et les liaisons de
+  chaque version déployée ne nomment que les siens ;
+- [x] un produit créé dans l'une n'apparaît pas dans l'autre : chaque croix en
+  200 chez elle et 404 chez l'autre, dans les deux sens, et chaque base ne
+  connaît que la sienne ;
+- [x] `catalog import` lancé depuis l'arbre de l'une vers l'autre : refus, code
+  4, avant toute lecture du compte ; la canari inchangée ;
+- [x] `shopctl destroy --env staging --confirm canari-certif` : tout part,
   et rien de `pilote-certif` ; si le bucket `-backups` porte des archives, R2 le
-  refuse et la base reste — c'est le comportement attendu, à constater.
+  refuse et la base reste — c'est le comportement attendu, à constater. Premier
+  passage en code 6, les buckets d'images et de sauvegardes refusés, la base
+  gardée ; second passage en 0 une fois vidés ; le pilote sous les mêmes
+  identifiants, ses liaisons inchangées.
+
+Répétée en doublure le 2026-10-19 : une canari montée de `v0.3.2` en `v0.3.9`
+d'un seul saut, sans conflit, à côté d'un pilote en `v0.3.9`, sur un
+`wrangler` de doublure qui voit deux comptes. Quatre défauts de `shopctl`,
+que le passage en réel aurait tous rencontrés, corrigés dans `v0.3.10` ; la
+fiche de passage, qui monte la canari en `v0.3.10`, est
+[etape-7-commandes.md](etape-7-commandes.md).
+
+- **Le premier déploiement d'une boutique sans Access finissait en code 6.**
+  Tant que `/admin/setup` n'a pas tourné, la vitrine renvoie chaque page vers
+  lui, et le test de fumée lisait ces redirections comme une vitrine absente.
+  La canari sur workers.dev l'aurait vu, et la première production de chaque
+  boutique à l'étape 9 aussi.
+- **`destroy` laissait le namespace KV des sessions**, que wrangler crée au
+  premier déploiement sous `<worker>-session` et qu'aucun fichier de la
+  boutique ne nomme : « tout part » était faux.
+- **La commande proposée pour vider un bucket refusé ne vidait rien** : sans
+  `--remote`, wrangler 4 vide son simulateur local et répond « Delete
+  complete ».
+- **Le refus de l'import croisé conseillait `prepare-client.mjs --env`**, qui
+  rend un identifiant de base factice ; il renvoie vers `shopctl provision`.
+
+La porte d'isolation supprime désormais le staging de la canari à côté du
+pilote et vérifie que seules ses six ressources quittent le compte. Non
+répétés, faute de doublure : Access, la lecture des liaisons déployées, les
+limiteurs de Cloudflare ; la fiche les constate en réel.
+
+Passée en réel dans la nuit du 19 au 20 octobre 2026 : la canari montée en
+`v0.3.10` (pull request #8 de la boutique, CI 20/20, fusion sans conflit),
+provisionnée, déployée, puis supprimée à côté d'un pilote resté en `v0.3.9`.
+Les quatre lignes tenues ; les trois correctifs de `v0.3.10` que le passage
+pouvait voir, vus : le déploiement d'avant l'assistant vert avec ses
+avertissements, le namespace des sessions supprimé, la commande de vidage
+avec `--remote`. Access et la lecture des liaisons déployées ont fonctionné
+tels que la fiche les écrit.
+
+- **Le premier déploiement est sorti en code 6**, comme la fiche le prévoyait :
+  le test de fumée a couru avant que workers.dev ne serve le nouveau nom
+  partout (`/` et `/products` en 404, dont le message accuse la liaison D1,
+  `/robots.txt` déjà en 200). Relancé une minute plus tard, il était vert avec
+  ses avertissements. C'était Cloudflare qui répondait : un `404` sur chaque
+  chemin (« There is nothing here yet », ou `error code: 1042` à `curl`), et
+  son propre robots.txt, fait de commentaires, en 200 ; `/admin` et `/robots.txt` passaient donc sur des
+  réponses que la boutique n'avait pas données. Corrigé dans `v0.3.11` : le
+  test de fumée reconnaît cette réponse, attend la propagation deux minutes au
+  plus, et n'en fait jamais un succès ni un rollback.
+- **La mesure des limiteurs ne tranche pas seule** : 40 réponses 429 sur 600
+  recherches de la canari, le pilote en 200 juste après, mais la canari
+  elle-même rouverte quand on l'a relue ensuite. La clé de chaque compteur
+  porte le nom d'hôte ; la mesure est compatible avec elle sans la prouver,
+  et la fiche relit désormais la canari avant le pilote.
+- **Le refus de R2 n'était pas relayé.** Dans `destroy-1.json`, la raison
+  donnée pour les deux buckets refusés est la ligne par laquelle wrangler
+  annonce la suppression (« Deleting bucket … (eu). »), pas le refus : la
+  doublure ne l'imprimait pas. `destroy` lit désormais la phrase de l'API,
+  avec son code ; corrigé après `v0.3.11`, livré avec la version suivante,
+  avant que l'étape 9 ne supprime le staging du pilote.
+
+Preuves dans `client/certification/etape-7/` de `canari-certif` (pull request
+#10).
 
 Fait avancer : §8.3 (lignes déployées), jalon 6 (`destroy` réel).
 
@@ -668,6 +776,45 @@ Crée : des archives de sauvegarde ; une restauration sur le compte B.
 
 Les runbooks de l'étape 0 sont corrigés d'après ce qui s'est réellement
 passé. Produit : la **preuve de restauration**.
+
+Répétée en doublure le 2026-10-20 : le pilote en `v0.3.11` servi en local
+avec des commandes, un coffre rempli et Turnstile actif, puis un `wrangler` de
+doublure qui voit A et B. Sauvegarde, rapatriement et contrôle depuis un
+second arbre ; restauration en production sur B puis déploiement ;
+destruction ; rotation de `AUTH_SECRET` ; mot de passe perdu ; export et
+anonymisation ; seuil du monitor abaissé ; une image supprimée à la main. Trois
+défauts du socle, corrigés dans `v0.3.12` avec celui de `destroy` trouvé à
+l'étape 7 ; la fiche de passage, qui monte le pilote en `v0.3.12`, est
+[etape-8-commandes.md](etape-8-commandes.md).
+
+- **`deploy` désignait la mauvaise version pour revenir en arrière.** Chaque
+  rapport du staging du pilote depuis l'étape 3 nomme la même `rollbackTo`, la
+  plus ancienne des dix que liste `wrangler versions list`. `deploy` lit
+  désormais la version qui sert avant de téléverser.
+- **La restauration chronométrée aurait échoué sur B.** `restore` reversait les
+  images dans les buckets que l'archive nomme, ceux du staging, qui n'existent
+  pas sur B ; restaurée sur le même compte, une production aurait rempli le
+  bucket du staging. Les objets suivent désormais leur liaison.
+- **Le coffre ne voyage pas, et rien ne le disait.** Restaurées sur B, les
+  quatre clés des fournisseurs sont chiffrées avec la `SECRETS_KEK` du staging :
+  illisibles, et Turnstile, actif, refuse alors toute connexion à
+  l'administration, là où elles se ressaisissent. `restore` les nomme et donne
+  la commande qui désactive Turnstile ; la connexion qui refuse reste, la porte
+  de sécurité l'exige.
+
+Quatre runbooks et la page d'exploitation corrigés : une commande `wrangler` brute nomme son compte (une
+session qui en voit deux refuse de choisir hors d'un terminal) ; un retour
+arrière ramène les secrets de la version visée, et wrangler passe outre tout
+seul hors d'un terminal ; une rotation de `SECRETS_KEK` désactive Turnstile
+d'abord ; une rotation de `AUTH_SECRET` remet aussi à zéro les compteurs de
+connexion ; la restauration vers un autre compte, et les effacements RGPD à
+rejouer après elle ; le mot de passe de staging à remplacer aussi dans le
+secret du nocturne. Une image supprimée à la main : la fiche reste en 200,
+l'image en `404` sans erreur, mais servie depuis le cache de Cloudflare
+jusqu'à un an là où elle y est ; et le nocturne refuse ensuite de restaurer
+l'archive qui ne la porte plus, ce qui est voulu. Non répétés, faute de
+doublure : le retour arrière réel (lu dans le source de wrangler), le domaine
+personnalisé sur B, Access, les trois nuits.
 
 Fait avancer : jalon 8 (critère de sortie, supervision, runbooks), jalon 9
 (rollback applicatif), §7.3, §8.7.
@@ -723,7 +870,7 @@ Fait avancer : jalon 7 (critère de sortie), §8.8.
 |---|---|
 | rapport de tests | étapes 3, 4, 6, 7 |
 | [rapport de sécurité](rapport-securite.md) | étape 5 |
-| rapport de performance | étape 6 |
+| [rapport de performance](rapport-performance.md) | étape 6 |
 | preuve de restauration | étape 8 |
 | validation TVA/facturation | étape 11 |
 | checklist de lancement | étape 9, rejouable pour chaque boutique |

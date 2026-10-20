@@ -94,7 +94,12 @@ own `CLOUDFLARE_ACCOUNT_ID`.
 `destroy` is irreversible and shaped by it: the shop's slug typed out (not
 `--yes`, which becomes a reflex), `--yes` on top in production, read-before-
 write, the database deleted LAST and only once everything else is gone, and a
-non-empty bucket's refusal relayed rather than worked around.
+non-empty bucket's refusal relayed rather than worked around — with an
+`r2 object delete` that says `--remote`, because wrangler 4 otherwise empties
+its local simulator. It also removes the sessions KV namespace, which nothing
+in the tree names: the Astro adapter binds `SESSION` in the built
+configuration and wrangler provisions it at the first deploy as
+`<worker>-session`, so `destroy` looks it up on the account by that title.
 
 `repo` wraps `gh`, and that is forced rather than preferred (ADR 0014): a GitHub
 environment secret is a libsodium sealed box (X25519 + Blake2b +
@@ -109,7 +114,18 @@ read as "already correct".
 `deploy` follows plan §5.5 in order: resources, config, `npm run verify`,
 bookmark (production), migrations, build, upload, deferred secrets, smoke test.
 The smoke test can fail the command, and an unreachable site is a failure, never
-a pass. `.github/workflows/deploy.yml` runs the same commands behind a GitHub
+a pass. Cloudflare's own answer on a name that leads to no Worker yet — a
+`404`, "There is nothing here yet" or `error code: 1042` depending on what the
+request accepts, and a comment-only robots.txt — is never read as the shop's:
+`deploy` reruns the whole test while it lasts, `--smoke-wait` seconds at most
+(120), then fails without advising a rollback. The first deployment on
+workers.dev met it in real at certification step 7.
+The report's `rollbackTo` is the version serving BEFORE the upload, read from
+`wrangler deployments status` while it is still the active one; inferred
+afterwards from `versions list`, which is oldest first and capped at ten, it
+named a version weeks old (certification step 8). `null` means there was none
+to read: a first deployment, or an answer wrangler did not give.
+`.github/workflows/deploy.yml` runs the same commands behind a GitHub
 Environment so production waits for a reviewer.
 
 `backup` and `restore` are the operations half of jalon 8 (plan §5.6, ADR 0005),

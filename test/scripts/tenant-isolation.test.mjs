@@ -228,6 +228,16 @@ describe('the resources of two shops in one account', () => {
     expect(new Set(buckets).size).toBe(12);
   });
 
+  // The one resource no manifest renders: wrangler provisions it at the first
+  // deploy, from the SESSION binding of the built configuration, under the
+  // Worker's name. Two shops deployed are two namespaces, and a teardown has
+  // to find its own by that name alone.
+  it('gives each deployed Worker its own sessions namespace', () => {
+    const titles = world.state().kv.map(({ title }) => title);
+    expect(titles.sort()).toEqual([names(world.pilot.slug, 'staging').sessions, names(world.canary.slug, 'staging').sessions].sort());
+    expect(new Set(world.state().kv.map(({ id }) => id)).size).toBe(2);
+  });
+
   it('never lets two shops share a database, an id or a Worker', () => {
     const { databases, ids, workers } = inventory();
     expect(new Set(databases).size).toBe(databases.length);
@@ -375,5 +385,50 @@ describe('no crossed data', () => {
     expect(result.status).toBe(EXIT_CODES.precondition);
     expect(result.stderr).toMatch(/une autre boutique/);
     expect(rows(render(world.canary, 'staging', world.state()), 'products')).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// One shop torn down beside the other (§8.3, certification step 7)
+
+/**
+ * `destroy` finds what it deletes by NAME on an account that holds the other
+ * shop too. A prefix match, a name read from the environment, a namespace
+ * looked up by binding rather than by title — each would take the neighbour's
+ * resource with it, and each is invisible with one shop on the account.
+ *
+ * Last in the file on purpose: it changes the world the suites above read.
+ */
+describe('tearing one shop down', () => {
+  it('removes the canary’s staging and nothing of the pilot’s', () => {
+    const before = world.state();
+    const canary = names(world.canary.slug, 'staging');
+    const { report, status } = world.canary.json([
+      'destroy',
+      '--env',
+      'staging',
+      '--confirm',
+      world.canary.slug,
+      '--account',
+      ACCOUNT.id,
+    ]);
+    expect(status).toBe(EXIT_CODES.ok);
+    expect(report.removed).toEqual([canary.worker, canary.sessions, canary.images, canary.files, canary.backups, canary.database]);
+
+    const after = world.state();
+    const gone = new Set(report.removed);
+    // Exactly the canary's staging left the account: every other worker,
+    // namespace, bucket and database is still there, under the same id.
+    expect(after.workers.map(({ name }) => name)).toEqual(before.workers.map(({ name }) => name).filter((name) => !gone.has(name)));
+    expect(after.kv).toEqual(before.kv.filter(({ title }) => !gone.has(title)));
+    expect(after.r2.map(({ name }) => name)).toEqual(before.r2.map(({ name }) => name).filter((name) => !gone.has(name)));
+    expect(after.d1).toEqual(before.d1.filter(({ name }) => !gone.has(name)));
+    expect(after.workers.map(({ name }) => name)).toEqual([names(world.pilot.slug, 'staging').worker]);
+  });
+
+  it('leaves the pilot’s catalogue and images where they were', () => {
+    const state = world.state();
+    expect(rows(render(world.pilot, 'staging', state), 'products')).toBe(20);
+    expect(state.r2.find(({ name }) => name === names(world.pilot.slug, 'staging').images)?.objects).toBe(8);
   });
 });

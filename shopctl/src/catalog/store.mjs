@@ -74,21 +74,33 @@ export function jurisdictionFlags(manifest, remote) {
  * parser this CLI would then have to carry: what is being checked is that this
  * shop's name family appears in the configuration wrangler is about to read.
  *
+ * The remedy depends on where the import goes. A DEPLOYED database is named
+ * by its id, which only the account knows: `prepare-client.mjs --env` renders
+ * the right names around a placeholder id, the name check then passes, and
+ * wrangler fails on a database that does not exist. `provision` renders the
+ * real id and creates nothing on a second run, so that is what a remote import
+ * is told to run.
+ *
  * @param {string} root the tree wrangler will run in
  * @param {string} bucket this shop's images bucket, from imagesBucket()
+ * @param {{ remote?: boolean, env?: string|null }} [target] where the import writes
  */
-export function assertWranglerNamesShop(root, bucket) {
+export function assertWranglerNamesShop(root, bucket, { remote = false, env = null } = {}) {
+  const render =
+    remote && env
+      ? `\`npm run shopctl -- provision --env ${env}\` : il la rend avec l'identifiant réel de la base, et ne crée rien sur un environnement déjà provisionné`
+      : `\`node scripts/prepare-client.mjs <slug>${env ? ` --env ${env}` : ''}\``;
   const file = resolve(root, 'wrangler.jsonc');
   if (!existsSync(file)) {
     throw preconditionError(
       `${root} n'a pas de wrangler.jsonc ; wrangler ne saurait pas quelle base écrire.`,
-      'Rendez-le avec `node scripts/prepare-client.mjs <slug> [--env <staging|production>]`, ou laissez `shopctl provision --env <env>` le faire.',
+      `Rendez la configuration de cette boutique : ${render}.`,
     );
   }
   if (!readFileSync(file, 'utf8').includes(bucket)) {
     throw preconditionError(
       `wrangler.jsonc ne nomme pas « ${bucket} » : il décrit une autre boutique que ce manifeste.`,
-      'Rendez-le pour cette boutique ET cet environnement — `node scripts/prepare-client.mjs <slug> [--env <staging|production>]` — avant d\'importer. Sans ce contrôle, l\'import écrirait dans la base d\'une autre boutique, ou dans celle d\'un autre environnement : la liaison D1 s\'appelle « DB » partout.',
+      `Rendez la configuration de cette boutique ET de cet environnement avant d'importer — ${render}. Sans ce contrôle, l'import écrirait dans la base d'une autre boutique, ou dans celle d'un autre environnement : la liaison D1 s'appelle « DB » partout.`,
     );
   }
 }

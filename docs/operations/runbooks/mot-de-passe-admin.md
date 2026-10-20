@@ -44,9 +44,13 @@ fenêtre doit durer quelques secondes, pas une nuit.
    présent, et un fichier laissé par l'autre environnement l'enverrait ailleurs :
 
    ```sh
+   export CLOUDFLARE_ACCOUNT_ID=<id du compte de l'environnement>
    npx wrangler d1 list   # relever l'identifiant de minshop-<slug>-production-db
    node scripts/prepare-client.mjs <slug> --env production --database-id <uuid>
    ```
+
+   `npm run shopctl -- provision --env production` rend le même fichier sans
+   rien créer sur un environnement déjà provisionné.
 
 3. Réinitialiser, puis ouvrir aussitôt `/admin/setup` sur le domaine de
    production et poser le nouveau mot de passe (huit caractères au moins) :
@@ -63,6 +67,13 @@ curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' https://<domaine>/admi
 
 Toutes les sessions d'administration ouvertes avec l'ancien mot de passe
 tombent : la session est liée au haché.
+
+L'assistant redemande aussi le nom de la boutique et son fuseau, préremplis :
+les garder tels quels. Sur un staging derrière Access, il ne s'ouvre qu'à
+travers Access, ce qui borne la fenêtre aux membres de la politique. Le mot de
+passe de staging est aussi le secret d'environnement GitHub
+`MINSHOP_ADMIN_PASSWORD`, avec lequel le contrôle d'e-mail du `Nightly` se
+connecte : le remplacer dans la foulée, sans quoi le run suivant est rouge.
 
 ## Après
 

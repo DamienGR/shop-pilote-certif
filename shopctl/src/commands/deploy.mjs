@@ -53,14 +53,14 @@ import {
   whoami,
   wrangler,
 } from '../cloudflare.mjs';
-import { ShopctlError, preconditionError, verificationError } from '../errors.mjs';
+import { ShopctlError, preconditionError, usageError, verificationError } from '../errors.mjs';
 import { run } from '../process.mjs';
 import { requireEnvironment, resolveShop } from '../shop.mjs';
 import { INTERNAL_SECRETS, generateSecret, renderEnvironmentConfig } from './provision.mjs';
 import { captureBackup, uploadArchive } from './backup.mjs';
 import { repositoryPath } from '../backup/archive.mjs';
 import { keyId, loadKey } from '../backup/crypto.mjs';
-import { originFromDeployOutput, runSmoke } from '../smoke.mjs';
+import { SMOKE_WAIT_SECONDS, originFromDeployOutput, runSmoke } from '../smoke.mjs';
 import { environmentHost, resourceNames } from '../../../scripts/manifest.mjs';
 
 export const DEPLOY_OPTIONS = {
@@ -68,6 +68,7 @@ export const DEPLOY_OPTIONS = {
   '--shop': 'slug',
   '--account': 'id',
   '--url': 'origine',
+  '--smoke-wait': 'secondes',
   '--key-file': 'chemin',
   '--backup-dir': 'répertoire',
 };
@@ -82,6 +83,8 @@ export const deployUsage = `Usage: shopctl deploy --env <staging|production> [op
   --skip-smoke                Ne pas interroger l'URL déployée. À n'utiliser que
                               lorsque le réseau du runner ne peut pas l'atteindre.
   --url <origine>             Origine à interroger, si wrangler n'en annonce pas.
+  --smoke-wait <secondes>     Attente au plus, tant que Cloudflare répond à la place
+                              du Worker (propagation d'un nouveau nom). Défaut : ${SMOKE_WAIT_SECONDS}.
   --key-file <chemin>         Clé de la sauvegarde prise avant une mise en production.
                               Défaut : .shopctl/backup.key, sinon SHOPCTL_BACKUP_KEY.
   --backup-dir <répertoire>   Où écrire cette sauvegarde. Défaut : backups/.
@@ -147,6 +150,11 @@ export async function runDeploy(args, reporter) {
   // stream to the terminal, so they write to stderr there, as `shopctl new`'s
   // installs do.
   const childStdio = json ? ['inherit', 2, 'inherit'] : 'inherit';
+  // Read before anything slow: a typo here should not cost a verification run.
+  const smokeWait = Number(args.values['--smoke-wait'] ?? SMOKE_WAIT_SECONDS);
+  if (!Number.isInteger(smokeWait) || smokeWait < 0 || smokeWait > 600) {
+    throw usageError(`--smoke-wait « ${args.values['--smoke-wait']} » n'est pas un nombre de secondes entre 0 et 600.`);
+  }
 
   // Production is never a default and never an accident. `--yes` is eight
   // characters and is the difference between deploying to staging and
@@ -305,6 +313,9 @@ export async function runDeploy(args, reporter) {
     reporter.ok('npm run build');
   }
 
+  // Read BEFORE the upload: the version serving now is the one to come back to
+  // if this one fails. Asked after, it can only be guessed from a list.
+  const rollback = activeVersion(names.worker, { cwd: root });
   const uploaded = wrangler(['deploy'], { cwd: root });
   // The custom domain first: it is the route this command just rendered, and
   // wrangler lists it bare — "preview.example.fr (custom domain)" — with no
@@ -352,7 +363,13 @@ export async function runDeploy(args, reporter) {
     // one. Read from the manifest rather than from a flag, so a deployment
     // cannot be told the shop is private when the configuration says otherwise.
     const gated = env === 'staging' && Boolean(manifest.cloudflare.stagingDomain);
-    smoke = await runSmoke(origin, { gated });
+    smoke = await runSmoke(origin, {
+      gated,
+      waitMs: smokeWait * 1000,
+      onWait: ({ intervalMs, remainingMs }) => reporter.step(
+        `    Cloudflare ne sert pas encore ${names.worker} sous ${origin} : nouvel essai dans ${intervalMs / 1000} s (encore ${Math.ceil(remainingMs / 1000)} s au plus).`,
+      ),
+    });
     if (gated) reporter.step(`    Preview privée attendue sur ${manifest.cloudflare.stagingDomain}.`);
     for (const result of smoke.results) {
       const line = `${result.path} — ${result.what}${result.status ? ` (${result.status})` : ''}`;
@@ -362,7 +379,6 @@ export async function runDeploy(args, reporter) {
     }
   }
 
-  const rollback = previousVersion(names.worker, { cwd: root });
   reporter.result({
     command: 'deploy',
     ok: smoke ? smoke.ok : true,
@@ -381,12 +397,8 @@ export async function runDeploy(args, reporter) {
   });
 
   if (smoke && !smoke.ok) {
-    throw verificationError(
-      `le test de fumée a échoué sur ${origin} : la version déployée ne sert pas la boutique.`,
-      rollback
-        ? `Revenez à la version précédente : npx wrangler rollback ${rollback} --name ${names.worker}. Les migrations, elles, ne se rejouent pas à l'envers (ADR 0006) — c'est le code qui recule.`
-        : `Aucune version antérieure n'existe sur ${names.worker} : c'est le premier déploiement, il n'y a rien derrière quoi revenir.`,
-    );
+    const { message, hint } = smokeFailure({ smoke, origin, worker: names.worker, env, rollback, waitSeconds: smokeWait });
+    throw verificationError(message, hint);
   }
 
   if (!json) reporter.section(`${manifest.client.slug} est en ligne en ${env}${origin ? ` sur ${origin}` : ''}.`);
@@ -394,7 +406,31 @@ export async function runDeploy(args, reporter) {
 }
 
 /**
- * The version to roll back to, read before it is needed.
+ * What a failed smoke test tells the operator to do.
+ *
+ * Two different failures, and the advice of one is wrong for the other. A shop
+ * that answers and is broken is the code's fault: roll back. A name Cloudflare
+ * still answers for is no fault of the version, and a rollback would change
+ * nothing — the previous version is served under the same name, or not at
+ * all. Step 7 got the first advice for the second failure.
+ */
+export function smokeFailure({ smoke, origin, worker, env, rollback, waitSeconds }) {
+  if (smoke.notServed) {
+    return {
+      message: `Cloudflare ne sert toujours pas ${worker} sous ${origin}${waitSeconds > 0 ? ` après ${waitSeconds} s` : ''} : le test de fumée n'a pas pu interroger la boutique.`,
+      hint: `Le téléversement a eu lieu. Un nouveau nom sur workers.dev peut mettre plus longtemps à être servi partout : relancez le test dans quelques minutes, npm run shopctl -- deploy --env ${env} --skip-verify --skip-build. Si Cloudflare répond encore, la route ou le domaine ne mène pas à ${worker}.`,
+    };
+  }
+  return {
+    message: `le test de fumée a échoué sur ${origin} : la version déployée ne sert pas la boutique.`,
+    hint: rollback
+      ? `Revenez à la version qui servait avant ce déploiement : npx wrangler rollback ${rollback} --name ${worker}. Les migrations, elles, ne se rejouent pas à l'envers (ADR 0006) — c'est le code qui recule.`
+      : `Aucune version antérieure n'existe sur ${worker} : c'est le premier déploiement, il n'y a rien derrière quoi revenir.`,
+  };
+}
+
+/**
+ * The version to roll back to: the one serving before this deployment.
  *
  * Named in the failure message rather than rolled back automatically: an
  * automatic rollback on a failed smoke test would also fire on a check that
@@ -402,15 +438,23 @@ export async function runDeploy(args, reporter) {
  * deployment that was fine. The operator gets the exact command, with the
  * version id already resolved, which is the part that is tedious to find under
  * pressure.
+ *
+ * Asked of the DEPLOYMENT, before the upload, and not read off `versions list`
+ * afterwards. That list is oldest first (the ten most recent, sorted by
+ * `created_on`), and it counts every `secret put` as a version: its second
+ * entry, which this function used to return, was the pilot's first secret
+ * version of step 3 in every report of the certification — a rollback to
+ * v0.3.2 offered as "the previous version" through v0.3.9.
  */
-export function previousVersion(worker, { cwd }) {
-  const result = wrangler(['versions', 'list', '--name', worker, '--json'], { cwd, allowFailure: true });
+export function activeVersion(worker, { cwd }) {
+  const result = wrangler(['deployments', 'status', '--name', worker, '--json'], { cwd, allowFailure: true });
   if (result.status !== 0) return null;
   const start = result.stdout.search(/[[{]/);
   if (start === -1) return null;
   try {
-    const versions = JSON.parse(result.stdout.slice(start));
-    return Array.isArray(versions) && versions.length > 1 ? (versions[1].id ?? null) : null;
+    const deployment = JSON.parse(result.stdout.slice(start));
+    const [serving] = [...(deployment.versions ?? [])].sort((a, b) => (b.percentage ?? 0) - (a.percentage ?? 0));
+    return serving?.version_id ?? null;
   } catch {
     return null;
   }

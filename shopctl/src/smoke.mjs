@@ -20,7 +20,7 @@
  */
 
 /**
- * @typedef {{ id: string, path: string, what: string, severity?: 'fail'|'warn', check: (response: SmokeResponse) => string|null }} SmokeCheck
+ * @typedef {{ id: string, path: string, what: string, severity?: 'fail'|'warn', check: (response: SmokeResponse) => string|{ message: string, severity: 'warn' }|{ message: string, notServed: true }|null }} SmokeCheck
  * @typedef {{ ok: boolean, status: number|null, body: string, headers: Record<string,string>, error: string|null }} SmokeResponse
  */
 
@@ -29,6 +29,67 @@
  *  catalogue is a megabyte nobody looks at. */
 export const BODY_LIMIT = 64 * 1024;
 
+/**
+ * A shop nobody has installed yet sends every storefront page to the wizard.
+ *
+ * That is the state of EVERY first deployment that no Access application
+ * hides — a staging on workers.dev, and the first production of every shop,
+ * deployed before the client can enter anything (ADR 0015). Read as a failure,
+ * it turned each of them red after the upload; read as a pass, it would vouch
+ * for a storefront nobody has seen. So it is a warning that names the state,
+ * and the redirect is not nothing: the middleware sends it only after reading
+ * the settings from D1 and finding the installation unfinished, so the
+ * database answered.
+ */
+function awaitingSetup(response) {
+  if (![301, 302, 303, 307, 308].includes(response.status)) return false;
+  const location = response.headers?.location;
+  if (!location) return false;
+  try {
+    return new URL(location, 'http://shop.invalid').pathname === '/admin/setup';
+  } catch {
+    return false;
+  }
+}
+
+const SETUP_PENDING = {
+  severity: 'warn',
+  message: 'renvoie vers /admin/setup : la boutique n\'est pas encore installée (la base a répondu, l\'installation y est inachevée). Ce point se vérifiera au déploiement qui suivra l\'assistant.',
+};
+
+/**
+ * Cloudflare's own answer on a name that leads to no Worker — not yet, or not
+ * any more.
+ *
+ * Seen in real at step 7 of the certification (2026-10-20): the first
+ * deployment of a shop on workers.dev was smoke-tested before every edge
+ * served the new name, and Cloudflare itself answered `404` on `/`,
+ * `/products` and `/admin`. Read as the shop's answers, they failed a healthy
+ * deployment — code 6, "la liaison D1 est le premier suspect", a rollback to
+ * run — and passed `/admin` for the wrong reason: a 404 from nobody is not an
+ * administration that is closed. So no check judges this answer; each one
+ * reports that nothing was asked.
+ *
+ * One answer, two forms, chosen by what the request accepts: `error code:
+ * 1042` in plain text to a request that takes no compression (curl's
+ * default), and an HTML page, "There is nothing here yet", without the code,
+ * to one that does — which is what fetch sends, and so what this module gets.
+ */
+export function servedByCloudflare(response) {
+  if (response.status !== 404) return false;
+  const body = response.body.trim();
+  return body === 'error code: 1042' || /<h1>\s*There is nothing here yet\s*<\/h1>/.test(body);
+}
+
+const NOT_SERVED = 'Cloudflare répond lui-même (« There is nothing here yet », error code: 1042) : aucun Worker n\'est servi sous ce nom. Juste après un premier déploiement, c\'est la propagation de workers.dev ; sinon, la route ne mène pas au Worker.';
+
+/** How long `deploy` waits for Cloudflare to serve a new name, by default. The
+ *  real one took under a minute; twice that before calling it a failure. */
+export const SMOKE_WAIT_SECONDS = 120;
+
+/** Between two runs of the whole smoke test while Cloudflare answers. */
+export const SMOKE_INTERVAL_MS = 10_000;
+
 /** @type {SmokeCheck[]} */
 export const SMOKE_CHECKS = [
   {
@@ -36,6 +97,7 @@ export const SMOKE_CHECKS = [
     path: '/',
     what: 'la vitrine répond et se déclare française',
     check(response) {
+      if (awaitingSetup(response)) return SETUP_PENDING;
       if (response.status !== 200) return `répond ${response.status ?? 'rien'} au lieu de 200`;
       // The locale attribute is the one thing on this page that proves the
       // FRENCH core is what got deployed. A 200 from a default Worker
@@ -53,6 +115,7 @@ export const SMOKE_CHECKS = [
       // against a database that does not exist — a missing binding, a
       // jurisdiction the binding does not name — still serves the home page and
       // fails here.
+      if (awaitingSetup(response)) return SETUP_PENDING;
       if (response.status !== 200) return `répond ${response.status ?? 'rien'} au lieu de 200 : la liaison D1 est le premier suspect`;
       return null;
     },
@@ -62,7 +125,18 @@ export const SMOKE_CHECKS = [
     path: '/robots.txt',
     what: 'les fichiers de service sont servis',
     check(response) {
+      if (awaitingSetup(response)) return SETUP_PENDING;
       if (response.status !== 200) return `répond ${response.status ?? 'rien'} au lieu de 200`;
+      // On a name that leads to no Worker, Cloudflare serves a robots.txt of
+      // its own, in 200 — its content signals, nothing but comments. It passed
+      // this check at step 7. The shop's carries the rule that keeps the
+      // administration out of search engines.
+      if (!/^Disallow: \/admin\s*$/m.test(response.body)) {
+        return {
+          notServed: true,
+          message: 'répond 200 sans la règle « Disallow: /admin » : ce robots.txt n\'est pas celui de la boutique (Cloudflare sert le sien, fait de commentaires, sur un nom sans Worker)',
+        };
+      }
       return null;
     },
   },
@@ -133,9 +207,13 @@ export const GATED_CHECKS = [
 /**
  * Turn responses into verdicts.
  *
+ * `notServed` says the verdict is about Cloudflare, not the shop: at least one
+ * answer came from a name that leads to no Worker yet. It is what `runSmoke`
+ * waits out, and never a pass.
+ *
  * @param {Record<string, SmokeResponse>} responses by check id
  * @param {SmokeCheck[]} [checks]
- * @returns {{ ok: boolean, results: Array<{ id: string, path: string, what: string, severity: string, ok: boolean, status: number|null, message: string|null }> }}
+ * @returns {{ ok: boolean, notServed: boolean, results: Array<{ id: string, path: string, what: string, severity: string, ok: boolean, status: number|null, message: string|null, notServed?: true }> }}
  */
 export function evaluateSmoke(responses, checks = SMOKE_CHECKS) {
   const results = checks.map((check) => {
@@ -151,11 +229,22 @@ export function evaluateSmoke(responses, checks = SMOKE_CHECKS) {
       // warning-level check that cannot be run has told us nothing.
       return { ...base, severity: 'fail', ok: false, status: null, message: response.error ?? 'requête impossible' };
     }
-    const message = check.check(response);
-    return { ...base, ok: message === null, status: response.status, message };
+    // Before any check reads it, and a failure even where the check only
+    // warns: like an unreachable site, it is an answer nobody in the shop gave.
+    if (servedByCloudflare(response)) {
+      return { ...base, severity: 'fail', ok: false, status: response.status, message: NOT_SERVED, notServed: true };
+    }
+    const verdict = check.check(response);
+    // A check may lower its own severity for one answer — the shop that is
+    // not installed yet — and never raise it.
+    const message = typeof verdict === 'string' || verdict === null ? verdict : verdict.message;
+    const lowered = verdict !== null && typeof verdict === 'object' && verdict.severity === 'warn' ? { severity: 'warn' } : {};
+    const notServed = verdict !== null && typeof verdict === 'object' && verdict.notServed === true ? { notServed: true } : {};
+    return { ...base, ...lowered, ok: message === null, status: response.status, message, ...notServed };
   });
   return {
     ok: results.every((result) => result.ok || result.severity === 'warn'),
+    notServed: results.some((result) => result.notServed === true),
     results,
   };
 }
@@ -184,14 +273,36 @@ export async function fetchSmoke(url, { timeoutMs = 15_000, fetchImpl = fetch } 
 /**
  * Run every check against one origin.
  *
+ * While Cloudflare answers for the name instead of the Worker, and `waitMs`
+ * allows it, the whole test runs again: a name being propagated answers from
+ * some edges and not others (step 7 saw both in one run), so a check that
+ * passed on one attempt says nothing about the next. Only that answer is
+ * waited out. A shop that answers and is broken fails on the first attempt,
+ * and an unreachable origin is not retried either: a wait would only delay
+ * the failure the operator has to see.
+ *
  * @param {string} origin e.g. https://minshop-atelier-staging.example.workers.dev
  */
-export async function runSmoke(origin, { gated = false, checks = gated ? GATED_CHECKS : SMOKE_CHECKS, ...options } = {}) {
-  const responses = {};
-  for (const check of checks) {
-    responses[check.id] = await fetchSmoke(new URL(check.path, origin).toString(), options);
+export async function runSmoke(origin, {
+  gated = false,
+  checks = gated ? GATED_CHECKS : SMOKE_CHECKS,
+  waitMs = 0,
+  intervalMs = SMOKE_INTERVAL_MS,
+  onWait = () => {},
+  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  ...options
+} = {}) {
+  const deadline = Date.now() + waitMs;
+  for (let attempts = 1; ; attempts += 1) {
+    const responses = {};
+    for (const check of checks) {
+      responses[check.id] = await fetchSmoke(new URL(check.path, origin).toString(), options);
+    }
+    const verdict = evaluateSmoke(responses, checks);
+    if (!verdict.notServed || Date.now() + intervalMs > deadline) return { origin, gated, attempts, ...verdict };
+    onWait({ attempts, intervalMs, remainingMs: deadline - Date.now() });
+    await sleep(intervalMs);
   }
-  return { origin, gated, ...evaluateSmoke(responses, checks) };
 }
 
 /**

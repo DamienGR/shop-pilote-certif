@@ -20,10 +20,18 @@
  * `--dry-run` is the same walk with every write removed.
  *
  * IT DELETES THE DATABASE LAST, and only when everything else is gone. The
- * order is Worker (traffic stops), then buckets, then D1 — so a run that fails
- * halfway leaves a database with no Worker, which can still be read and
- * exported, rather than buckets with no database, which cannot be interpreted
- * by anything.
+ * order is Worker (traffic stops), then the sessions namespace, then buckets,
+ * then D1 — so a run that fails halfway leaves a database with no Worker,
+ * which can still be read and exported, rather than buckets with no database,
+ * which cannot be interpreted by anything.
+ *
+ * THE SESSIONS NAMESPACE IS THE SHOP'S TOO, though nothing in the tree names
+ * it: the Astro adapter binds `SESSION` in the built configuration and
+ * wrangler provisions it at the first deploy, as `<worker>-session`.
+ * `wrangler delete` leaves it behind, so it is looked up by that name and
+ * removed right after the Worker — it holds nothing a teardown means to keep,
+ * and left in place it is one more thing of the shop's on an account the
+ * client does not own.
  *
  * IT NEVER EMPTIES A BUCKET. R2 refuses to delete one that still holds objects,
  * and that refusal is relayed rather than worked around: a teardown that clears
@@ -39,9 +47,11 @@
 import {
   deleteBucket,
   deleteDatabase,
+  deleteKvNamespace,
   deleteWorker,
   listBuckets,
   listDatabases,
+  listKvNamespaces,
   expectedAccount,
   resolveAccount,
   whoami,
@@ -63,8 +73,8 @@ export const destroyUsage = `Usage: shopctl destroy --env <staging|production> -
   --shop <slug>               Manifeste à utiliser quand l'arbre en contient plusieurs.
   --json                      Rapport lisible par une machine.
 
-Supprime, dans cet ordre : le Worker, les trois buckets R2 (images, fichiers,
-sauvegardes), puis la base D1.
+Supprime, dans cet ordre : le Worker, le namespace KV des sessions, les trois
+buckets R2 (images, fichiers, sauvegardes), puis la base D1.
 La base passe en dernier et seulement si le reste est parti — une exécution
 interrompue laisse une base lisible plutôt que des buckets orphelins.
 
@@ -127,9 +137,11 @@ export function runDestroy(args, reporter) {
   const buckets = listBuckets({ cwd: root, jurisdiction });
   const database = listDatabases({ cwd: root }).find((entry) => entry.name === names.database);
   const worker = workerExists(names.worker, { cwd: root });
+  const sessions = listKvNamespaces({ cwd: root }).find((entry) => entry.title === names.sessions) ?? null;
 
   const present = [
     { kind: 'Worker', name: names.worker, exists: worker },
+    { kind: 'namespace KV des sessions', name: names.sessions, exists: Boolean(sessions) },
     { kind: 'bucket images', name: names.images, exists: buckets.includes(names.images) },
     { kind: 'bucket fichiers', name: names.files, exists: buckets.includes(names.files) },
     { kind: 'bucket sauvegardes', name: names.backups, exists: buckets.includes(names.backups) },
@@ -182,6 +194,7 @@ export function runDestroy(args, reporter) {
   };
 
   if (worker) record(deleteWorker(names.worker, { cwd: root }), 'Worker');
+  if (sessions) record(deleteKvNamespace(sessions, { cwd: root }), 'namespace KV des sessions');
 
   for (const [kind, name] of [
     ['bucket images', names.images],
@@ -195,7 +208,10 @@ export function runDestroy(args, reporter) {
       if (name === names.backups) {
         reporter.step(`    Ce sont les archives de ${env} : récupérez celles à garder avant de vider (shopctl backup pull <id> --env ${env}).`);
       }
-      reporter.step(`    npx wrangler r2 object delete ${name}/<clé> -J ${jurisdiction}  — ou videz-le dans le tableau de bord.`);
+      // `--remote` is not optional: wrangler 4 runs `r2 object` against the
+      // local simulator by default, where the delete succeeds on nothing and
+      // the next run is refused by the same bucket.
+      reporter.step(`    npx wrangler r2 object delete ${name}/<clé> --remote -J ${jurisdiction}  — ou videz-le dans le tableau de bord.`);
     }
   }
 

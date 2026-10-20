@@ -17,7 +17,7 @@ suffit pas : l'historique, les forks et les caches l'ont gardé.
 | Secret de webhook Stripe | coffre chiffré | commerçant (endpoint Stripe → « Roll secret ») | les webhooks échouent tant que le nouveau n'est pas saisi |
 | Clé Resend | coffre chiffré | commerçant | les e-mails échouent tant que la nouvelle n'est pas saisie |
 | Clé secrète Turnstile | coffre chiffré | commerçant | les formulaires protégés refusent tant qu'elle n'est pas saisie |
-| `AUTH_SECRET` | secret du Worker | opérateur | toutes les sessions tombent, rien d'autre |
+| `AUTH_SECRET` | secret du Worker | opérateur | toutes les sessions tombent, et les compteurs d'échecs de connexion repartent à zéro ; rien d'autre |
 | `SECRETS_KEK` | secret du Worker | opérateur | **le coffre devient illisible** : voir plus bas |
 | Clé de sauvegarde | `.shopctl/backup.key`, secret GitHub `SHOPCTL_BACKUP_KEY` | opérateur | voir plus bas |
 | Mot de passe admin | haché en D1 | commerçant | les sessions admin tombent |
@@ -36,9 +36,18 @@ suffit pas : l'historique, les forks et les caches l'ont gardé.
   (par l'entrée standard, jamais en argument).
 - **`SECRETS_KEK`** : sa fuite n'expose les clés du coffre que si la base a
   fuité aussi, mais il faut le traiter comme si. Ordre : révoquer chez chaque
-  fournisseur les clés que le coffre contient ; poser un nouveau
-  `SECRETS_KEK` comme ci-dessus ; ressaisir chaque clé dans Admin → Réglages.
-  Les anciennes valeurs chiffrées deviennent illisibles, ce qui est voulu.
+  fournisseur les clés que le coffre contient ; **désactiver Turnstile**
+  (Admin → Réglages → Protection anti-robots) ; poser un nouveau
+  `SECRETS_KEK` comme ci-dessus ; ressaisir chaque clé dans Admin → Réglages,
+  puis réactiver Turnstile. Les anciennes valeurs chiffrées deviennent
+  illisibles, ce qui est voulu — y compris la clé secrète de Turnstile : laissé
+  actif, il refuse toute connexion à l'administration, là où les clés se
+  ressaisissent. Si c'est déjà fait :
+  `npx wrangler d1 execute minshop-<slug>-<env>-db --remote --command "DELETE FROM settings WHERE key = 'turnstile_enabled'"`.
+
+Une rotation se fait en avant : un retour arrière du Worker vers une version
+antérieure ramène l'ancien secret
+([worker en erreur, §2](worker-en-erreur.md#2-revenir-en-arrière-5-minutes)).
 - **Clé de sauvegarde** : elle ouvre toutes les archives prises avec elle. En
   écrire une nouvelle ailleurs (`backup keygen --key-file .shopctl/backup-2.key`),
   la mettre à la place de l'ancienne, supprimer le secret GitHub

@@ -28,16 +28,26 @@ npx wrangler deployments list --name minshop-<slug>-production
 
 Si un déploiement a eu lieu dans les dernières heures, c'est le premier
 suspect. Le rapport de `shopctl deploy` (artefact `deploy-<slug>-production-…`
-du workflow Deploy) nomme la version précédente ; à défaut,
-`npx wrangler deployments list` la donne.
+du workflow Deploy) nomme dans `rollbackTo` la version qui servait avant lui,
+depuis `v0.3.12`. Avant, il nommait une version bien plus ancienne (étape 8 de
+la certification) : ne pas s'y fier, prendre l'avant-dernier déploiement de
+`npx wrangler deployments list --name minshop-<slug>-production`, qui liste du
+plus ancien au plus récent.
 
 ```sh
-npx wrangler rollback <version> --name minshop-<slug>-production
+npx wrangler rollback <version> --name minshop-<slug>-production --message "<incident>"
 ```
 
 Le retour arrière ramène **le code**, pas le schéma : les migrations sont
 additives (ADR 0006), l'ancien code lit donc une base plus récente sans
 erreur. Ne jamais tenter de « dé-migrer ».
+
+Il ramène aussi **les secrets de cette version**. Si un secret a été changé
+depuis (`AUTH_SECRET`, `SECRETS_KEK` après une fuite), Cloudflare refuse le
+retour, et wrangler demande s'il faut passer outre en nommant les secrets en
+cause : répondre **non**, et choisir une version postérieure au changement.
+Hors d'un terminal (un workflow, une commande dont l'entrée est redirigée),
+wrangler répond oui tout seul ; une rotation se défait alors sans un mot.
 
 ## 3. Comprendre
 
