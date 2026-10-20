@@ -1,0 +1,8 @@
+{
+  "command": "privacy export",
+  "ok": true,
+  "shop": "pilote-certif",
+  "env": "staging",
+  "found": false,
+  "tables": {}
+}

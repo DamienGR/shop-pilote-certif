@@ -1,0 +1,64 @@
+
+ ⛅️ wrangler 4.149.0 (update available 4.151.3)
+───────────────────────────────────────────────
+├ Fetching latest deployment
+│
+├ Your current deployment has 1 version(s):
+│
+│ (100%) c87afb92-4acc-4a89-a276-f26b5611d407
+│       Created:  2026-10-20T13:53:12.31289Z
+│           Tag:  -
+│       Message:  -
+│
+? Please provide an optional message for this rollback (120 characters max)
+🤖 Using default value in non-interactive context: certification étape 8 : retour arrière
+│
+├  WARNING  You are about to rollback to Worker Version 00392f82-440f-4cd5-a16b-37f2f3371d29.
+│ This will immediately replace the current deployment and become the active deployment across all your deployed triggers.
+│ However, your local development environment will not be affected by this rollback.
+│ Rolling back to a previous deployment will not rollback any of the bound resources (Durable Object, D1, R2, KV, etc).
+│
+│ (100%) 00392f82-440f-4cd5-a16b-37f2f3371d29
+│       Created:  2026-10-19T18:30:44.68189Z
+│           Tag:  -
+│       Message:  -
+│
+? Are you sure you want to deploy this Worker Version to 100% of traffic?
+🤖 Using fallback value in non-interactive context: yes
+Performing rollback...
+│
+╰  SUCCESS  Worker Version 00392f82-440f-4cd5-a16b-37f2f3371d29 has been deployed to 100% of traffic.
+
+Current Version ID: 00392f82-440f-4cd5-a16b-37f2f3371d29
+
+ ⛅️ wrangler 4.149.0 (update available 4.151.3)
+───────────────────────────────────────────────
+├ Fetching latest deployment
+│
+├ Your current deployment has 1 version(s):
+│
+│ (100%) 00392f82-440f-4cd5-a16b-37f2f3371d29
+│       Created:  2026-10-19T18:30:44.68189Z
+│           Tag:  -
+│       Message:  -
+│
+? Please provide an optional message for this rollback (120 characters max)
+🤖 Using default value in non-interactive context: certification étape 8 : retour en avant
+│
+├  WARNING  You are about to rollback to Worker Version c87afb92-4acc-4a89-a276-f26b5611d407.
+│ This will immediately replace the current deployment and become the active deployment across all your deployed triggers.
+│ However, your local development environment will not be affected by this rollback.
+│ Rolling back to a previous deployment will not rollback any of the bound resources (Durable Object, D1, R2, KV, etc).
+│
+│ (100%) c87afb92-4acc-4a89-a276-f26b5611d407
+│       Created:  2026-10-20T13:53:12.31289Z
+│           Tag:  -
+│       Message:  -
+│
+? Are you sure you want to deploy this Worker Version to 100% of traffic?
+🤖 Using fallback value in non-interactive context: yes
+Performing rollback...
+│
+╰  SUCCESS  Worker Version c87afb92-4acc-4a89-a276-f26b5611d407 has been deployed to 100% of traffic.
+
+Current Version ID: c87afb92-4acc-4a89-a276-f26b5611d407

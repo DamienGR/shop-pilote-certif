@@ -1,0 +1,17 @@
+{
+  "ok": false,
+  "error": {
+    "kind": "external",
+    "code": 5,
+    "message": "npm run verify exited with status 1.",
+    "hint": null,
+    "details": {
+      "command": "npm",
+      "args": [
+        "run",
+        "verify"
+      ],
+      "status": 1
+    }
+  }
+}

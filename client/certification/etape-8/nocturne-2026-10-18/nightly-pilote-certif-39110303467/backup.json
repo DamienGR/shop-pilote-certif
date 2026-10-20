@@ -1,0 +1,155 @@
+{
+  "command": "backup",
+  "ok": true,
+  "dryRun": false,
+  "shop": "pilote-certif",
+  "env": "staging",
+  "id": "pilote-certif-staging-20261018T080909Z",
+  "path": "/home/runner/work/shop-pilote-certif/shop-pilote-certif/backups/pilote-certif-staging-20261018T080909Z",
+  "schema": "0044_admin_login_attempts.sql",
+  "tables": [
+    {
+      "name": "admin_login_attempts",
+      "rows": 0,
+      "digest": "38b6f9acc277956b199b2a3387c19a67a35f264b1a365294a973bcc41ab80384"
+    },
+    {
+      "name": "categories",
+      "rows": 4,
+      "digest": "478944b7af5686cbd27f065413be393f25ccdb95b61dfb19227b25176e4fd65f"
+    },
+    {
+      "name": "checkout_reservations",
+      "rows": 12,
+      "digest": "498b872b0619376e8c9d95facdb6427f8c5afff2fd72c181d1b1897682c02eac"
+    },
+    {
+      "name": "media",
+      "rows": 8,
+      "digest": "6744e2cb1e542dc3e301de7ba3618657d45d7ff6fa926f65c37d609a6315f32b"
+    },
+    {
+      "name": "menu_items",
+      "rows": 4,
+      "digest": "577ef30e6e6363adbbc6c43011e3bab0cb921b468b25cbe2f9285dfc1e456d7c"
+    },
+    {
+      "name": "order_guest_access",
+      "rows": 12,
+      "digest": "bf74d703909178854cd2852b550b3947c85add5aa192eeeb5d585bccbcfa31fb"
+    },
+    {
+      "name": "order_item_ids",
+      "rows": 14,
+      "digest": "8481ce64def7b04e9b06262ed99385e5bee5d3540de42b3d67d62936007e4f49"
+    },
+    {
+      "name": "order_reference_aliases",
+      "rows": 0,
+      "digest": "1fb74310acdecf754da83a744750d44af8691bcd6bfc1a94e1581c085b0416b2"
+    },
+    {
+      "name": "orders",
+      "rows": 5,
+      "digest": "517304581842aad275bb6013f88b33f9dbe6faad5b4c9f5649868b5dd8a7c207"
+    },
+    {
+      "name": "pages",
+      "rows": 4,
+      "digest": "fa1808e3592ecce11ea26efe988eb4de1a64c8d91f50ae09813f053a733382fe"
+    },
+    {
+      "name": "pending_payments",
+      "rows": 0,
+      "digest": "587762144c91d04ea32f3fa465dface825cfe28108fbbfe21559b3ab78b90a03"
+    },
+    {
+      "name": "products",
+      "rows": 25,
+      "digest": "1fee880d116b1ddefb67044f123a695e3d7c2e87351bb67aa30d7b6001f9bc71"
+    },
+    {
+      "name": "refund_sync_events",
+      "rows": 3,
+      "digest": "b6d91d01e21f213ced0fd29d8b9aae93993de106855d5fa8fb29bdbb81c93372"
+    },
+    {
+      "name": "settings",
+      "rows": 13,
+      "digest": "43b7499c6e1c4bcb99cfdbbbba3806814cf97994c5398baa1c48b4e5aeba7832"
+    },
+    {
+      "name": "order_inventory_exceptions",
+      "rows": 0,
+      "digest": "5b21726064109682241b6a44880f822197d74a8a5d3fd1521d464e9c9401b215"
+    },
+    {
+      "name": "order_items",
+      "rows": 7,
+      "digest": "5fb242ec41e3f2c977f590a706d469a09af16f7809deafa447eeb6b01ab0b372"
+    },
+    {
+      "name": "order_notifications",
+      "rows": 12,
+      "digest": "25fee80c2f93418e243aa03a5db418d9ac4e74fdf1639ce2ee6ee55e6823f96d"
+    },
+    {
+      "name": "page_media",
+      "rows": 0,
+      "digest": "2f2ced4c51fedf399c3038c81cb78e325534f0209c109cb5ee6f22e8fd40bde4"
+    },
+    {
+      "name": "product_categories",
+      "rows": 28,
+      "digest": "654381ba3b55db9fe47e95619f2d919fecbde582f5ce9eed7d5d0d18d2f52b2f"
+    },
+    {
+      "name": "product_extras",
+      "rows": 0,
+      "digest": "48ac6e30a45857712b074783e3bdf3b1e9ba66feb23bfec3ae566ee02e85eba7"
+    },
+    {
+      "name": "product_images",
+      "rows": 10,
+      "digest": "d6f0fbbd9b8e86ae1eecc891e42fd437d12350a219e82c5cdde6ed4792d77cc0"
+    },
+    {
+      "name": "product_variants",
+      "rows": 9,
+      "digest": "4062856ac24b6a8c3a604fcb696943cc3dd320757f34be7e335d0342b034a429"
+    },
+    {
+      "name": "refunds",
+      "rows": 3,
+      "digest": "b5e02d75c8b54e4b1ea031b12a9cd6834825056ef36f86dc8f9e8608f3c42961"
+    },
+    {
+      "name": "shipping_label_attempts",
+      "rows": 0,
+      "digest": "1799b92130fbdcab0c0c198bf28a418e216a929f167f73dce64d141471f4ffa9"
+    },
+    {
+      "name": "shipping_labels",
+      "rows": 0,
+      "digest": "f4da39ef166092a211fdf1e43ad4c3d8fe2af417080d489ee58f41350ea46bf7"
+    }
+  ],
+  "r2": [
+    {
+      "name": "minshop-pilote-certif-staging-images",
+      "objects": 8,
+      "stored": true
+    },
+    {
+      "name": "minshop-pilote-certif-staging-files",
+      "objects": 0,
+      "stored": true
+    }
+  ],
+  "bytes": 11162,
+  "uploaded": {
+    "bucket": "minshop-pilote-certif-staging-backups",
+    "prefix": "pilote-certif-staging-20261018T080909Z/",
+    "files": 10
+  }
+}

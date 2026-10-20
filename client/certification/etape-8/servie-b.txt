@@ -1,0 +1,3 @@
+vitrine   200
+catalogue 200  produits 20
+image     200 image/png

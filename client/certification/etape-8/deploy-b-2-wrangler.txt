@@ -1,0 +1,7 @@
+✘ [ERROR] Trigger configuration for "minshop-pilote-certif-production" was only partially updated:
+
+    Cron schedules:
+      - A request to the Cloudflare API (/accounts/b8505b293a291d9d82edf5417b02084d/workers/scripts/minshop-pilote-certif-production/schedules) failed.
+        - You need a workers.dev subdomain in order to proceed. Please go to the dashboard and open the Workers menu. Opening the Workers landing page for the first time will create a workers.dev subdomain automatically. [code: 10063]
+
+  Successful trigger changes were not rolled back.

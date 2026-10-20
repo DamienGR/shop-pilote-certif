@@ -1,0 +1,49 @@
+{
+  "command": "privacy anonymize",
+  "ok": true,
+  "shop": "pilote-certif",
+  "env": "staging",
+  "found": true,
+  "rows": 6,
+  "plan": [
+    {
+      "table": "orders",
+      "rows": 1,
+      "action": "réécrite",
+      "columns": [
+        "email",
+        "ship_address",
+        "tracking_number",
+        "label_url"
+      ]
+    },
+    {
+      "table": "order_guest_access",
+      "rows": 1,
+      "action": "supprimée",
+      "columns": [
+        "access_token"
+      ]
+    },
+    {
+      "table": "order_notifications",
+      "rows": 2,
+      "action": "réécrite",
+      "columns": [
+        "last_error"
+      ]
+    }
+  ],
+  "kept": [
+    {
+      "table": "order_item_ids",
+      "rows": 1
+    },
+    {
+      "table": "order_items",
+      "rows": 1
+    }
+  ],
+  "review": [],
+  "statements": 3
+}

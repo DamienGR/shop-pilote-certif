@@ -1,0 +1,27 @@
+{
+  "command": "privacy export",
+  "ok": true,
+  "shop": "pilote-certif",
+  "env": "staging",
+  "found": true,
+  "rows": 6,
+  "processors": [
+    {
+      "table": "orders",
+      "column": "provider_payment_id",
+      "values": [
+        "pi_3USeJzPDgQeHL5O72uBjs1Uk"
+      ],
+      "why": "Le paiement Stripe : la ligne bancaire se rapproche par lui."
+    },
+    {
+      "table": "orders",
+      "column": "provider_session_id",
+      "values": [
+        "cs_test_b1x4Yhkjd8DAmSzYNWvudwkfDmHQxAMNsgawsYwLttRcTGwKNTxkQMjXaq"
+      ],
+      "why": "La session Stripe qui détient les mêmes données chez le sous-traitant."
+    }
+  ],
+  "review": []
+}

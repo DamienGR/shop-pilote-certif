@@ -1,0 +1,12 @@
+-- avant
+/products/croix-test-media 200 text/html
+/products 200 text/html
+/api/products/croix-test-media 200 application/json; charset=utf-8
+/images/media/83872ef29aa2313780f1.png 200 image/png
+/images/media/83872ef29aa2313780f1.png?avant 200 image/png
+-- après suppression
+/products/croix-test-media 200 text/html
+/products 200 text/html
+/api/products/croix-test-media 200 application/json; charset=utf-8
+/images/media/83872ef29aa2313780f1.png 200 image/png
+/images/media/83872ef29aa2313780f1.png?apres 404 text/plain;charset=UTF-8

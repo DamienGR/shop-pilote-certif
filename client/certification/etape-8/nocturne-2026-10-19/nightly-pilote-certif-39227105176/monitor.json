@@ -1,0 +1,59 @@
+{
+  "command": "monitor",
+  "ok": false,
+  "shop": "pilote-certif",
+  "env": "staging",
+  "plan": "free",
+  "window": {
+    "since": "2026-10-18T09:07:54.936Z",
+    "until": "2026-10-19T09:07:54.936Z",
+    "hours": 24
+  },
+  "worker": {
+    "requests": 713,
+    "errors": 0,
+    "cpuP99Ms": 22.003
+  },
+  "d1": {
+    "databaseId": "42136d04-8561-487d-bf2d-044ce11ea2ea",
+    "rowsRead": 36192,
+    "rowsWritten": 1255
+  },
+  "checks": [
+    {
+      "name": "taux d'erreur",
+      "ok": true,
+      "judged": true,
+      "value": 0,
+      "detail": "0 erreur(s) sur 713 requêtes (0.00 %, seuil 1.00 %)"
+    },
+    {
+      "name": "requêtes Workers (plan gratuit)",
+      "ok": true,
+      "judged": true,
+      "value": 0.00713,
+      "detail": "713 sur 100000 par jour (0.71 %, seuil 70 %)"
+    },
+    {
+      "name": "lignes D1 lues (plan gratuit)",
+      "ok": true,
+      "judged": true,
+      "value": 0.0072384,
+      "detail": "36192 sur 5000000 par jour (0.72 %, seuil 70 %)"
+    },
+    {
+      "name": "lignes D1 écrites (plan gratuit)",
+      "ok": true,
+      "judged": true,
+      "value": 0.01255,
+      "detail": "1255 sur 100000 par jour (1.26 %, seuil 70 %)"
+    },
+    {
+      "name": "CPU p99 (plan gratuit)",
+      "ok": false,
+      "judged": true,
+      "value": 2.2003,
+      "detail": "22.00 ms sur 10 ms par requête (220 %)"
+    }
+  ]
+}

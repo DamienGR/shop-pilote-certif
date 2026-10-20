@@ -1,0 +1,3 @@
+2026-10-20T15:05:03Z lien de suivi de la commande anonymisée (jeton masqué) : 200
+2026-10-20T15:05:05Z jeton inventé otk_AAAA… : 200
+les deux pages sont identiques au jeton et aux nonces près (8427 octets) : « Confirmation de votre commande… », ni article, ni montant, ni référence

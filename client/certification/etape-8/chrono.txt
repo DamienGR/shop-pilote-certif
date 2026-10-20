@@ -1,0 +1,9 @@
+2026-10-20T14:09:12Z début : provision --env production sur B
+2026-10-20T14:10:20Z provisionné (code 0)
+2026-10-20T14:11:12Z restauré (code 0)
+2026-10-20T14:17:40Z déployé, test de fumée (code 5)
+2026-10-20T14:20:07Z relance du deploy : la clé en fichier, SHOPCTL_BACKUP_KEY retirée
+2026-10-20T14:33:05Z déployé, test de fumée (code 5)
+2026-10-20T14:36:52Z relance : le sous-domaine workers.dev de B créé (code 10063 au passage précédent)
+2026-10-20T14:38:33Z déployé, relance (code 0)
+2026-10-20T14:39:35Z administration ouverte
