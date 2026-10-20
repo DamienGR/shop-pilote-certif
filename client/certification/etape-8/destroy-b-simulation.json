@@ -1,0 +1,19 @@
+{
+  "command": "destroy",
+  "ok": true,
+  "dryRun": true,
+  "shop": "pilote-certif",
+  "env": "production",
+  "account": {
+    "id": "b8505b293a291d9d82edf5417b02084d",
+    "name": "Miijot"
+  },
+  "wouldRemove": [
+    "minshop-pilote-certif-production",
+    "minshop-pilote-certif-production-session",
+    "minshop-pilote-certif-production-images",
+    "minshop-pilote-certif-production-files",
+    "minshop-pilote-certif-production-backups",
+    "minshop-pilote-certif-production-db"
+  ]
+}

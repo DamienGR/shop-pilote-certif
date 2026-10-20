@@ -1,0 +1,232 @@
+{
+  "command": "backup verify",
+  "ok": true,
+  "id": "pilote-certif-staging-20261020T135944Z",
+  "path": "<second-arbre>/shop-pilote-certif/backups/pilote-certif-staging-20261020T135944Z",
+  "opened": true,
+  "checks": [
+    {
+      "name": "taille du corps",
+      "ok": true,
+      "detail": "12162 octet(s), le manifeste en annonce 12162",
+      "level": "structure"
+    },
+    {
+      "name": "empreinte du corps",
+      "ok": true,
+      "detail": "6e806b533167d44eb2131bc9de5afc7592c6a3b22a28726db19bea7462d3b678",
+      "level": "structure"
+    },
+    {
+      "name": "objet media/053b6b97fc5ccaf2b08c.png",
+      "ok": true,
+      "detail": "intact",
+      "level": "structure"
+    },
+    {
+      "name": "objet media/57d97735a1aad93e22d6.png",
+      "ok": true,
+      "detail": "intact",
+      "level": "structure"
+    },
+    {
+      "name": "objet media/9a337e73d21f749e20e3.png",
+      "ok": true,
+      "detail": "intact",
+      "level": "structure"
+    },
+    {
+      "name": "objet media/b630063abd1cec42c79d.png",
+      "ok": true,
+      "detail": "intact",
+      "level": "structure"
+    },
+    {
+      "name": "objet media/bde9ce8d5d67b3a6925c.png",
+      "ok": true,
+      "detail": "intact",
+      "level": "structure"
+    },
+    {
+      "name": "objet media/c305815dae2ad10c293b.png",
+      "ok": true,
+      "detail": "intact",
+      "level": "structure"
+    },
+    {
+      "name": "objet media/c35201cd8b09cc286be4.png",
+      "ok": true,
+      "detail": "intact",
+      "level": "structure"
+    },
+    {
+      "name": "objet media/e9df9de207b06c5bf0b8.png",
+      "ok": true,
+      "detail": "intact",
+      "level": "structure"
+    },
+    {
+      "name": "ouverture",
+      "ok": true,
+      "detail": "authentifiée par le manifeste en clair",
+      "level": "contenu"
+    },
+    {
+      "name": "table admin_login_attempts",
+      "ok": true,
+      "detail": "0 ligne(s)",
+      "level": "contenu"
+    },
+    {
+      "name": "table categories",
+      "ok": true,
+      "detail": "4 ligne(s)",
+      "level": "contenu"
+    },
+    {
+      "name": "table checkout_reservations",
+      "ok": true,
+      "detail": "18 ligne(s)",
+      "level": "contenu"
+    },
+    {
+      "name": "table media",
+      "ok": true,
+      "detail": "8 ligne(s)",
+      "level": "contenu"
+    },
+    {
+      "name": "table menu_items",
+      "ok": true,
+      "detail": "7 ligne(s)",
+      "level": "contenu"
+    },
+    {
+      "name": "table order_guest_access",
+      "ok": true,
+      "detail": "18 ligne(s)",
+      "level": "contenu"
+    },
+    {
+      "name": "table order_item_ids",
+      "ok": true,
+      "detail": "20 ligne(s)",
+      "level": "contenu"
+    },
+    {
+      "name": "table order_reference_aliases",
+      "ok": true,
+      "detail": "0 ligne(s)",
+      "level": "contenu"
+    },
+    {
+      "name": "table orders",
+      "ok": true,
+      "detail": "6 ligne(s)",
+      "level": "contenu"
+    },
+    {
+      "name": "table pages",
+      "ok": true,
+      "detail": "4 ligne(s)",
+      "level": "contenu"
+    },
+    {
+      "name": "table pending_payments",
+      "ok": true,
+      "detail": "0 ligne(s)",
+      "level": "contenu"
+    },
+    {
+      "name": "table products",
+      "ok": true,
+      "detail": "25 ligne(s)",
+      "level": "contenu"
+    },
+    {
+      "name": "table refund_sync_events",
+      "ok": true,
+      "detail": "3 ligne(s)",
+      "level": "contenu"
+    },
+    {
+      "name": "table settings",
+      "ok": true,
+      "detail": "13 ligne(s)",
+      "level": "contenu"
+    },
+    {
+      "name": "table sweep_cursors",
+      "ok": true,
+      "detail": "1 ligne(s)",
+      "level": "contenu"
+    },
+    {
+      "name": "table order_inventory_exceptions",
+      "ok": true,
+      "detail": "0 ligne(s)",
+      "level": "contenu"
+    },
+    {
+      "name": "table order_items",
+      "ok": true,
+      "detail": "8 ligne(s)",
+      "level": "contenu"
+    },
+    {
+      "name": "table order_notifications",
+      "ok": true,
+      "detail": "14 ligne(s)",
+      "level": "contenu"
+    },
+    {
+      "name": "table page_media",
+      "ok": true,
+      "detail": "0 ligne(s)",
+      "level": "contenu"
+    },
+    {
+      "name": "table product_categories",
+      "ok": true,
+      "detail": "28 ligne(s)",
+      "level": "contenu"
+    },
+    {
+      "name": "table product_extras",
+      "ok": true,
+      "detail": "0 ligne(s)",
+      "level": "contenu"
+    },
+    {
+      "name": "table product_images",
+      "ok": true,
+      "detail": "10 ligne(s)",
+      "level": "contenu"
+    },
+    {
+      "name": "table product_variants",
+      "ok": true,
+      "detail": "9 ligne(s)",
+      "level": "contenu"
+    },
+    {
+      "name": "table refunds",
+      "ok": true,
+      "detail": "3 ligne(s)",
+      "level": "contenu"
+    },
+    {
+      "name": "table shipping_label_attempts",
+      "ok": true,
+      "detail": "0 ligne(s)",
+      "level": "contenu"
+    },
+    {
+      "name": "table shipping_labels",
+      "ok": true,
+      "detail": "0 ligne(s)",
+      "level": "contenu"
+    }
+  ],
+  "failures": 0
+}

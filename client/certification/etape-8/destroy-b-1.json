@@ -1,0 +1,31 @@
+{
+  "command": "destroy",
+  "ok": false,
+  "dryRun": false,
+  "shop": "pilote-certif",
+  "env": "production",
+  "account": {
+    "id": "b8505b293a291d9d82edf5417b02084d",
+    "name": "Miijot"
+  },
+  "removed": [
+    "minshop-pilote-certif-production",
+    "minshop-pilote-certif-production-session",
+    "minshop-pilote-certif-production-files"
+  ],
+  "remaining": [
+    "minshop-pilote-certif-production-images",
+    "minshop-pilote-certif-production-backups",
+    "minshop-pilote-certif-production-db"
+  ],
+  "failures": [
+    {
+      "name": "minshop-pilote-certif-production-images",
+      "reason": "The bucket you tried to delete (minshop-pilote-certif-production-images) is not empty (account b8505b293a291d9d82edf5417b02084d). [code: 10008]"
+    },
+    {
+      "name": "minshop-pilote-certif-production-backups",
+      "reason": "The bucket you tried to delete (minshop-pilote-certif-production-backups) is not empty (account b8505b293a291d9d82edf5417b02084d). [code: 10008]"
+    }
+  ]
+}

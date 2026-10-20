@@ -1,0 +1,15 @@
+[
+  {
+    "id": 7,
+    "public_id": "ord_y68x861wxw",
+    "status": "paid",
+    "amount_total_cents": 2090,
+    "shipping_cents": 590,
+    "vat_rate_bps": 2000,
+    "vat_amount_cents": 348,
+    "email": "anonymise-aeccacd3338dc524ce4327e4ea39aec6@exemple.invalid",
+    "ship_address": "{\"country\":\"FR\"}",
+    "tracking_number": null,
+    "label_url": null
+  }
+]

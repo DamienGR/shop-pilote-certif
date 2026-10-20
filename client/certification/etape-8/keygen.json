@@ -1,0 +1,10 @@
+{
+  "ok": false,
+  "error": {
+    "kind": "precondition",
+    "code": 4,
+    "message": ".shopctl/backup.key existe déjà et n'est pas remplacé.",
+    "hint": "C'est la clé qui ouvre les archives déjà prises. Pour en installer une nouvelle, déplacez celle-ci d'abord — et gardez-la tant qu'une archive chiffrée avec elle doit rester lisible.",
+    "details": null
+  }
+}

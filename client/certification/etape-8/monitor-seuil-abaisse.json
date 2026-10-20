@@ -1,0 +1,67 @@
+{
+  "command": "monitor",
+  "ok": false,
+  "shop": "pilote-certif",
+  "env": "staging",
+  "plan": "free",
+  "window": {
+    "since": "2026-10-19T15:08:37.795Z",
+    "until": "2026-10-20T15:08:37.795Z",
+    "hours": 24
+  },
+  "worker": {
+    "requests": 8693,
+    "errors": 0,
+    "exceededResources": 0,
+    "cpuP99Ms": 29.896
+  },
+  "d1": {
+    "databaseId": "42136d04-8561-487d-bf2d-044ce11ea2ea",
+    "rowsRead": 827539,
+    "rowsWritten": 1233
+  },
+  "checks": [
+    {
+      "name": "taux d'erreur",
+      "ok": true,
+      "judged": true,
+      "value": 0,
+      "detail": "0 erreur(s) sur 8693 requêtes (0.00 %, seuil 1.00 %)"
+    },
+    {
+      "name": "requêtes Workers (plan gratuit)",
+      "ok": false,
+      "judged": true,
+      "value": 0.08693,
+      "detail": "8693 sur 100000 par jour (8.69 %, seuil 0.01 %)"
+    },
+    {
+      "name": "lignes D1 lues (plan gratuit)",
+      "ok": false,
+      "judged": true,
+      "value": 0.1655078,
+      "detail": "827539 sur 5000000 par jour (17 %, seuil 0.01 %)"
+    },
+    {
+      "name": "lignes D1 écrites (plan gratuit)",
+      "ok": false,
+      "judged": true,
+      "value": 0.01233,
+      "detail": "1233 sur 100000 par jour (1.23 %, seuil 0.01 %)"
+    },
+    {
+      "name": "invocations arrêtées (plan gratuit)",
+      "ok": true,
+      "judged": true,
+      "value": 0,
+      "detail": "0 invocation(s) arrêtée(s) par Cloudflare pour ressources dépassées (erreur 1102) en 24 h"
+    },
+    {
+      "name": "CPU p99",
+      "ok": true,
+      "judged": false,
+      "value": 29.896,
+      "detail": "29.90 ms par requête ; le plan gratuit en accorde 10 et tolère un dépassement occasionnel par isolat — les invocations arrêtées sont le signal"
+    }
+  ]
+}

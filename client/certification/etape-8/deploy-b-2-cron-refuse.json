@@ -1,0 +1,16 @@
+{
+  "ok": false,
+  "error": {
+    "kind": "external",
+    "code": 5,
+    "message": "<second-arbre>/shop-pilote-certif/node_modules/.bin/wrangler deploy exited with status 1.",
+    "hint": "\u001b[31m✘ \u001b[41;31m[\u001b[41;97mERROR\u001b[41;31m]\u001b[0m \u001b[1mTrigger configuration for \"minshop-pilote-certif-production\" was only partially updated:\u001b[0m",
+    "details": {
+      "command": "<second-arbre>/shop-pilote-certif/node_modules/.bin/wrangler",
+      "args": [
+        "deploy"
+      ],
+      "status": 1
+    }
+  }
+}
