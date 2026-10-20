@@ -202,7 +202,7 @@ export function runCatalog(args, reporter) {
   // Checked BEFORE the read, not before the write: a read against the wrong
   // shop's database produces a plan that looks plausible and is about someone
   // else's catalogue.
-  assertWranglerNamesShop(shop.root, bucket);
+  assertWranglerNamesShop(shop.root, bucket, { remote, env });
   if (remote) connectRemote({ shop, env, values: args.values, reporter });
 
   reporter.step(`Lecture du catalogue de la boutique (${remote ? 'distant' : 'local'})…`);
@@ -310,7 +310,7 @@ function printPlan(reporter, plan, { file, dryRun, remote, oversized }) {
 }
 
 function runReport({ shop, remote, env, json, values }, reporter) {
-  assertWranglerNamesShop(shop.root, imagesBucket(shop.manifest, { env }));
+  assertWranglerNamesShop(shop.root, imagesBucket(shop.manifest, { env }), { remote, env });
   if (remote) connectRemote({ shop, env, values, reporter });
   const store = readCatalogue({ cwd: shop.root, remote });
   const withSku = store.products.filter((product) => product.sku);

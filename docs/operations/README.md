@@ -20,7 +20,7 @@ certification).
 
 Et une procédure qui n'est pas un incident : le [départ d'un client](sortie-client.md).
 
-Trois règles valent pour tous :
+Quatre règles valent pour tous :
 
 - **revenir d'abord, comprendre ensuite.** Un retour arrière du Worker, une
   désactivation du panier, une révocation de jeton se font en minutes ;
@@ -30,7 +30,13 @@ Trois règles valent pour tous :
   commande suffit ;
 - **chaque incident laisse une note datée** dans le registre d'incidents de la
   boutique : détection, retour, cause, mesures. C'est aussi le registre des
-  violations qu'exige l'article 33 du RGPD quand des données sont en cause.
+  violations qu'exige l'article 33 du RGPD quand des données sont en cause ;
+- **une commande `npx wrangler` nomme son compte.** Une session qui voit
+  plusieurs comptes (celle de l'agence) refuse d'en choisir un hors d'un
+  terminal, ou prend celui qu'elle a choisi la dernière fois : chaque commande
+  brute de ces runbooks se lance avec `CLOUDFLARE_ACCOUNT_ID=<id>` devant, l'id
+  du compte de l'environnement (`cloudflare.accountId`, ou
+  `cloudflare.productionAccountId` pour la production). `shopctl` le fait seul.
 
 ## Supervision
 

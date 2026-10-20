@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 // .mjs like its neighbours: tsconfig pins `types` to the Cloudflare types, so
 // node builtins have no declarations in a .ts file here.
 import { EXIT_CODES } from '../../shopctl/src/errors.mjs';
@@ -15,6 +19,15 @@ function provisioned(env = 'staging') {
 }
 
 const CONFIRM = (target) => ['--confirm', target.slug];
+
+/** Deployed, not just provisioned: the first deploy is what creates the Worker
+ *  and, through wrangler's provisioning, the sessions namespace. */
+function deployed() {
+  const target = provisioned();
+  const result = target.run(['deploy', '--env', 'staging', '--skip-verify', '--skip-build', '--skip-smoke']);
+  expect(result.status, result.stderr).toBe(EXIT_CODES.ok);
+  return target;
+}
 
 describe('shopctl destroy', () => {
   it('refuses to run without --env', () => {
@@ -101,20 +114,52 @@ describe('shopctl destroy', () => {
     });
 
     it('deletes the Worker before anything else', () => {
-      const target = provisioned();
-      const expected = names(target.slug, 'staging');
-      target.account({ workers: [{ name: expected.worker, secrets: [], versions: [{ id: 'v1' }] }] });
+      const target = deployed();
 
       const before = target.read().calls.length;
       target.run(['destroy', '--env', 'staging', ...CONFIRM(target)]);
       const calls = target.read().calls.slice(before).map(({ argv }) => argv.join(' '));
 
       const worker = calls.findIndex((call) => call.startsWith('delete --name'));
+      const sessions = calls.findIndex((call) => call.startsWith('kv namespace delete'));
       const bucket = calls.findIndex((call) => call.startsWith('r2 bucket delete'));
       const db = calls.findIndex((call) => call.startsWith('d1 delete'));
       expect(worker).toBeGreaterThan(-1);
-      expect(worker).toBeLessThan(bucket);
+      expect(worker).toBeLessThan(sessions);
+      expect(sessions).toBeLessThan(bucket);
       expect(bucket).toBeLessThan(db);
+    });
+
+    // Nothing in the tree names it, and `wrangler delete` leaves it: the
+    // sessions namespace the first deploy provisioned outlived every teardown
+    // until the certification's step 7 looked for it on the account.
+    it('removes the sessions namespace the first deploy created', () => {
+      const target = deployed();
+      const expected = names(target.slug, 'staging');
+      expect(target.read().kv.map(({ title }) => title)).toEqual([expected.sessions]);
+
+      const { report, status } = target.json(['destroy', '--env', 'staging', ...CONFIRM(target)]);
+      expect(status).toBe(EXIT_CODES.ok);
+      expect(report.removed).toEqual([
+        expected.worker,
+        expected.sessions,
+        expected.images,
+        expected.files,
+        expected.backups,
+        expected.database,
+      ]);
+      const state = target.read();
+      expect(state.kv).toEqual([]);
+      expect(state.workers).toEqual([]);
+    });
+
+    it('leaves a namespace of the same family that is not this environment’s', () => {
+      const target = deployed();
+      const production = names(target.slug, 'production');
+      target.account({ kv: [...target.read().kv, { id: 'f'.repeat(32), title: production.sessions }] });
+
+      expect(target.run(['destroy', '--env', 'staging', ...CONFIRM(target)]).status).toBe(EXIT_CODES.ok);
+      expect(target.read().kv.map(({ title }) => title)).toEqual([production.sessions]);
     });
 
     // Re-runnable: a teardown people stop finishing is worse than either state.
@@ -158,6 +203,17 @@ describe('shopctl destroy', () => {
       expect(target.read().d1.map((entry) => entry.name)).toEqual([expected.database]);
     });
 
+    // The reason is R2's, not wrangler's announcement of what it was about to
+    // do: the étape 7 report gave "Deleting bucket … (eu)." for both buckets.
+    it('relays the refusal, not the line wrangler printed before it', () => {
+      const target = withObjects();
+      const result = target.json(['destroy', '--env', 'staging', ...CONFIRM(target)]);
+
+      const [failure] = result.report.failures;
+      expect(failure.reason).toMatch(/not empty/);
+      expect(failure.reason).not.toMatch(/^Deleting bucket/);
+    });
+
     it('says how to empty it rather than emptying it', () => {
       const target = withObjects();
       const result = target.run(['destroy', '--env', 'staging', ...CONFIRM(target)]);
@@ -165,6 +221,34 @@ describe('shopctl destroy', () => {
       expect(result.stdout).toMatch(/wrangler r2 object delete/);
       // Nothing was emptied on the operator's behalf.
       expect(target.read().calls.some(({ argv }) => argv.join(' ').startsWith('r2 object delete'))).toBe(false);
+    });
+
+    // The printed command is the remedy, so it is run as printed. Without
+    // `--remote`, wrangler 4 deletes from its local simulator, says so
+    // cheerfully, and the bucket on the account stays exactly as full.
+    it('prints a command that empties the bucket on the account', () => {
+      const target = provisioned();
+      const expected = names(target.slug, 'staging');
+      const file = join(mkdtempSync(join(tmpdir(), 'shopctl-destroy-')), 'object');
+      writeFileSync(file, 'facture');
+      const keys = ['factures/1.pdf', 'factures/2.pdf'];
+      for (const key of keys) {
+        const put = target.wrangler(['r2', 'object', 'put', `${expected.files}/${key}`, '--file', file, '--remote', '-J', 'eu']);
+        expect(put.status, put.stderr).toBe(0);
+      }
+
+      const refused = target.run(['destroy', '--env', 'staging', ...CONFIRM(target)]);
+      expect(refused.status).toBe(EXIT_CODES.verification);
+      const printed = refused.stdout.match(/npx wrangler (r2 object delete \S+ .*?)\s+—/)?.[1];
+      expect(printed).toContain(expected.files);
+      for (const key of keys) {
+        const removal = target.wrangler(printed.replace('<clé>', key).split(/\s+/));
+        expect(removal.status, removal.stderr).toBe(0);
+      }
+
+      const { report, status } = target.json(['destroy', '--env', 'staging', ...CONFIRM(target)]);
+      expect(status).toBe(EXIT_CODES.ok);
+      expect(report.removed).toEqual([expected.files, expected.database]);
     });
 
     it('finishes the job once the blockage is lifted', () => {

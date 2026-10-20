@@ -281,4 +281,7 @@ export const names = (slug, env) => ({
   images: `minshop-${slug}-${env}-images`,
   files: `minshop-${slug}-${env}-files`,
   backups: `minshop-${slug}-${env}-backups`,
+  // Never rendered by the shop: wrangler provisions it at the first deploy,
+  // from the SESSION binding the Astro adapter adds to the built configuration.
+  sessions: `minshop-${slug}-${env}-session`,
 });

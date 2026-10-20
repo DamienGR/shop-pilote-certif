@@ -6,11 +6,43 @@ import { createServer } from 'node:http';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { smokeFailure } from '../../shopctl/src/commands/deploy.mjs';
 import { EXIT_CODES } from '../../shopctl/src/errors.mjs';
 import { GATED_CHECKS, SMOKE_CHECKS, evaluateSmoke, originFromDeployOutput, runSmoke } from '../../shopctl/src/smoke.mjs';
 import { names, shop } from '../helpers/provisioned-shop.mjs';
 
 vi.setConfig({ testTimeout: 60_000 });
+
+/** The robots.txt `src/pages/robots.txt.ts` serves. */
+const SHOP_ROBOTS = 'User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /api/\nSitemap: https://shop.example/sitemap.xml\n';
+
+/**
+ * What Cloudflare answered on a workers.dev name with no Worker behind it,
+ * read at step 7 of the certification (2026-10-20): `404` on every path, and
+ * its own robots.txt — content signals, comments only — in 200. The first
+ * deployment's smoke test met it while the name propagated.
+ *
+ * The 404 in both its forms: plain text to curl's default request, the HTML
+ * page (trimmed here) to a request that accepts compression, as fetch does.
+ */
+const CLOUDFLARE_404 = { ok: true, status: 404, body: 'error code: 1042', headers: { 'content-type': 'text/plain; charset=UTF-8', server: 'cloudflare' }, error: null };
+const CLOUDFLARE_PAGE_BODY = [
+  '<!DOCTYPE html>',
+  '<!--[if gt IE 8]><!--> <html class="no-js" lang="en-US"> <!--<![endif]-->',
+  '<head><title>Page not found</title></head>',
+  '<body><div id="cf-wrapper"><div id="cf-error-details">',
+  '<h1>There is nothing here yet</h1>',
+  '<p>If you expect something to be here, it may take some time. Please check back again later.</p>',
+  '</div></div></body></html>',
+].join('\n');
+const CLOUDFLARE_404_PAGE = { ok: true, status: 404, body: CLOUDFLARE_PAGE_BODY, headers: { 'content-type': 'text/html; charset=UTF-8', server: 'cloudflare' }, error: null };
+const CLOUDFLARE_ROBOTS = {
+  ok: true,
+  status: 200,
+  body: '# As a condition of accessing this website, you agree to abide by the following\n# content signals:\n\n# search:   building a search index and providing search results\n# ai-train: training or fine-tuning AI models.\n',
+  headers: { 'content-type': 'text/plain; charset=utf-8', server: 'cloudflare' },
+  error: null,
+};
 
 /**
  * A shop whose environment has already been provisioned.
@@ -39,7 +71,7 @@ describe('the smoke test', () => {
   const ok = {
     storefront: { ok: true, status: 200, body: '<!doctype html><html lang="fr" data-locale="fr-FR">', headers: {}, error: null },
     catalogue: { ok: true, status: 200, body: '<h1>Catalogue</h1>', headers: {}, error: null },
-    robots: { ok: true, status: 200, body: 'User-agent: *', headers: {}, error: null },
+    robots: { ok: true, status: 200, body: SHOP_ROBOTS, headers: {}, error: null },
     'admin-closed': { ok: true, status: 303, body: '', headers: {}, error: null },
     'admin-setup-open': { ok: true, status: 303, body: '', headers: {}, error: null },
   };
@@ -80,6 +112,38 @@ describe('the smoke test', () => {
     expect(result).toMatchObject({ ok: false, severity: 'warn' });
   });
 
+  // Every first deployment no Access application hides — a staging on
+  // workers.dev, the first production of every shop — answers this way until
+  // someone runs the wizard. Failing it turned each of them red after the
+  // upload (found rehearsing certification step 7); passing it silently would
+  // vouch for a storefront nobody has seen.
+  it('warns, rather than fails, a shop that is not installed yet', () => {
+    const toSetup = { ok: true, status: 302, body: '', headers: { location: 'https://shop.example/admin/setup' }, error: null };
+    const verdict = evaluateSmoke({
+      ...ok,
+      storefront: toSetup,
+      catalogue: toSetup,
+      robots: toSetup,
+      'admin-setup-open': { ok: true, status: 200, body: '<html lang="fr">', headers: {}, error: null },
+    });
+    expect(verdict.ok).toBe(true);
+    for (const id of ['storefront', 'catalogue', 'robots']) {
+      const result = verdict.results.find((check) => check.id === id);
+      expect(result).toMatchObject({ ok: false, severity: 'warn', status: 302 });
+      expect(result.message).toMatch(/pas encore installée/);
+    }
+  });
+
+  // Only the wizard. A redirect anywhere else is still a storefront that does
+  // not answer, and a 302 with no destination proves nothing about the base.
+  it('still fails a redirect that does not lead to the wizard', () => {
+    for (const headers of [{ location: '/admin/login' }, { location: 'https://ailleurs.example/admin/setup-guide' }, {}]) {
+      const verdict = evaluateSmoke({ ...ok, storefront: { ok: true, status: 302, body: '', headers, error: null } });
+      expect(verdict.ok).toBe(false);
+      expect(verdict.results.find((result) => result.id === 'storefront').severity).toBe('fail');
+    }
+  });
+
   // The failure this whole module exists to prevent: a deployment announced as
   // green because the check could not reach it.
   it('never reads an unreachable site as a pass', () => {
@@ -90,6 +154,59 @@ describe('the smoke test', () => {
 
   it('fails a check whose response never arrived', () => {
     expect(evaluateSmoke({}).results.every((result) => !result.ok)).toBe(true);
+  });
+
+  // The real first deployment of step 7: a healthy upload failed in code 6,
+  // blamed on D1, while two checks passed on answers nobody in the shop gave.
+  it('reads Cloudflare’s own answers as a Worker not served yet, never as the shop’s', () => {
+    for (const answer of [CLOUDFLARE_404, CLOUDFLARE_404_PAGE]) {
+      const verdict = evaluateSmoke({
+        storefront: answer,
+        catalogue: answer,
+        robots: CLOUDFLARE_ROBOTS,
+        'admin-closed': answer,
+        'admin-setup-open': answer,
+      });
+      expect(verdict).toMatchObject({ ok: false, notServed: true });
+      for (const result of verdict.results) expect(result).toMatchObject({ ok: false, severity: 'fail', notServed: true });
+      const catalogue = verdict.results.find((result) => result.id === 'catalogue');
+      expect(catalogue.message).toMatch(/There is nothing here yet/);
+      expect(catalogue.message).not.toMatch(/D1/);
+    }
+  });
+
+  // A 404 from nobody is not an administration that is closed.
+  it('no longer passes the administration check on Cloudflare’s 404', () => {
+    for (const answer of [CLOUDFLARE_404, CLOUDFLARE_404_PAGE]) {
+      const verdict = evaluateSmoke({ ...ok, 'admin-closed': answer });
+      expect(verdict.ok).toBe(false);
+      expect(verdict.results.find((result) => result.id === 'admin-closed')).toMatchObject({ ok: false, notServed: true });
+    }
+  });
+
+  it('wants the shop’s own robots.txt, not any 200', () => {
+    const verdict = evaluateSmoke({ ...ok, robots: CLOUDFLARE_ROBOTS });
+    expect(verdict).toMatchObject({ ok: false, notServed: true });
+    expect(verdict.results.find((result) => result.id === 'robots').message).toMatch(/Disallow: \/admin/);
+  });
+
+  // Only Cloudflare's own answer is waited out. A shop that answers and is
+  // broken is the version's fault, and the verdict says so at once.
+  it('does not mistake a broken shop for one not served yet', () => {
+    const verdict = evaluateSmoke({ ...ok, catalogue: { ...ok.catalogue, status: 404, body: '<html lang="fr">Introuvable' } });
+    expect(verdict).toMatchObject({ ok: false, notServed: false });
+  });
+
+  // Two failures, two remedies. Step 7 was told to roll back a version that
+  // was fine, on a name Cloudflare did not serve yet.
+  it('advises a rollback only for a shop that answered', () => {
+    const notServed = smokeFailure({ smoke: { notServed: true }, origin: 'https://w.example.workers.dev', worker: 'w', env: 'staging', rollback: 'v1', waitSeconds: 120 });
+    expect(notServed.message).toMatch(/Cloudflare ne sert toujours pas w .* après 120 s/);
+    expect(notServed.hint).toMatch(/deploy --env staging --skip-verify --skip-build/);
+    expect(notServed.hint).not.toMatch(/rollback/);
+
+    const broken = smokeFailure({ smoke: { notServed: false }, origin: 'https://w.example.workers.dev', worker: 'w', env: 'staging', rollback: 'v1', waitSeconds: 120 });
+    expect(broken.hint).toMatch(/wrangler rollback v1 --name w/);
   });
 
   it('reads the deployed origin out of wrangler’s own output', () => {
@@ -149,18 +266,39 @@ describe('the smoke test on a gated preview', () => {
     const verdict = evaluateSmoke({ gated: { ok: false, status: null, body: '', headers: {}, error: 'ETIMEDOUT' } }, GATED_CHECKS);
     expect(verdict.ok).toBe(false);
   });
+
+  // A 404 is "not 200", and so it passed: but nothing stands in front of a
+  // name Cloudflare does not route — there is nothing behind it either.
+  it('does not read Cloudflare’s 404 as a closed preview', () => {
+    for (const answer of [CLOUDFLARE_404, CLOUDFLARE_404_PAGE]) {
+      expect(evaluateSmoke({ gated: answer }, GATED_CHECKS)).toMatchObject({ ok: false, notServed: true });
+    }
+  });
 });
 
 describe('the smoke test against a live origin', () => {
   let server;
   let origin;
   const routes = new Map();
+  // How many more requests Cloudflare answers instead of the Worker, as on a
+  // name still propagating; -1 for a name that never gets there.
+  let unserved = 0;
 
   beforeAll(async () => {
     server = createServer((request, response) => {
+      if (unserved !== 0) {
+        if (unserved > 0) unserved -= 1;
+        // As Cloudflare does: the page to a request that accepts compression,
+        // which fetch always sends, the plain-text code otherwise.
+        return /gzip|br/.test(request.headers['accept-encoding'] ?? '')
+          ? response.writeHead(404, { 'content-type': 'text/html; charset=UTF-8' }).end(CLOUDFLARE_PAGE_BODY)
+          : response.writeHead(404, { 'content-type': 'text/plain; charset=UTF-8' }).end('error code: 1042');
+      }
       const route = routes.get(new URL(request.url, 'http://x').pathname);
       if (!route) return response.writeHead(404).end('not found');
-      response.writeHead(route.status, { 'content-type': 'text/html' }).end(route.body ?? '');
+      response
+        .writeHead(route.status, { 'content-type': 'text/html', ...(route.location ? { location: route.location } : {}) })
+        .end(route.body ?? '');
     });
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
     origin = `http://127.0.0.1:${server.address().port}`;
@@ -171,13 +309,60 @@ describe('the smoke test against a live origin', () => {
   it('fetches every path and agrees with the pure evaluation', async () => {
     routes.set('/', { status: 200, body: '<!doctype html><html lang="fr">' });
     routes.set('/products', { status: 200, body: 'ok' });
-    routes.set('/robots.txt', { status: 200, body: 'User-agent: *' });
+    routes.set('/robots.txt', { status: 200, body: SHOP_ROBOTS });
     routes.set('/admin', { status: 303 });
     routes.set('/admin/setup', { status: 303 });
 
     const report = await runSmoke(origin);
     expect(report.ok).toBe(true);
+    expect(report.attempts).toBe(1);
     expect(report.results.map((result) => result.path)).toEqual(SMOKE_CHECKS.map((check) => check.path));
+  });
+
+  // The first deployment of step 7, replayed: the whole test runs again while
+  // Cloudflare answers, then judges the shop once it is served. Six requests
+  // unserved, so the second run still meets one — a name propagating answers
+  // from some edges and not others.
+  it('waits while Cloudflare answers for a new name, then judges the shop', async () => {
+    unserved = SMOKE_CHECKS.length + 1;
+    const waits = [];
+    const report = await runSmoke(origin, { waitMs: 5_000, intervalMs: 10, onWait: (wait) => waits.push(wait) });
+    expect(report).toMatchObject({ ok: true, notServed: false, attempts: 3 });
+    expect(waits.map((wait) => wait.attempts)).toEqual([1, 2]);
+  });
+
+  it('gives up after the wait, on a verdict that names Cloudflare', async () => {
+    unserved = -1;
+    try {
+      const report = await runSmoke(origin, { waitMs: 50, intervalMs: 10 });
+      expect(report).toMatchObject({ ok: false, notServed: true });
+      expect(report.attempts).toBeGreaterThan(1);
+      expect(report.results.every((result) => result.message?.includes('error code: 1042'))).toBe(true);
+    } finally {
+      unserved = 0;
+    }
+  });
+
+  // Without a wait, as before: one run, whatever it meets.
+  it('does not wait unless asked to', async () => {
+    unserved = -1;
+    try {
+      const report = await runSmoke(origin, { onWait: () => { throw new Error('waited'); } });
+      expect(report).toMatchObject({ ok: false, notServed: true, attempts: 1 });
+    } finally {
+      unserved = 0;
+    }
+  });
+
+  // A broken shop answers; waiting would only delay what the operator has to see.
+  it('does not wait on a shop that answers and is broken', async () => {
+    routes.set('/products', { status: 500, body: 'erreur' });
+    try {
+      const report = await runSmoke(origin, { waitMs: 5_000, intervalMs: 10, onWait: () => { throw new Error('waited'); } });
+      expect(report).toMatchObject({ ok: false, notServed: false, attempts: 1 });
+    } finally {
+      routes.set('/products', { status: 200, body: 'ok' });
+    }
   });
 
   // `redirect: 'manual'`: following the redirect would report the login page's
@@ -186,6 +371,24 @@ describe('the smoke test against a live origin', () => {
     routes.set('/admin', { status: 302 });
     const report = await runSmoke(origin);
     expect(report.results.find((result) => result.id === 'admin-closed')).toMatchObject({ ok: true, status: 302 });
+  });
+
+  // The shape the built Worker gives a fresh database: every storefront path
+  // redirects to the wizard, which answers 200. Read off the wire, location
+  // header and all, the deployment is a warning and not a failure.
+  it('passes, with warnings, a shop whose wizard has not run', async () => {
+    for (const path of ['/', '/products', '/robots.txt']) routes.set(path, { status: 302, location: `${origin}/admin/setup` });
+    routes.set('/admin', { status: 303, location: '/admin/setup' });
+    routes.set('/admin/setup', { status: 200, body: '<!doctype html><html lang="fr">' });
+
+    const report = await runSmoke(origin);
+    expect(report.ok).toBe(true);
+    expect(report.results.filter((result) => !result.ok).map((result) => result.id)).toEqual([
+      'storefront',
+      'catalogue',
+      'robots',
+      'admin-setup-open',
+    ]);
   });
 
   it('runs the gated checks instead when the environment is private', async () => {
@@ -208,6 +411,17 @@ describe('shopctl deploy', () => {
     const result = shop().run(['deploy']);
     expect(result.status).toBe(EXIT_CODES.usage);
     expect(result.stderr).toMatch(/--env est obligatoire/);
+  });
+
+  // Before anything slow: a typo should not cost a verification run.
+  it('refuses a smoke wait that is not a number of seconds', () => {
+    const target = provisioned();
+    for (const value of ['abc', '-1', '1.5', '601']) {
+      const result = target.run(['deploy', '--env', 'staging', ...FAST, '--smoke-wait', value]);
+      expect(result.status, value).toBe(EXIT_CODES.usage);
+      expect(result.stderr).toMatch(/--smoke-wait/);
+    }
+    expect(target.read().deploys ?? []).toEqual([]);
   });
 
   // Production is never a default and never an accident.
@@ -505,16 +719,31 @@ describe('shopctl deploy', () => {
     // one that reports failure, because the second one gets looked at.
     it('fails the command and names the version to roll back to', () => {
       const target = provisioned();
-      // Deploy twice: the rollback target is the version BEFORE the current one,
-      // and a first deployment has nothing behind it.
+      // The rollback target is the version serving BEFORE this deployment. The
+      // first one uploads v1, then each deferred secret is a version of its
+      // own: v3 is what served when the second deployment started.
       target.run(['deploy', '--env', 'staging', ...FAST, '--skip-smoke']);
 
       const result = target.json(['deploy', '--env', 'staging', ...FAST, '--url', 'http://127.0.0.1:1']);
       expect(result.status).toBe(EXIT_CODES.verification);
       expect(result.report.ok).toBe(false);
       expect(result.report.smoke.results.every((check) => !check.ok)).toBe(true);
-      expect(result.report.rollbackTo).toBe('v1');
-      expect(result.stderr).toMatch(/wrangler rollback v1/);
+      expect(result.report.rollbackTo).toBe('v3');
+      expect(result.stderr).toMatch(/wrangler rollback v3/);
+    });
+
+    // The certification's pilot: six deployments, six reports naming the same
+    // second-oldest version, because `versions list` is oldest first and the
+    // command read its second entry.
+    it('names the version that served last, however many came before', () => {
+      const target = provisioned();
+      target.run(['deploy', '--env', 'staging', ...FAST, '--skip-smoke']);
+      target.run(['deploy', '--env', 'staging', ...FAST, '--skip-smoke']);
+      target.run(['deploy', '--env', 'staging', ...FAST, '--skip-smoke']);
+
+      const result = target.json(['deploy', '--env', 'staging', ...FAST, '--url', 'http://127.0.0.1:1']);
+      expect(result.report.rollbackTo).toBe('v5');
+      expect(target.read().workers.find((worker) => worker.name === result.report.resources.worker).active).toBe('v6');
     });
 
     it('says plainly that a first deployment has nothing behind it', () => {

@@ -32,6 +32,11 @@ Two things follow from that when you edit it:
   asserts a REFUSAL — `shopctl catalog import` stops when the tree's
   configuration names another shop or another environment — and not only the
   absence of rows afterwards.
+- **a teardown finds its resources by name on a shared account.** The gate
+  ends by destroying the canary's staging and checking that exactly its six
+  resources left — Worker, sessions namespace, three buckets, database — and
+  that the pilot's catalogue and images did not move. It runs last because it
+  changes the world every other test reads.
 
 The Cloudflare account and the forge are doubles. What runs for real is
 everything else: the commands, the renderers, every migration and the

@@ -199,8 +199,12 @@ PLAN=$(ac "$BASE_URL/sitemap.xml")
 CAT=$(echo "$PLAN" | grep -o '/categories/[^<]*' | head -1)
 PROD=$(ac "$BASE_URL/api/products?limit=100" | node -e 'const p = JSON.parse(require("fs").readFileSync(0, "utf8")).products.find((x) => x.in_stock && !x.variant_label); console.log(p.slug, p.id)')
 echo "$CAT $PROD"
-lh() { npx -y lighthouse@13.5.0 "$BASE_URL$1" --form-factor=mobile --only-categories=performance,accessibility,seo \
-  --extra-headers "$2" --output=json --output=html --output-path="client/certification/etape-6/lighthouse-$3" --quiet --chrome-flags=--headless=new; }
+# Sous WSL, Lighthouse crée ses profils Chrome dans le dossier courant, sous
+# un nom Windows littéral (`C:\Users\…\lighthouse.XXXX`), cookies d'Access
+# compris : il tourne donc depuis un dossier jetable, hors de la boutique.
+PREUVES="$PWD/client/certification/etape-6"
+lh() { (cd "$(mktemp -d)" && npx -y lighthouse@13.5.0 "$BASE_URL$1" --form-factor=mobile --only-categories=performance,accessibility,seo \
+  --extra-headers "$2" --output=json --output=html --output-path="$PREUVES/lighthouse-$3" --quiet --chrome-flags=--headless=new); }
 lh / ~/certif-lh-headers.json accueil
 lh "$CAT" ~/certif-lh-headers.json categorie
 lh "/products/${PROD% *}" ~/certif-lh-headers.json fiche

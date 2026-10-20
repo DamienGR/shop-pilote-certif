@@ -559,6 +559,21 @@ describe('l\'import refuse d\'écrire dans une autre boutique', () => {
     cleanup();
   });
 
+  // Le remède d'un import distant est `provision`, pas `prepare-client` : ce
+  // dernier rend les bons noms autour d'un identifiant de base factice, le
+  // contrôle passe, et wrangler échoue sur une base qui n'existe pas
+  // (répétition de l'étape 7 de la certification).
+  it('envoie un import distant vers provision, qui rend l\'identifiant réel', () => {
+    const { directory, cleanup } = catalogue([]);
+    writeFileSync(join(directory, 'wrangler.jsonc'), '{ "name": "minshop-autre-staging" }');
+    const remote = () => assertWranglerNamesShop(directory, 'minshop-atelier-staging-images', { remote: true, env: 'staging' });
+    expect(remote).toThrow(expect.objectContaining({ hint: expect.stringMatching(/shopctl -- provision --env staging/) }));
+    expect(remote).toThrow(expect.objectContaining({ hint: expect.not.stringMatching(/prepare-client/) }));
+    const local = () => assertWranglerNamesShop(directory, 'minshop-atelier-images');
+    expect(local).toThrow(expect.objectContaining({ hint: expect.stringMatching(/prepare-client\.mjs <slug>`/) }));
+    cleanup();
+  });
+
   it('refuse un arbre sans wrangler.jsonc du tout', () => {
     const { directory, cleanup } = catalogue([]);
     expect(() => assertWranglerNamesShop(directory, 'minshop-atelier-images')).toThrow(/pas de wrangler\.jsonc/);

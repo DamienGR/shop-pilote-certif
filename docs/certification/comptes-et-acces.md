@@ -120,6 +120,7 @@ Workers », puis :
 | Workers Scripts, écriture | `deploy`, `versions list`, `secret list` et `secret put` |
 | D1, écriture | création et lecture des bases, migrations, `d1 execute` (sauvegarde, import), signet Time Travel |
 | Workers R2 Storage, écriture | buckets dans leur juridiction, règle de cycle de vie, objets des sauvegardes |
+| Workers KV Storage, écriture | le namespace des sessions, que wrangler crée au premier `deploy` et que `destroy` supprime |
 | Workers Routes, écriture, sur la zone | le domaine personnalisé du Worker |
 | Account Settings et Memberships, lecture | `wrangler whoami`, que `shopctl` lit pour refuser le mauvais compte |
 | Account Analytics, lecture | `shopctl monitor --env staging` dans le nocturne |

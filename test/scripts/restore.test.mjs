@@ -8,6 +8,7 @@ import { EXIT_CODES } from '../../shopctl/src/errors.mjs';
 import { generatedColumns } from '../../shopctl/src/backup/schema.mjs';
 import { insertStatements, restoreScript } from '../../shopctl/src/backup/dump.mjs';
 import { HOSTILE, IMAGE_BYTES, IMAGE_KEY, names, seededShop, takeBackup } from '../helpers/backup-shop.mjs';
+import { ACCOUNT } from '../helpers/provisioned-shop.mjs';
 
 /** Everything the shop wrote, as the target database holds it now. */
 function contents(target) {
@@ -293,6 +294,60 @@ describe('shopctl restore', () => {
       expect(contents(target).products).toEqual([]);
       target.run(['provision', '--env', 'production']);
       expect(contents(target).products).toEqual(staging.products);
+    });
+
+    // Certification step 8, served after the restore: the vault came along, the
+    // KEK did not, and Turnstile with an unreadable secret refuses every admin
+    // login. The restore cannot open the keys either; it can say so, and name
+    // the one command that gives the admin back.
+    it('says which vault keys will not open, and how to get past Turnstile', () => {
+      const target = seededShop();
+      target.sql([
+        "INSERT INTO settings (key, value) VALUES ('enc:stripe_secret_key', 'gcm$c2FsdA$aXY$Y2lwaGVy');",
+        "INSERT INTO settings (key, value) VALUES ('enc:turnstile_secret_key', 'gcm$c2FsdA$aXY$Y2lwaGVy');",
+        "INSERT INTO settings (key, value) VALUES ('turnstile_enabled', '1');",
+      ]);
+      const id = takeBackup(target);
+      expect(target.run(['provision', '--env', 'production']).status).toBe(EXIT_CODES.ok);
+
+      const result = target.json(['restore', '--env', 'production', '--from', id, '--allow-production', '--confirm', 'atelier-test']);
+      expect(result.status).toBe(EXIT_CODES.ok);
+      expect(result.report.vault).toEqual({ keys: ['stripe_secret_key', 'turnstile_secret_key'], turnstile: true, readable: false });
+      expect(result.stderr).toMatch(/ne s'ouvrent pas ici : stripe_secret_key, turnstile_secret_key/);
+      expect(result.stderr).toContain(
+        `CLOUDFLARE_ACCOUNT_ID=${ACCOUNT.id} npx wrangler d1 execute ${names('atelier-test', 'production').database} --remote --command "DELETE FROM settings WHERE key = 'turnstile_enabled'"`,
+      );
+    });
+
+    it('stays quiet about the vault when the archive goes back where it came from', () => {
+      const target = seededShop();
+      target.sql(["INSERT INTO settings (key, value) VALUES ('enc:stripe_secret_key', 'gcm$c2FsdA$aXY$Y2lwaGVy');"]);
+      const id = takeBackup(target);
+      emptyTheShop(target);
+
+      const result = target.json(['restore', '--env', 'staging', '--from', id]);
+      expect(result.status).toBe(EXIT_CODES.ok);
+      expect(result.report.vault).toEqual({ keys: ['stripe_secret_key'], turnstile: false, readable: null });
+      expect(result.stderr).not.toMatch(/Coffre/);
+    });
+
+    // Certification step 8: a staging archive restored into a production. The
+    // bytes belong in the production's bucket; the archive only says where they
+    // were taken from, and on the client's account that bucket does not exist.
+    it('puts the objects into the target environment\'s buckets, not the source\'s', () => {
+      const target = productionShop();
+      const id = takeBackup(target);
+      const staging = names('atelier-test', 'staging').images;
+      const production = names('atelier-test', 'production').images;
+      target.wrangler(['r2', 'object', 'delete', `${staging}/${IMAGE_KEY}`, '--remote', '-J', 'eu']);
+
+      const { status, report } = target.json(['restore', '--env', 'production', '--from', id, '--allow-production', '--confirm', 'atelier-test']);
+      expect(status).toBe(EXIT_CODES.ok);
+      expect(report.objects).toBe(1);
+      const file = join(target.root, 'in-production.bin');
+      expect(target.wrangler(['r2', 'object', 'get', `${production}/${IMAGE_KEY}`, '--file', file, '--remote', '-J', 'eu']).status).toBe(0);
+      expect(readFileSync(file)).toEqual(IMAGE_BYTES);
+      expect(target.wrangler(['r2', 'object', 'get', `${staging}/${IMAGE_KEY}`, '--file', join(target.root, 'in-staging.bin'), '--remote', '-J', 'eu']).status).not.toBe(0);
     });
   });
 

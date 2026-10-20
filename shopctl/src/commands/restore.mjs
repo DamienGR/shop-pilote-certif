@@ -260,9 +260,27 @@ export function runRestore(args, reporter) {
   const generated = Object.fromEntries(order.map((name) => [name, [...generatedColumns(targetSql.get(name) ?? '')]]));
   const statements = restoreScript({ order, tables: dump, generated });
 
+  // The archive names the buckets of the environment it was TAKEN in; the
+  // bytes go back by binding, into the target's own. Written to the source's
+  // names, a staging archive restored into a production lands in staging's
+  // bucket on the same account, and fails on another account, where that
+  // bucket does not exist — the restore of certification step 8, onto B.
+  const targetBuckets = { BUCKET: names.images, FILES: names.files };
   const storedMedia = (archive.r2?.buckets ?? []).flatMap((bucket) =>
-    bucket.inventory.filter((object) => object.file).map((object) => ({ ...object, bucket: bucket.name, binding: bucket.binding })),
+    bucket.inventory.filter((object) => object.file).map((object) => ({
+      ...object,
+      source: bucket.name,
+      bucket: targetBuckets[bucket.binding] ?? null,
+      binding: bucket.binding,
+    })),
   );
+  const unbound = [...new Set(storedMedia.filter((object) => !object.bucket).map((object) => object.binding))];
+  if (unbound.length > 0) {
+    throw preconditionError(
+      `l'archive porte des objets d'un binding que cet arbre ne connaît pas : ${unbound.join(', ')}.`,
+      'Restaurez depuis un arbre au moins aussi récent que l\'archive. Aucune donnée n\'a été écrite.',
+    );
+  }
   const uncarried = (archive.r2?.buckets ?? []).flatMap((bucket) => bucket.inventory.filter((object) => !object.file).map((object) => object.key));
 
   if (dryRun) {
@@ -296,11 +314,12 @@ export function runRestore(args, reporter) {
   reporter.ok(`${statements.length} instruction(s) appliquées`);
 
   for (const object of storedMedia) {
-    const bytes = open({ iv: object.cipher.iv, tag: object.cipher.tag, ciphertext: readFileSync(join(entry.path, object.file)) }, key, `${archive.id}:${object.bucket}:${object.key}`);
+    // Sealed under the SOURCE bucket's name: it is what the backup authenticated.
+    const bytes = open({ iv: object.cipher.iv, tag: object.cipher.tag, ciphertext: readFileSync(join(entry.path, object.file)) }, key, `${archive.id}:${object.source}:${object.key}`);
     // A local bucket has no jurisdiction; wrangler would refuse the flag there.
     putObject(object.key, bytes, { cwd: root, bucket: object.bucket, remote, jurisdiction: remote ? jurisdiction : [] });
   }
-  if (storedMedia.length > 0) reporter.ok(`${storedMedia.length} objet(s) reversés dans R2`);
+  if (storedMedia.length > 0) reporter.ok(`${storedMedia.length} objet(s) reversés dans ${[...new Set(storedMedia.map((object) => object.bucket))].join(', ')}`);
   if (uncarried.length > 0) reporter.warn(`${uncarried.length} objet(s) manquent toujours.`, 'Les pages qui les affichent resteront cassées ; l\'inventaire du manifeste les nomme.');
 
   // ── The comparison, which is the point ────────────────────────────────────
@@ -323,6 +342,18 @@ export function runRestore(args, reporter) {
     }
   }
 
+  // The vault does not travel. Provider keys are sealed in `settings` under the
+  // SECRETS_KEK of the Worker that wrote them, and that secret never leaves
+  // its Worker: restored anywhere else, every key is stored and unreadable.
+  // Turnstile is the one that locks the door — enabled with a secret the
+  // Worker cannot open, the admin login fails closed (the security gate wants
+  // exactly that), and the admin is where the keys are re-entered.
+  // Back where it was taken, the keys open only if that Worker still holds the
+  // KEK — not after a destroy then provision — so that case is reported as
+  // unknown rather than readable.
+  const vault = vaultState(dump.settings?.rows ?? []);
+  const elsewhere = local || account?.id !== archive.account?.id || env !== archive.env;
+
   reporter.result({
     command: 'restore',
     ok: differences.length === 0,
@@ -337,6 +368,7 @@ export function runRestore(args, reporter) {
     uncarried,
     tables: archive.tables.map((table) => ({ name: table.name, rows: table.rows })),
     differences,
+    vault: { keys: vault.keys, turnstile: vault.turnstile, readable: vault.keys.length > 0 && elsewhere ? false : null },
   });
 
   if (differences.length > 0) {
@@ -350,6 +382,23 @@ export function runRestore(args, reporter) {
   }
 
   reporter.ok(`${archive.tables.length} table(s) identiques à l'archive, empreinte pour empreinte`);
+
+  // Said for an environment someone will serve. A local restore is the
+  // nightly's proof on a runner thrown away after it; the report carries the
+  // vault there too, without telling a runner to re-enter keys.
+  if (vault.keys.length > 0 && elsewhere && remote) {
+    reporter.section('Coffre');
+    reporter.warn(
+      `${vault.keys.length} clé(s) du coffre ne s'ouvrent pas ici : ${vault.keys.join(', ')}.`,
+      `Elles sont chiffrées avec la SECRETS_KEK du Worker de ${archive.env}${archive.account?.name ? ` sur ${archive.account.name}` : ''}, qui ne quitte jamais son Worker. Ressaisissez-les dans Admin → Réglages : d'ici là, la boutique les croit posées, et ce qui en dépend (paiement, e-mails, anti-robots) répond en erreur.`,
+    );
+    if (vault.turnstile) {
+      reporter.warn(
+        'Turnstile est activé avec une clé secrète illisible : la connexion à l\'administration sera refusée.',
+        `Désactivez-le avant de vous connecter : CLOUDFLARE_ACCOUNT_ID=${account.id} npx wrangler d1 execute ${names.database} --remote --command "DELETE FROM settings WHERE key = 'turnstile_enabled'". Ressaisissez ensuite ses clés dans Admin → Réglages → Protection anti-robots, et réactivez-le.`,
+      );
+    }
+  }
   if (!args.values['--json']) {
     if (local) {
       reporter.section(`${manifest.client.slug} restauré en local depuis ${archive.id}.`);
@@ -360,4 +409,18 @@ export function runRestore(args, reporter) {
     }
   }
   return 0;
+}
+
+/**
+ * The provider keys a restored `settings` table carries, read off its rows
+ * without opening them — the same reading as the Worker's `configuredSecrets`:
+ * an `enc:<name>` row with a value is a key the shop believes it has.
+ */
+export function vaultState(rows) {
+  const keys = rows
+    .filter((row) => typeof row.key === 'string' && row.key.startsWith('enc:') && row.value)
+    .map((row) => row.key.slice('enc:'.length))
+    .sort();
+  const turnstile = rows.some((row) => row.key === 'turnstile_enabled' && row.value === '1') && keys.includes('turnstile_secret_key');
+  return { keys, turnstile };
 }

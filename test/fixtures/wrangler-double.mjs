@@ -24,7 +24,11 @@
  *                                            (plain `whoami` still exits 0)
  *   d1              [{ name, uuid, jurisdiction }]
  *   r2              [{ name, jurisdiction, devUrl, domains }]
- *   workers         [{ name, secrets: [] }]
+ *   kv              [{ id, title }]          one per deployed Worker, as the
+ *                                            adapter's SESSION binding makes it
+ *   workers         [{ name, secrets: [], versions, active }]
+ *                                            versions oldest first, `active`
+ *                                            the one deployed
  *   reportsD1Jurisdiction  boolean           `d1 info` publishes the field or not
  *   failAt          "d1 create" | …          one command that dies, for the
  *                                            interrupted-run test
@@ -98,6 +102,15 @@ function fail(text, code = 1) {
   save();
   process.stderr.write(`${text}\n`);
   process.exit(code);
+}
+
+/** A new version of a Worker, deployed to all of its traffic at once: what
+ *  `deploy` and `secret put` both do. Kept in creation order, as the account
+ *  dates them. */
+function release(worker) {
+  const number = (worker.versions?.length ?? 0) + 1;
+  worker.versions = [...(worker.versions ?? []), { id: `v${number}`, number, metadata: { created_on: new Date(Date.UTC(2026, 9, 1, 0, number)).toISOString() } }];
+  worker.active = `v${number}`;
 }
 
 // One command can be made to die, so a test can kill a run halfway and re-run
@@ -205,8 +218,14 @@ function databaseNameFor(binding) {
  * keeps it: nothing to provision, nothing on the account, and nothing shared
  * with the remote database of the same name — which is the property a local
  * restore relies on and the suite checks.
+ *
+ * And it is the DEFAULT where wrangler 4 makes it one: `d1 execute`,
+ * `d1 migrations apply` and `r2 object` touch the local simulator unless told
+ * `--remote`. A double that read silence as "remote" let `destroy` print an
+ * `r2 object delete` that empties nothing on the account.
  */
-const LOCAL = argv.includes('--local');
+const LOCAL_BY_DEFAULT = ['d1 execute', 'd1 migrations', 'r2 object'].some((prefix) => command.startsWith(prefix));
+const LOCAL = argv.includes('--local') || (LOCAL_BY_DEFAULT && !argv.includes('--remote'));
 const localState = (...parts) => join(process.cwd(), '.wrangler', 'state', ...parts);
 
 /** Where one database's bytes live: beside the state, one file per D1 name. */
@@ -480,6 +499,10 @@ if (command.startsWith('secret put')) {
   if (!worker) fail(`Could not find Worker "${name}".`);
   if (!stdin.trim()) fail('No value was piped in for the secret.');
   worker.secrets = [...new Set([...(worker.secrets ?? []), secret])];
+  // A secret is part of a version: on a Worker that exists, the real `secret
+  // put` creates a new version and deploys it. The first deployment's deferred
+  // secrets are therefore two versions newer than its upload.
+  release(worker);
   done(`✨ Success! Uploaded secret ${secret}`);
 }
 
@@ -489,6 +512,20 @@ if (positionals[0] === 'delete' && flag('--name')) {
   if (index === -1) fail(`Could not find Worker "${name}".`);
   state.workers.splice(index, 1);
   done(`? Are you sure you want to delete ${name}?\n🤖 Using fallback value in non-interactive context: yes\n✨ Successfully deleted ${name}`);
+}
+
+if (command === 'kv namespace list') {
+  // A JSON array on stdout, with no --json flag: the real command has only
+  // this one shape.
+  done(JSON.stringify((state.kv ?? []).map(({ id, title }) => ({ id, title, supports_url_encoding: true })), null, '  '));
+}
+
+if (command === 'kv namespace delete') {
+  const id = flag('--namespace-id');
+  const index = (state.kv ?? []).findIndex((namespace) => namespace.id === id);
+  if (index === -1) fail(`A request to the Cloudflare API (/accounts/…/storage/kv/namespaces/${id}) failed.\n  namespace not found [code: 10013]`);
+  const [removed] = state.kv.splice(index, 1);
+  done(`Deleting KV namespace id: "${removed.id}".\nDeleted KV namespace id: "${removed.id}".`);
 }
 
 if (command.startsWith('d1 delete')) {
@@ -506,6 +543,9 @@ if (command.startsWith('d1 delete')) {
 if (command.startsWith('r2 bucket delete')) {
   const name = positionals[3];
   const wanted = jurisdictionOf();
+  // The real one announces the deletion on stdout before asking, so a refusal
+  // arrives after a line that reads like progress.
+  process.stdout.write(`Deleting bucket ${name}${wanted ? ` (${wanted})` : ''}.\n`);
   const index = (state.r2 ?? []).findIndex((bucket) => bucket.name === name && (bucket.jurisdiction ?? null) === (wanted ?? null));
   if (index === -1) fail('The specified bucket does not exist.');
   // R2 refuses a bucket that still holds objects. The double refuses it too,
@@ -520,10 +560,25 @@ if (command.startsWith('versions list')) {
   const name = flag('--name');
   const worker = (state.workers ?? []).find((candidate) => candidate.name === name);
   if (!worker) fail(`Could not find Worker "${name}".`);
-  // Newest first, like the real one. `shopctl deploy` names the SECOND entry as
-  // the rollback target, so a Worker with a single version must report exactly
-  // one — that is the "nothing to roll back to" case of a first deployment.
-  done(JSON.stringify(worker.versions ?? [{ id: 'v1', number: 1 }]));
+  // OLDEST first, the ten most recent: wrangler 4 sorts by `created_on`
+  // ascending and keeps the tail. This double used to answer newest first, and
+  // `shopctl deploy` read its second entry as the previous version — in real,
+  // the second-oldest of the ten, the same stale id in six reports of the
+  // certification's pilot.
+  done(JSON.stringify((worker.versions ?? []).slice(-10)));
+}
+
+if (command.startsWith('deployments status')) {
+  const name = flag('--name');
+  const worker = (state.workers ?? []).find((candidate) => candidate.name === name);
+  if (!worker) fail(`Could not find Worker "${name}".`);
+  if (!worker.active) fail(`The Worker ${name} has no deployments.`);
+  done(JSON.stringify({
+    id: `deployment-${worker.active}`,
+    source: 'api',
+    strategy: 'percentage',
+    versions: [{ version_id: worker.active, percentage: 100 }],
+  }));
 }
 
 if (positionals[0] === 'deploy') {
@@ -543,8 +598,16 @@ if (positionals[0] === 'deploy') {
     worker = { name, secrets: [], versions: [] };
     state.workers = [...(state.workers ?? []), worker];
   }
-  worker.versions = [{ id: `v${(worker.versions?.length ?? 0) + 1}`, number: (worker.versions?.length ?? 0) + 1 }, ...(worker.versions ?? [])];
+  release(worker);
   state.deploys = [...(state.deploys ?? []), name];
+  // The Astro adapter binds SESSION in the BUILT configuration, with no id,
+  // and wrangler provisions it at the first deploy under `<worker>-<binding>`.
+  // Nothing the shop renders names it, which is how a teardown came to forget
+  // it; the double creates it where the real deploy does.
+  const session = `${name}-session`;
+  if (!(state.kv ?? []).some((namespace) => namespace.title === session)) {
+    state.kv = [...(state.kv ?? []), { id: uuid(session).replaceAll('-', ''), title: session }];
+  }
   // The targets, listed as wrangler lists them: the workers.dev URL only while
   // that door is open, and a custom domain BARE, with no scheme. A double that
   // printed a workers.dev URL with that door shut is how `deploy` came to read

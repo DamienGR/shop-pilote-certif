@@ -63,6 +63,28 @@ Si la base a été **supprimée**, `shopctl provision --env production` la
 recrée d'abord (vide, mêmes nom et juridiction), puis la restauration s'y
 applique sans `--overwrite`.
 
+Une archive qui ne porte pas toutes les images que ses lignes nomment (un objet
+perdu ou supprimé à la main avant la sauvegarde, que `backup` signale) est
+refusée tant que `--allow-missing-media` n'est pas ajouté : les lignes
+reviennent, ces images restent cassées.
+
+### Vers un environnement neuf, ou un autre compte
+
+Le coffre ne voyage pas. Les clés des fournisseurs (Stripe, Resend, Turnstile)
+sont chiffrées en base avec la `SECRETS_KEK` du Worker qui les a écrites, et
+ce secret ne quitte jamais son Worker : restaurées ailleurs — un autre
+environnement, un autre compte, un Worker recréé par `destroy` puis
+`provision` —, elles sont présentes et illisibles. `restore` les nomme, et si
+Turnstile est activé, donne la commande qui le désactive : sans elle,
+l'administration refuse toute connexion, et c'est là que les clés se
+ressaisissent. Ensuite, Admin → Réglages : ressaisir chaque clé, réactiver
+Turnstile. D'ici là, le paiement répond en erreur.
+
+Restaurer dans un environnement neuf, c'est aussi le déployer :
+`shopctl deploy --env <env>` (`--yes` en production) pose ses secrets
+internes et lie le Worker à la nouvelle base. Le rapport de la répétition de
+l'étape 8 de la certification donne l'ordre de grandeur de chaque étape.
+
 ## 4. Revenir à la normale
 
 - `shopctl deploy --env production --yes` si la base a été recréée (le Worker
@@ -74,5 +96,9 @@ applique sans `--overwrite`.
 
 - noter le temps réel de retour : c'est la mesure du RTO, et la campagne de
   certification la compare à 60 minutes ;
+- rejouer les effacements RGPD faits depuis la date de l'archive
+  (`shopctl privacy anonymize`, une fois par demande reçue depuis, que le
+  commerçant tient) : une sauvegarde leur est antérieure, et la restauration a
+  rendu les données qu'ils avaient effacées ;
 - si la cause est une migration, elle devient un test (`npm run check:release`
   refuse déjà une migration publiée réécrite ou destructive).
