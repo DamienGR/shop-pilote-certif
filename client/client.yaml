@@ -37,6 +37,7 @@ cloudflare:
   jurisdiction: eu
   workerName: minshop-pilote-certif
   productionDomain: certif-minshop.miijot.fr
+  imagesDomain: images-certif-minshop.miijot.fr
   # Compte Cloudflare de cette boutique. `shopctl provision` refuse tout autre
   # compte : provisionner ailleurs ne se défait pas (ADR 0002).
   accountId: e11ea775b0317980f1f70960d1000d09
