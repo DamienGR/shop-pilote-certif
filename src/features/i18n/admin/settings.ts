@@ -46,6 +46,7 @@ export const settings = {
   'admin.settings.error.turnstileKeys': 'Ajoutez la clé de site et la clé secrète Turnstile avant d’activer la protection anti-robots.',
   'admin.settings.error.defaultMethod': 'Choisissez comme moyen par défaut un moyen de paiement activé et configuré.',
   'admin.settings.error.lightningBackend': 'Choisissez un type de nœud Lightning valide.',
+  'admin.settings.error.secretAutofilled': 'Un champ de clé contenait le mot de passe de l’administration, que le navigateur y avait rempli. La clé enregistrée est conservée, le reste est enregistré. Saisissez la clé du fournisseur, ou laissez le champ vide.',
   'admin.settings.lightning.error.url': 'Indiquez l’URL {nom}.',
   'admin.settings.lightning.error.invalidUrl': 'Indiquez une URL HTTP(S) valide pour {nom}.',
   'admin.settings.lightning.error.lnbitsKey': 'Ajoutez la clé invoice/read LNbits.',
