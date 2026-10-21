@@ -29,7 +29,7 @@ import { hashPassword } from '../../src/features/auth/password.ts';
 import { signSession } from '../../src/features/auth/session.ts';
 import { generateAccessToken } from '../../src/features/ids/token.ts';
 import { generatePublicId } from '../../src/features/ids/publicId.ts';
-import { encryptSecret } from '../../src/features/secrets/crypto.ts';
+import { decryptSecret, encryptSecret } from '../../src/features/secrets/crypto.ts';
 import { REAL_IMAGES, PNG_1X1, SVG_WITH_SCRIPT, HTML_PAGE } from '../helpers/image-bytes.mjs';
 
 const ORIGIN = 'https://store.test';
@@ -374,6 +374,62 @@ try {
       .bind(hash)
       .run();
     ok('rotating the password invalidates the sessions issued before it');
+  }
+
+  /* ===================================== 3b. a vault key the browser filled */
+
+  section('Coffre — le mot de passe que le navigateur verse dans une clé');
+  {
+    // A browser that remembers the admin login fills it into a key field of
+    // Admin → Réglages. Saved, it replaced the Resend key on the pilot staging
+    // and went to Resend as its bearer token (étape 9, jalon 10).
+    const cookie = `admin_session=${await signSession(
+      AUTH_SECRET,
+      (await db
+        .prepare("SELECT value FROM settings WHERE key = 'admin_password_hash'")
+        .first()).value,
+      3600,
+      Date.now() / 1000,
+    )}`;
+    await db
+      .prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('enc:resend_api_key', ?)")
+      .bind(await encryptSecret(SECRETS_KEK, 're_stored_key'))
+      .run();
+    const saveEmail = (key) =>
+      fetch('/admin/settings', {
+        method: 'POST',
+        headers: { origin: ORIGIN, 'content-type': FORM, 'x-requested-with': 'fetch', cookie },
+        body: new URLSearchParams({
+          _action: 'save_email',
+          email_from: 'commandes@exemple-pilote.fr',
+          'secret:resend_api_key': key,
+        }).toString(),
+      });
+    const storedKey = async () =>
+      decryptSecret(
+        SECRETS_KEK,
+        (await db.prepare("SELECT value FROM settings WHERE key = 'enc:resend_api_key'").first()).value,
+      );
+    const setting = async (key) =>
+      (await db.prepare('SELECT value FROM settings WHERE key = ?').bind(key).first())?.value ?? null;
+
+    const refused = await saveEmail(PASSWORD);
+    assert.equal(refused.status, 400, 'a key field holding the admin password was saved silently');
+    assert.match(await refused.text(), /mot de passe de l’administration/);
+    assert.equal(await storedKey(), 're_stored_key', 'the admin password replaced the stored key');
+    assert.equal(await setting('email_from'), 'commandes@exemple-pilote.fr', 'the rest of the section was not saved');
+    ok('a key field holding the admin password keeps the stored key, saves the rest, and says so');
+
+    const accepted = await saveEmail('re_typed_key');
+    assert.equal(accepted.status, 204);
+    assert.equal(await storedKey(), 're_typed_key');
+    ok('a provider key typed into the same field replaces the stored one');
+
+    await db
+      .prepare(
+        "DELETE FROM settings WHERE key IN ('enc:resend_api_key', 'email_from', 'email_enabled', 'email_provider', 'email_from_name', 'email_notify_to')",
+      )
+      .run();
   }
 
   /* =========================================== 4. Turnstile */

@@ -2,7 +2,7 @@
 
 Fiche de passage pour le poste de Damien. Elle suit l'étape 9 du
 [plan](plan.md#étape-9--bascule-sur-le-compte--client-) : le pilote monte en
-`v0.3.15` ; les trois achats manuels qui restaient de l'étape 6 se font sur le
+`v0.3.16` ; les trois achats manuels qui restaient de l'étape 6 se font sur le
 staging pendant qu'il existe ; la production de `pilote-certif` est créée sur
 le compte B, son mot de passe posé avant tout déploiement, déployée par le
 workflow `Deploy`, installée et saisie sur B, contrôlée par la porte distante
@@ -61,7 +61,7 @@ Turnstile, Access.
 |---|---|
 | Cloudflare B | **créé et gardé** : Worker `minshop-pilote-certif-production` sur `certif-minshop.miijot.fr`, sa base, ses trois buckets en juridiction `eu`, le domaine d'images `images-certif-minshop.miijot.fr` attaché au bucket d'images, son namespace KV de sessions, ses secrets internes, un cron ; deux jetons API (déploiement, sauvegarde) ; les archives de `deploy` et du nocturne dans `-backups` |
 | Cloudflare A | **détruit** : le staging du pilote (Worker, base, trois buckets, namespace KV) ; le jeton de staging révoqué ; les applications Access de la preview et leurs jetons de service supprimés |
-| GitHub `shop-pilote-certif` | la pull request `socle/v0.3.15` ; une pull request qui déclare `imagesDomain` ; l'environnement `backup` et ses trois secrets ; le jeton de l'environnement `production` réécrit ; la variable `STAGING_RETIRED` ; l'environnement `staging` supprimé ; une pull request de preuves |
+| GitHub `shop-pilote-certif` | la pull request `socle/v0.3.16` ; une pull request qui déclare `imagesDomain` ; l'environnement `backup` et ses trois secrets ; le jeton de l'environnement `production` réécrit ; la variable `STAGING_RETIRED` ; l'environnement `staging` supprimé ; une pull request de preuves |
 | Stripe test | trois paiements (section 2) ; l'endpoint de webhook de la preview supprimé |
 | Resend | le domaine d'envoi vérifié s'il ne l'est pas ; des e-mails réels vers les adresses de Damien |
 | Stripe live | rien : l'étape 10 |
@@ -72,10 +72,12 @@ paiement, la démonstration coupée).
 
 ## 0. Shell propre, et ce qui doit exister avant
 
-Prérequis : le tag `v0.3.15`, publié par le workflow `Release` du socle. Il
-reprend `v0.3.14` et ferme l'alerte `markdown-it` que le `Nightly` du pilote a
-levée le matin du passage (`docs/migrations/v0.3.15.md`) : sans elle, le job
-`Dependency audit` est rouge aux sections 9 et 10.
+Prérequis : le tag `v0.3.16`, publié par le workflow `Release` du socle. Il
+reprend `v0.3.14` et ferme deux défauts trouvés le jour du passage :
+l'alerte `markdown-it` du `Nightly` (`v0.3.15`), sans laquelle le job
+`Dependency audit` est rouge aux sections 9 et 10, et le mot de passe que le
+navigateur versait dans les champs de clé de Réglages (`v0.3.16`), qui aurait
+remplacé les clés saisies à la section 7.
 
 Sur B, dans le tableau de bord, avant de commencer :
 
@@ -109,18 +111,18 @@ echo "$COMPTE_A $COMPTE_B $PILOTE $PROD"
 npx wrangler whoami                                  # la session voit A et B
 ```
 
-## 1. Monter le pilote en `v0.3.15`
+## 1. Monter le pilote en `v0.3.16`
 
 ```sh
-npm run shopctl -- core upgrade --to v0.3.15 --open-pr
-gh pr checks socle/v0.3.15 --watch
-gh pr merge socle/v0.3.15 --merge
+npm run shopctl -- core upgrade --to v0.3.16 --open-pr
+gh pr checks socle/v0.3.16 --watch
+gh pr merge socle/v0.3.16 --merge
 git switch main && git pull && npm ci && npm ci --prefix mcp
-npm run shopctl -- core status                       # v0.3.15
-npm run -s shopctl -- deploy --env staging --json > "$E/deploy-staging-v0.3.15.json"; echo $?
+npm run shopctl -- core status                       # v0.3.16
+npm run -s shopctl -- deploy --env staging --json > "$E/deploy-staging-v0.3.16.json"; echo $?
 ```
 
-Attendu : la pull request verte, avec les notes de `v0.3.13` à `v0.3.15`
+Attendu : la pull request verte, avec les notes de `v0.3.13` à `v0.3.16`
 pour un pilote resté en `v0.3.12` ; `deploy` en `0`
 sur A. Le staging sert maintenant ses images par le Worker, même une fois
 `imagesDomain` déclaré.

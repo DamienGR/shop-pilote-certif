@@ -898,7 +898,8 @@ et sa production sur B dans un `wrangler` de doublure, le chemin du workflow
 `Deploy` rejoué hors de GitHub, la production construite servie en local pour
 la saisie et la porte distante, puis la destruction du staging. Six défauts du
 socle, corrigés dans `v0.3.14` ; la fiche de passage, qui monte le pilote en
-`v0.3.15` (la même, plus l'alerte `markdown-it` levée le matin du passage), est [etape-9-commandes.md](etape-9-commandes.md), et le livrable de
+`v0.3.16` (la même, plus l'alerte `markdown-it` levée le matin du passage et
+le mot de passe que le navigateur versait dans les champs de clé), est [etape-9-commandes.md](etape-9-commandes.md), et le livrable de
 l'étape, la checklist de lancement rejouable pour chaque boutique, est
 [mise-en-ligne.md](../operations/mise-en-ligne.md).
 

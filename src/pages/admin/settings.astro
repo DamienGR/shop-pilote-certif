@@ -30,6 +30,8 @@ import {
   vaultReady,
   type SecretName,
 } from '../../features/secrets/store';
+import { submittedSecret } from '../../features/secrets/submitted';
+import { adminCredential } from '../../features/auth/admin';
 import {
   featureAvailability,
   lightningConfigurationError,
@@ -66,12 +68,26 @@ if (Astro.request.method === 'POST') {
   const action = form.get('_action');
   // Each section submits its keys as `secret:<name>` inputs (blank = keep) plus an
   // optional `clear:<name>` checkbox (remove). Process them with the section's save.
+  // A key field holding the admin password was filled by the browser: it is
+  // dropped, the stored key kept, and the save says so (`submittedSecret`).
+  let autofilled = false;
+  const submitted = new Map<SecretName, string>();
+  const secretValue = async (n: SecretName): Promise<string> => {
+    if (!submitted.has(n)) {
+      const result = await submittedSecret(form, n, async (typed) =>
+        (await adminCredential(env.DB)).verify(typed),
+      );
+      autofilled ||= result.autofilled;
+      submitted.set(n, result.value);
+    }
+    return submitted.get(n) ?? '';
+  };
   const applySecrets = async (names: SecretName[]) => {
     for (const n of names) {
       try {
         if (String(form.get(`clear:${n}`)) === '1') await setSecret(env.DB, n, null);
         else {
-          const v = String(form.get(`secret:${n}`) ?? '').trim();
+          const v = await secretValue(n);
           if (v) await setSecret(env.DB, n, v);
         }
       } catch {
@@ -279,7 +295,7 @@ if (Astro.request.method === 'POST') {
       const secretName: SecretName =
         backend === 'lnbits' ? 'lnbits_api_key' : 'phoenixd_password';
       const url = String(form.get(urlField) ?? '').trim();
-      const suppliedSecret = String(form.get(`secret:${secretName}`) ?? '').trim();
+      const suppliedSecret = await secretValue(secretName);
       const clearSecret = form.get(`clear:${secretName}`) === '1';
       const existingSecret = clearSecret ? null : await getSecret(env.DB, secretName);
       validationError =
@@ -300,6 +316,11 @@ if (Astro.request.method === 'POST') {
   } else if (action === 'save_opennode') {
     await setSetting(env.DB, 'opennode_api_url', String(form.get('opennode_api_url') ?? '').trim() || null);
     await applySecrets(['opennode_api_key']);
+  }
+  if (autofilled) {
+    validationError = [validationError, t('admin.settings.error.secretAutofilled')]
+      .filter(Boolean)
+      .join(' ');
   }
   // Admin saves are deliberately coarse and infrequent. Purge both public
   // dependency roots after the write rather than risk a newly added setting
