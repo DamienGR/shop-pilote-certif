@@ -78,7 +78,12 @@ What CI takes does not stay on the runner. `backup --upload` copies the sealed
 files into the environment's private `-backups` bucket (manifest last, so a
 half-copied archive has no manifest), and `backup pull <id>` brings one back and
 checks it as `verify` would. `deploy --env production` takes one, uploads it and
-only then migrates (plan §9) — no flag skips that. The bucket's lifecycle rule is
+only then migrates (plan §9) — no flag skips that. The nightly run takes one of
+production too, in the `backup` GitHub environment (default branch only, a
+token that reads D1 and writes R2, never the deploy token), and `verify`s it
+with the key instead of restoring it: until the launch the staging half carries
+the RPO, and from certification step 9 on, with staging destroyed, a production
+deployed once a month would otherwise be backed up once a month. The bucket's lifecycle rule is
 `--keep-days`' 90, and it is an AGE rule only: R2 cannot count, so the "never
 lose the last one" half of `prune` does not hold there. What holds it instead is
 the nightly run failing loudly — a nightly that stopped is an incident, not a

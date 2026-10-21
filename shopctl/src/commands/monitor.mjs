@@ -67,8 +67,11 @@ export const monitorUsage = `Usage: shopctl monitor --env <staging|production> [
   --shop <slug>               Manifeste à utiliser quand l'arbre en contient plusieurs.
   --json                      Rapport lisible par une machine.
 
-Lit l'API GraphQL Analytics de Cloudflare avec CLOUDFLARE_API_TOKEN (droit
-« Account Analytics : Read »). Échoue (code 6) quand un seuil est franchi :
+Lit l'API GraphQL Analytics de Cloudflare avec CLOUDFLARE_API_TOKEN. Le même
+jeton sert à wrangler pour trouver le compte et la base : il lui faut
+« Account Analytics : Read », « D1 : Read », « Account Settings : Read », et
+côté utilisateur « Memberships : Read » et « User Details : Read ».
+Échoue (code 6) quand un seuil est franchi :
 taux d'erreur du Worker au-delà de 1 %, ou, au plan gratuit, 70 % d'un quota
 quotidien atteint ou une invocation arrêtée par Cloudflare (erreur 1102) —
 le moment de passer au plan Workers Paid. Le CPU p99 est relevé, pas jugé.
@@ -204,7 +207,7 @@ export async function runMonitor(args, reporter) {
   if (!token) {
     throw preconditionError(
       'CLOUDFLARE_API_TOKEN est absent.',
-      'L\'API GraphQL demande un jeton (droit « Account Analytics : Read ») ; une session `wrangler login` ne le fournit pas. En CI, c\'est le secret d\'environnement que `shopctl repo` pose.',
+      'L\'API GraphQL demande un jeton (droits : `shopctl monitor --help`) ; une session `wrangler login` ne le fournit pas. En CI, c\'est le secret d\'environnement que `shopctl repo` pose.',
     );
   }
 

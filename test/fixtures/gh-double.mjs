@@ -23,6 +23,7 @@
  *   hosts           { host: { git_protocol } }  what `gh config get --host` answers
  *                                           first, as `gh auth login` writes it
  *   repos           { "owner/name": { visibility, environments, secrets, pulls } }
+ *                   an environment: { secrets, reviewers, branchPolicy, branches }
  *   users           { login: id }
  *   refuseReviewers boolean                 the free-plan private-repo refusal
  *   calls           [{ argv, stdin }]       appended to on every invocation
@@ -133,6 +134,26 @@ if (argv[0] === 'api') {
     done(JSON.stringify({ total_count: names.length, environments: names.map((name) => ({ name })) }));
   }
 
+  // Deployment branch policies: listed, and added one branch at a time. The
+  // real API refuses a branch on an environment whose policy is not custom.
+  const branchPolicies = path?.match(/^repos\/([^/]+\/[^/]+)\/environments\/([^/]+)\/deployment-branch-policies$/);
+  if (branchPolicies) {
+    const [, name, environment] = branchPolicies;
+    const target = state.repos[name]?.environments?.[environment];
+    if (!target) fail('gh: Not Found (HTTP 404)');
+    target.branches = target.branches ?? [];
+    if (method === 'GET') {
+      done(JSON.stringify({ total_count: target.branches.length, branch_policies: target.branches.map((branch) => ({ name: branch, type: 'branch' })) }));
+    }
+    if (method === 'POST') {
+      if (!target.branchPolicy?.custom_branch_policies) fail('gh: Not Found (HTTP 404)');
+      const body = JSON.parse(stdin);
+      if (target.branches.includes(body.name)) fail('gh: Validation Failed (HTTP 422)\nalready_exists');
+      target.branches.push(body.name);
+      done(JSON.stringify({ name: body.name, type: body.type }));
+    }
+  }
+
   const environmentPut = path?.match(/^repos\/([^/]+\/[^/]+)\/environments\/(.+)$/);
   if (environmentPut && method === 'PUT') {
     const [, name, environment] = environmentPut;
@@ -150,6 +171,9 @@ if (argv[0] === 'api') {
     repo.environments[environment] = {
       ...(repo.environments[environment] ?? { secrets: {} }),
       reviewers: (body.reviewers ?? []).length,
+      // The cautious reading of the API: a PUT that names no policy leaves
+      // every branch allowed, so the code under test must name it each time.
+      branchPolicy: body.deployment_branch_policy ?? null,
     };
     repo.environments[environment].secrets = repo.environments[environment].secrets ?? {};
     done(JSON.stringify({ name: environment }));

@@ -17,6 +17,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 import { stripAnsi } from '../../shopctl/src/cloudflare.mjs';
+import { OPERATOR_ENV } from './operator-env.mjs';
 
 const CORE = new URL('../../', import.meta.url).pathname;
 const BIN = resolve(CORE, 'shopctl/bin/shopctl.mjs');
@@ -251,25 +252,27 @@ export function shop({
       writeFileSync(ghState, JSON.stringify({ ...current, ...patch }, null, 2));
       return current;
     },
-    run(args, env = {}) {
+    /** `input`, when given, is the command's standard input — how a
+     *  password reaches `shopctl admin password`, never through an argument. */
+    run(args, env = {}, input = undefined) {
       const result = spawnSync('node', [BIN, ...args], {
         cwd: root,
         encoding: 'utf8',
+        input,
         env: {
           ...process.env,
           ...GIT_ENV,
           WRANGLER_DOUBLE_STATE: statePath,
           GH_DOUBLE_STATE: ghState,
-          CLOUDFLARE_ACCOUNT_ID: '',
-          CLOUDFLARE_API_TOKEN: '',
+          ...OPERATOR_ENV,
           ...(forge ? { PATH: `${bin}:${process.env.PATH}` } : {}),
           ...env,
         },
       });
       return { ...result, stdout: stripAnsi(result.stdout ?? ''), stderr: stripAnsi(result.stderr ?? '') };
     },
-    json(args, env = {}) {
-      const result = this.run([...args, '--json'], env);
+    json(args, env = {}, input = undefined) {
+      const result = this.run([...args, '--json'], env, input);
       return { ...result, report: result.stdout.trim() ? JSON.parse(result.stdout) : null };
     },
   };

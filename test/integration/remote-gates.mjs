@@ -14,7 +14,8 @@
  *   - security.mjs once a password is set (green, password mode), again with
  *     `--limiteurs` (search and checkout answer 429 under a flood, the login
  *     on its exact counter), and on a shop whose admin is behind Access
- *     (green, Access mode);
+ *     (green, Access mode), again with no payment method (green, the closed
+ *     checkout named);
  *   - on a configured shop — catalogue, e-mail, Stripe in test mode:
  *     last-unit.mjs (one session, four refusals, then a held unit refused
  *     before firing), load.mjs (no error), email.mjs (through the admin
@@ -127,6 +128,16 @@ try {
   assert.equal(access.status, 0, `Access shop: the remote gate failed\n${show(access)}`);
   assert.match(access.output, /mode access/, show(access));
   console.log('✓ remote security: green on an Access-guarded shop');
+
+  // A production before Stripe: provisioning switched the demo checkout off,
+  // so the cart offers nothing and /express sends the buyer back. A closed
+  // door, said in the report rather than failed (certification step 9). Here
+  // rather than on the password shop, whose login limiter the runs share.
+  await setting(worker.db, 'payment_methods_disabled', 'demo');
+  const closed = await run('security.mjs', String(await worker.mf.ready));
+  assert.equal(closed.status, 0, `closed checkout: the remote gate failed\n${show(closed)}`);
+  assert.match(closed.output, /✓ aucun champ de carte[^\n]*\n\s+aucun moyen de paiement configuré/, show(closed));
+  console.log('✓ remote security: green on a shop with no payment method yet, and says so');
 } finally {
   await worker.dispose();
 }

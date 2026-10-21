@@ -9,7 +9,7 @@ import { join } from 'node:path';
 
 import { EXIT_CODES } from '../../shopctl/src/errors.mjs';
 import { parseGithubRemote, repositoryNameFor, repositoryUrl } from '../../shopctl/src/forge.mjs';
-import { setupRepository, tokenFor } from '../../shopctl/src/commands/repo.mjs';
+import { BACKUP_ENVIRONMENT, backupTokenFor, setupRepository, tokenFor } from '../../shopctl/src/commands/repo.mjs';
 import { Reporter } from '../../shopctl/src/report.mjs';
 import { shop } from '../helpers/provisioned-shop.mjs';
 
@@ -88,6 +88,15 @@ describe('which token an environment gets', () => {
     expect(tokenFor('production', { CLOUDFLARE_API_TOKEN: 'shared' }).from).toBe('CLOUDFLARE_API_TOKEN');
     expect(tokenFor('production', {})).toBeNull();
   });
+
+  // The backup environment asks nobody's approval. A token that deploys,
+  // placed there, would be production's reviewers bypassed every night.
+  it('gives the nightly backup its own token or none, never one that deploys', () => {
+    expect(backupTokenFor({ CLOUDFLARE_API_TOKEN: 'shared' })).toBeNull();
+    expect(backupTokenFor({ CLOUDFLARE_API_TOKEN_BACKUP: 'lecture' })).toEqual({ value: 'lecture', from: 'CLOUDFLARE_API_TOKEN_BACKUP' });
+    expect(() => backupTokenFor({ CLOUDFLARE_API_TOKEN_PRODUCTION: 'prod', CLOUDFLARE_API_TOKEN_BACKUP: 'prod' })).toThrow(/CLOUDFLARE_API_TOKEN_PRODUCTION/);
+    expect(() => backupTokenFor({ CLOUDFLARE_API_TOKEN: 'shared', CLOUDFLARE_API_TOKEN_BACKUP: 'shared' })).toThrow(/jeton de CLOUDFLARE_API_TOKEN/);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -121,7 +130,49 @@ describe('shopctl repo', () => {
 
       const github = target.github();
       expect(github.repos[target.nameWithOwner].visibility).toBe('private');
-      expect(Object.keys(github.repos[target.nameWithOwner].environments)).toEqual(['staging', 'production']);
+      expect(Object.keys(github.repos[target.nameWithOwner].environments)).toEqual(['staging', 'production', BACKUP_ENVIRONMENT]);
+    });
+
+    // ADR 0005's RPO, once staging is gone (certification step 9): production
+    // backed up every night, from an environment no other branch can read.
+    it('limits the backup environment to the default branch, before any secret is in it', () => {
+      const target = forgeShop();
+      const { report } = target.json(['repo'], TOKENS);
+      const backup = target.github().repos[target.nameWithOwner].environments[BACKUP_ENVIRONMENT];
+      expect(backup.branchPolicy).toEqual({ protected_branches: false, custom_branch_policies: true });
+      expect(backup.branches).toEqual(['main']);
+      expect(backup.reviewers).toBe(0);
+      // No token of its own: the environment exists, and nothing is in it.
+      expect(backup.secrets).toEqual({});
+      expect(report.missingTokens).toEqual([]);
+
+      // A second run adds no second policy, and keeps the first.
+      target.run(['repo'], TOKENS);
+      const again = target.github().repos[target.nameWithOwner].environments[BACKUP_ENVIRONMENT];
+      expect(again.branches).toEqual(['main']);
+      expect(again.branchPolicy).toEqual({ protected_branches: false, custom_branch_policies: true });
+    });
+
+    it('places the backup token, production’s account and the key in the backup environment', () => {
+      const target = forgeShop({ cloudflare: { productionAccountId: '0123456789abcdef0123456789abcdef' } });
+      expect(target.run(['backup', 'keygen']).status).toBe(EXIT_CODES.ok);
+      const key = readFileSync(join(target.root, '.shopctl/backup.key'), 'utf8').trim();
+      const result = target.run(['repo'], { ...TOKENS, CLOUDFLARE_API_TOKEN_BACKUP: 'cf-backup' });
+      expect(result.status, result.stderr).toBe(EXIT_CODES.ok);
+      const backup = target.github().repos[target.nameWithOwner].environments[BACKUP_ENVIRONMENT];
+      expect(backup.secrets).toEqual({
+        CLOUDFLARE_API_TOKEN: 'cf-backup',
+        CLOUDFLARE_ACCOUNT_ID: '0123456789abcdef0123456789abcdef',
+        SHOPCTL_BACKUP_KEY: key,
+      });
+      expect(`${result.stdout}${result.stderr}`).not.toContain('cf-backup');
+    });
+
+    it('refuses a deploying token as the backup token, before writing anything', () => {
+      const target = forgeShop();
+      const result = target.run(['repo'], { CLOUDFLARE_API_TOKEN_PRODUCTION: 'cf-prod', CLOUDFLARE_API_TOKEN_BACKUP: 'cf-prod' });
+      expect(result.status).toBe(EXIT_CODES.input);
+      expect(target.github().repos).toEqual({});
     });
 
     // The default that matters most. A repository that was public for an hour

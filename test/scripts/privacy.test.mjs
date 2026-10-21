@@ -80,6 +80,9 @@ const PEOPLE = [
   `INSERT INTO order_guest_access (order_public_id, access_token) VALUES ('ord_0000000001', 'gat_secret_token');`,
   `INSERT INTO order_item_ids (public_id, order_public_id) VALUES ('oit_0000000001', 'ord_0000000001');`,
   `INSERT INTO order_notifications (order_id, kind, state, last_error) VALUES (1, 'confirmation', 'failed', 'Resend a refusé jean.dupont@example.fr');`,
+  `INSERT INTO order_notifications (order_id, kind, state, attempts, last_error) VALUES (1, 'customer-receipt', 'pending', 2, 'Resend send failed (403)');`,
+  `INSERT INTO order_notifications (order_id, kind, state, attempts, lease_expires_at) VALUES (1, 'order-shipped', 'processing', 1, datetime('now', '+5 minutes'));`,
+  `INSERT INTO order_notifications (order_id, kind, state, attempts, sent_at) VALUES (1, 'owner-notification', 'sent', 1, datetime('now'));`,
   `INSERT INTO shipping_labels (order_id, status, shipment_id, provider, tracking_number, label_url, error, claim_token)
      VALUES (1, 'purchased', 'shp_1', 'sendcloud', '6A11122233344', 'https://labels.example/6A111.pdf', 'adresse refusée : 3 rue des Lilas', 'clm_1');`,
   `INSERT INTO refunds (public_id, order_id, kind, status, amount_cents, provider, reason, note, created_by, idempotency_key)
@@ -91,6 +94,7 @@ const PEOPLE = [
   `INSERT INTO orders (provider_session_id, email, amount_total_cents, currency, status, public_id, ship_address)
      VALUES ('cs_test_2', '${OTHER}', 2500, 'eur', 'paid', 'ord_0000000002', '{"name":"Autre Cliente","city":"Nantes","country":"FR"}');`,
   `INSERT INTO order_guest_access (order_public_id, access_token) VALUES ('ord_0000000002', 'gat_other_token');`,
+  `INSERT INTO order_notifications (order_id, kind, state) VALUES ((SELECT id FROM orders WHERE public_id = 'ord_0000000002'), 'customer-receipt', 'pending');`,
 ];
 
 const orderRow = (target, id) => target.query(`SELECT * FROM orders WHERE public_id = '${id}'`)[0];
@@ -247,7 +251,12 @@ describe('les instructions', () => {
   it('réécrit ligne par ligne ce qui dépend de la ligne, et en une fois ce qui n’en dépend pas', () => {
     const statements = anonymizeScript(predicates, records, () => 'p@exemple.invalid');
     expect(statements.some((statement) => statement.startsWith('UPDATE "orders" SET') && statement.includes('"id" = 1'))).toBe(true);
-    expect(statements).toContain('UPDATE "order_notifications" SET "last_error" = NULL WHERE "order_id" IN (1);');
+    expect(statements).toContain(
+      'UPDATE "order_notifications" SET "last_error" = NULL, ' +
+        '"state" = CASE WHEN state IN (\'pending\', \'processing\') THEN \'skipped\' ELSE "state" END, ' +
+        '"lease_expires_at" = CASE WHEN state IN (\'pending\', \'processing\') THEN NULL ELSE "lease_expires_at" END ' +
+        'WHERE "order_id" IN (1);',
+    );
   });
 
   /** A token whose order has been anonymised is still a working key to that
@@ -404,6 +413,7 @@ describe('la commande, contre une vraie base', () => {
     expect(report.dryRun).toBe(true);
     expect(report.plan.find((entry) => entry.table === 'orders').columns).toEqual(['email', 'ship_address', 'tracking_number', 'label_url']);
     expect(report.plan.find((entry) => entry.table === 'order_guest_access').action).toBe('supprimée');
+    expect(report.plan.find((entry) => entry.table === 'order_notifications').columns).toEqual(['last_error', 'state', 'lease_expires_at']);
     expect(orderRow(target, 'ord_0000000001').email).toBe('Client@Example.FR');
   });
 
@@ -441,6 +451,21 @@ describe('la commande, contre une vraie base', () => {
     expect(label.error).toBeNull();
     // The label row itself stays: it carries what the shop paid for postage.
     expect(label.status).toBe('purchased');
+  });
+
+  // Certification step 8: a receipt Resend had refused was still pending when
+  // its buyer was erased, and the cron went on retrying it, to the pseudonym,
+  // until its fifth attempt.
+  it('clôt ce qui partirait encore vers la personne, et rien de ce qui est parti', () => {
+    const rows = target.query('SELECT kind, state, lease_expires_at FROM order_notifications WHERE order_id = 1 ORDER BY kind');
+    expect(rows).toEqual([
+      { kind: 'confirmation', state: 'failed', lease_expires_at: null },
+      { kind: 'customer-receipt', state: 'skipped', lease_expires_at: null },
+      { kind: 'order-shipped', state: 'skipped', lease_expires_at: null },
+      { kind: 'owner-notification', state: 'sent', lease_expires_at: null },
+    ]);
+    const other = target.query("SELECT state FROM order_notifications WHERE order_id = (SELECT id FROM orders WHERE public_id = 'ord_0000000002')");
+    expect(other).toEqual([{ state: 'pending' }]);
   });
 
   it('emporte le panier abandonné de la même personne', () => {

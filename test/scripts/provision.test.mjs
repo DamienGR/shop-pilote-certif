@@ -467,6 +467,55 @@ describe('shopctl provision', () => {
     });
   });
 
+  // The domain is attached to a bucket provisioning has just created, and
+  // `deploy` refuses production until it is: the step belongs here.
+  it('asks for a declared images domain to be attached before production deploys', () => {
+    const target = shop({ cloudflare: { imagesDomain: 'images.boutique.example.fr' } });
+    const production = target.run(['provision', '--env', 'production']);
+    expect(production.status, production.stderr).toBe(EXIT_CODES.ok);
+    expect(production.stdout).toMatch(/images\.boutique\.example\.fr : attachez-le à minshop-atelier-test-production-images/);
+    const staging = target.run(['provision', '--env', 'staging']);
+    expect(staging.stdout).not.toMatch(/attachez-le/);
+  });
+
+  // Demo is the rail a shop falls back to while no real one is configured.
+  // Behind staging's Access it is how a fresh shop is tried; on a public
+  // production it is an order form that takes no payment, open from the first
+  // deploy until Stripe is configured (certification step 9, 2026-10-20).
+  describe('the demo checkout', () => {
+    const disabled = (target) => target.query("SELECT value FROM settings WHERE key = 'payment_methods_disabled'");
+
+    it('is switched off in a production that has never been installed, once', () => {
+      const target = shop({ migrations: true });
+      const first = target.json(['provision', '--env', 'production']);
+      expect(first.status, first.stderr).toBe(EXIT_CODES.ok);
+      expect(first.report.demoCheckout).toBe('create');
+      expect(disabled(target)).toEqual([{ value: 'demo' }]);
+      expect(target.json(['provision', '--env', 'production']).report.demoCheckout).toBe('keep');
+    });
+
+    it('is left on in staging, behind its Access application', () => {
+      const target = shop({ migrations: true });
+      const { report } = target.json(['provision', '--env', 'staging']);
+      expect(report.demoCheckout).toBeNull();
+      expect(disabled(target)).toEqual([]);
+    });
+
+    // Once the shop is installed, which methods it offers is the merchant's
+    // setting: a re-run of provision must not switch back what they turned on.
+    it('is the merchant’s once the shop is installed', () => {
+      const target = shop({ migrations: true });
+      target.run(['provision', '--env', 'production']);
+      target.sql([
+        "DELETE FROM settings WHERE key = 'payment_methods_disabled';",
+        "INSERT INTO settings (key, value) VALUES ('setup_complete', '1');",
+      ]);
+      const { report } = target.json(['provision', '--env', 'production']);
+      expect(report.demoCheckout).toBe('merchant');
+      expect(disabled(target)).toEqual([]);
+    });
+  });
+
   it('keeps staging and production in separate name families', () => {
     const target = shop();
     target.run(['provision', '--env', 'staging']);

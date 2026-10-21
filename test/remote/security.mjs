@@ -41,6 +41,7 @@ import { parseArgs } from 'node:util';
 import { adminRoutes } from '../helpers/admin-routes.mjs';
 import { LOGIN_ATTEMPT_LIMIT, LOGIN_WINDOW_SECONDS } from '../../src/features/auth/loginThrottle.ts';
 import { generateAccessToken } from '../../src/features/ids/token.ts';
+import { fr } from '../../src/features/i18n/messages.ts';
 import { fetchAs, isAccessChallenge, remoteTarget } from './target.mjs';
 
 const { values: options } = parseArgs({ options: { limiteurs: { type: 'boolean', default: false } } });
@@ -263,13 +264,27 @@ await check('aucun champ de carte sur les pages de la boutique, du catalogue au 
   });
   const cookie = added.headers.getSetCookie().map((line) => line.split(';')[0]).join('; ');
   const wrong = [];
+  // A shop with no payment method yet — a production before Stripe, whose
+  // demo checkout provisioning switched off — has no express page: the cart
+  // says the order is unavailable, and /express sends the buyer back where
+  // they came from (src/pages/express.astro). That is the closed door, not a
+  // failure, and it is said rather than counted as having looked at a page
+  // that was never served (certification step 9, rehearsal of 2026-10-20).
+  let checkoutClosed = false;
+  const closed = [];
+  const backTo = { [`/express?product_id=${product.id}`]: `/products/${product.slug}`, '/express': '/cart' };
   for (const path of ['/', `/products/${product.slug}`, '/cart', `/express?product_id=${product.id}`, '/express']) {
     const response = await get(path, { headers: { cookie } });
     const html = await response.text();
-    if (response.status !== 200) wrong.push(`${path} → ${response.status}`);
+    if (path === '/cart' && response.status === 200) checkoutClosed = html.includes(fr['cart.unavailable']);
+    if (checkoutClosed && path in backTo && response.status === 303 && locationPath(response) === backTo[path]) closed.push(path);
+    else if (response.status !== 200) wrong.push(`${path} → ${response.status}`);
     else if (CARD_FIELD.test(html)) wrong.push(`${path} porte un champ de carte`);
   }
   expect(wrong.length === 0, wrong.join(', '));
+  if (closed.length > 0) {
+    return `aucun moyen de paiement configuré : ${closed.join(' et ')} renvoient vers la boutique ; à rejouer une fois Stripe configuré`;
+  }
 });
 
 /* ---------------------------------------------------------------- headers */

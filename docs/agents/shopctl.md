@@ -20,6 +20,7 @@ npm run shopctl -- new <slug> --account <id> --create-repo   # les trois d'un co
 npm run shopctl -- provision --env staging --dry-run
 npm run shopctl -- provision --env staging
 npm run shopctl -- deploy --env staging
+npm run shopctl -- admin password --env production < fichier   # avant le 1er deploy
 npm run shopctl -- deploy --env production --yes
 npm run shopctl -- destroy --env staging --confirm <slug>
 npm run shopctl -- privacy export --env production --email <adresse>
@@ -72,6 +73,24 @@ account (`d1 list`, `r2 bucket list`, `secret list`) and then decides. A second
 run creates nothing; a killed run resumes by asking the same questions. An
 existing secret is KEPT, never rotated — `SECRETS_KEK` decrypts the payment keys
 already in D1, and a new one would break payments with no error anyone can read.
+In PRODUCTION, and only while the shop has never been installed (no
+`setup_complete`), it also switches the demo checkout off — the
+`payment_methods_disabled` row the admin's Payments card writes. Demo is the
+rail a shop falls back to while no real one is configured; behind staging's
+Access that is how a fresh shop is tried, on a public production it is an order
+form that takes no payment, from the first deploy until Stripe is configured.
+Once installed, the setting is the merchant's and a re-run leaves it alone.
+
+`admin password` writes the administration's password hash into an
+environment's database: read from STDIN (typed twice without echo, or a file),
+hashed by the shop's own `src/features/auth/password.ts` in a child Node with
+type stripping, written through `applyScript` and read back. It exists for the
+window the first-run wizard opens: until a password exists, `/admin/setup`
+answers anyone (bootstrap), and on a production that is whoever reaches the
+new domain first. Run after `provision`, before the first `deploy`, the wizard
+then opens only after a login. It is also the lost-password reset, without the
+public window `scripts/admin-reset.sh` opened
+(`docs/operations/runbooks/mot-de-passe-admin.md`).
 
 A shop's LIFECYCLE has four steps, and the account boundary falls between the
 second and the third (ADR 0015): build on the agency account, private preview
@@ -96,7 +115,11 @@ own `CLOUDFLARE_ACCOUNT_ID`.
 write, the database deleted LAST and only once everything else is gone, and a
 non-empty bucket's refusal relayed rather than worked around — with an
 `r2 object delete` that says `--remote`, because wrangler 4 otherwise empties
-its local simulator. It also removes the sessions KV namespace, which nothing
+its local simulator, and the dashboard's Empty Bucket for the keys nobody
+printed (wrangler 4 lists no object: a nightly archive, an image uploaded
+through the admin). Destroying staging tells the operator to set the repository
+variable `STAGING_RETIRED`, which turns the Nightly's staging half off rather
+than leaving it red every night. It also removes the sessions KV namespace, which nothing
 in the tree names: the Astro adapter binds `SESSION` in the built
 configuration and wrangler provisions it at the first deploy as
 `<worker>-session`, so `destroy` looks it up on the account by that title.
@@ -109,10 +132,21 @@ CLI cannot encrypt one at all. It creates the repository — derived as `<owner>
 — pushes, creates both environments and sets their Cloudflare secrets;
 idempotently, asking GitHub first. Secrets are REWRITTEN rather than kept, the opposite of the Cloudflare
 rule, because GitHub never returns a secret's value: "already there" cannot be
-read as "already correct".
+read as "already correct". A third environment, `backup`, carries the Nightly's
+backup of production (ADR 0005's RPO once staging is gone): no reviewer,
+limited to the default branch by a deployment branch policy, created even
+before it has a token — GitHub creates a missing environment on first use,
+open to every branch. Its token comes from `CLOUDFLARE_API_TOKEN_BACKUP` alone,
+never the shared one, and a deploying token there is refused: an environment
+that asks nobody's approval would bypass production's reviewers.
 
 `deploy` follows plan §5.5 in order: resources, config, `npm run verify`,
 bookmark (production), migrations, build, upload, deferred secrets, smoke test.
+Only the production render names `cloudflare.imagesDomain` — the domain is
+attached to production's images bucket, and a staging or local build that used
+it would serve production's objects — so a production `deploy` refuses, before
+the backup, a declared domain that is not attached to that bucket: every
+product image would link to it.
 The smoke test can fail the command, and an unreachable site is a failure, never
 a pass. Cloudflare's own answer on a name that leads to no Worker yet — a
 `404`, "There is nothing here yet" or `error code: 1042` depending on what the
@@ -155,6 +189,7 @@ without tags answers "no such tag" for a tag the repository publishes, and a
 gate built on that frees a version number that is taken.
 
 Tests: `test/scripts/shopctl.test.mjs` (creation), `repo.test.mjs` (forge),
+`admin.test.mjs` (the password, never in an argument),
 `fleet.test.mjs` (core upgrade, fleet, pull requests) and `release.test.mjs`
 (the publication gate),
 `provision.test.mjs`, `deploy.test.mjs` and `destroy.test.mjs` (account,
@@ -181,7 +216,9 @@ runbook in the same commit.
 `shopctl monitor --env <env>` is the supervision, and it is a command because
 Cloudflare's notification catalogue has no alert for a Worker's error rate,
 its CPU time or a D1 quota on the plans a shop runs on. It reads the GraphQL
-Analytics API (`CLOUDFLARE_API_TOKEN`, Account Analytics: Read), fails at 1 %
+Analytics API (`CLOUDFLARE_API_TOKEN`; the same token reaches wrangler's
+`whoami` and `d1 list`, so it needs Account Analytics, D1 and Account
+Settings: Read, plus the user's Memberships and User Details: Read), fails at 1 %
 errors, at 70 % of a Workers Free quota, or on one invocation Cloudflare
 stopped for its limits (error 1102) — the CPU p99 is reported, not judged,
 because a cold start runs past 10 ms by construction and the plan tolerates it

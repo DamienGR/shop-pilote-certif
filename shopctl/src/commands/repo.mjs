@@ -12,7 +12,8 @@
  *
  *   1. the repository exists (created PRIVATE if not);
  *   2. the branch is on the remote;
- *   3. `staging` and `production` exist as GitHub Environments;
+ *   3. `staging` and `production` exist as GitHub Environments, and `backup`
+ *      — the nightly backup of production — limited to the default branch;
  *   4. each carries CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID, and the
  *      backup key the CI encrypts its archives with (SHOPCTL_BACKUP_KEY).
  *
@@ -32,7 +33,7 @@
  * up. GitHub Free has no environment secrets on a private repository.
  */
 import { ENVIRONMENTS, environmentAccount } from '../../../scripts/manifest.mjs';
-import { ShopctlError, preconditionError } from '../errors.mjs';
+import { ShopctlError, inputError, preconditionError } from '../errors.mjs';
 import { KEY_ENV, keyId, loadKey } from '../backup/crypto.mjs';
 import { capture } from '../process.mjs';
 import { resolveShop } from '../shop.mjs';
@@ -51,6 +52,7 @@ import {
   repository,
   repositoryNameFor,
   repositoryUrl,
+  restrictEnvironment,
   setEnvironmentSecret,
   userId,
 } from '../forge.mjs';
@@ -80,6 +82,9 @@ Les secrets viennent de l'environnement, jamais de la ligne de commande :
   CLOUDFLARE_API_TOKEN               utilisé pour les deux environnements
   CLOUDFLARE_API_TOKEN_STAGING       remplace le précédent pour staging
   CLOUDFLARE_API_TOKEN_PRODUCTION    remplace le précédent pour production
+  CLOUDFLARE_API_TOKEN_BACKUP        jeton de la sauvegarde nocturne de la
+                                     production (environnement backup) ; jamais
+                                     remplacé par CLOUDFLARE_API_TOKEN
 
 L'identifiant de compte, lui, vient du manifeste : cloudflare.accountId, et
 cloudflare.productionAccountId quand la production vit sur un autre compte.
@@ -100,6 +105,38 @@ export function tokenFor(env, source = process.env) {
   if (specific) return { value: specific, from: `CLOUDFLARE_API_TOKEN_${env.toUpperCase()}` };
   if (source.CLOUDFLARE_API_TOKEN) return { value: source.CLOUDFLARE_API_TOKEN, from: 'CLOUDFLARE_API_TOKEN' };
   return null;
+}
+
+/**
+ * The GitHub Environment the nightly backup of production runs in.
+ *
+ * Not `production`: its required reviewers would hold every night's run for an
+ * approval, and its token can deploy. An environment of its own, without
+ * reviewers, limited to the default branch so that no other branch's workflow
+ * can read its secrets, with a token of its own — D1 read and R2 write on the
+ * production account, nothing that deploys (ADR 0005, certification step 9).
+ */
+export const BACKUP_ENVIRONMENT = 'backup';
+
+/**
+ * The backup environment's token: its own variable or nothing.
+ *
+ * Never the shared CLOUDFLARE_API_TOKEN, and never production's: either would
+ * put a token that deploys in an environment that asks nobody's approval —
+ * production's reviewers, bypassed by a nightly job.
+ */
+export function backupTokenFor(source = process.env) {
+  const value = source.CLOUDFLARE_API_TOKEN_BACKUP;
+  if (!value) return null;
+  const deploying = [tokenFor('production', source), tokenFor('staging', source)].filter(Boolean);
+  const same = deploying.find((token) => token.value === value);
+  if (same) {
+    throw inputError(
+      `CLOUDFLARE_API_TOKEN_BACKUP est le jeton de ${same.from}.`,
+      "L'environnement backup ne demande l'approbation de personne : un jeton qui déploie y contournerait les relecteurs de production. Créez sur le compte de production un jeton à part — D1 en lecture, Workers R2 Storage en écriture, Account Settings et Memberships en lecture, User Details en lecture — et rien d'autre.",
+    );
+  }
+  return { value, from: 'CLOUDFLARE_API_TOKEN_BACKUP' };
 }
 
 /** The branch a shop tree is on. */
@@ -167,6 +204,8 @@ export function setupRepository({
 
   reporter.section('GitHub');
   assertForgeReady({ cwd: root });
+  // Refused before anything is written, like every other bad input.
+  const backupToken = backupTokenFor(env);
 
   // Three sources, in decreasing order of how explicit they are: the flag, the
   // remote the tree already has, and the convention. The convention is only
@@ -283,6 +322,23 @@ export function setupRepository({
     }
   }
 
+  // The nightly backup of production. Created even without its token, so
+  // that the environment a workflow names always exists WITH its branch
+  // policy: GitHub creates a missing environment on first use, open to every
+  // branch, and secrets added to it later would be readable from any of them.
+  const backupBranch = existing?.defaultBranchRef?.name ?? head;
+  const backupAction = existingEnvironments.includes(BACKUP_ENVIRONMENT) ? 'keep' : 'create';
+  if (dryRun) {
+    reporter.todo(`${BACKUP_ENVIRONMENT} — ${backupAction === 'keep' ? 'déjà présent' : 'serait créé'}, limité à la branche ${backupBranch}`);
+  } else {
+    putEnvironment(target.nameWithOwner, BACKUP_ENVIRONMENT, { cwd: root, branchPolicy: true });
+    restrictEnvironment(target.nameWithOwner, BACKUP_ENVIRONMENT, [backupBranch], { cwd: root });
+    reporter.ok(
+      `${BACKUP_ENVIRONMENT} — ${backupAction === 'keep' ? 'déjà présent' : 'créé'}, limité à la branche ${backupBranch}, sans relecteur (sauvegarde nocturne de la production)`,
+    );
+  }
+  environmentReport.push({ env: BACKUP_ENVIRONMENT, action: backupAction, protected: false, refusal: null, branches: [backupBranch] });
+
   // ── 4. the secrets ────────────────────────────────────────────────────────
   reporter.section('Secrets d\'environnement');
   // One account per environment, because ADR 0015 puts them on two: the
@@ -314,10 +370,21 @@ export function setupRepository({
     );
   }
 
+  // The backup environment reads production, on production's account.
+  accounts[BACKUP_ENVIRONMENT] = accounts.production;
+
   const secretReport = [];
   const missingTokens = [];
-  for (const name of ENVIRONMENTS) {
-    const token = tokenFor(name, env);
+  for (const name of [...ENVIRONMENTS, BACKUP_ENVIRONMENT]) {
+    const token = name === BACKUP_ENVIRONMENT ? backupToken : tokenFor(name, env);
+    if (!token && name === BACKUP_ENVIRONMENT) {
+      // Not a warning: before the launch there is no production to back up.
+      reporter.todo(
+        `${BACKUP_ENVIRONMENT} : aucun jeton (CLOUDFLARE_API_TOKEN_BACKUP) — la production ne sera pas sauvegardée chaque nuit.`,
+        'À poser avant la mise en ligne : un jeton du compte de production, D1 en lecture, Workers R2 Storage en écriture, Account Settings, Memberships et User Details en lecture. Relancez alors `shopctl repo`.',
+      );
+      continue;
+    }
     if (!token) {
       missingTokens.push(name);
       reporter.warn(

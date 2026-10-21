@@ -245,3 +245,22 @@ export const WITHHELD_ACTIONS = new Set(['internal', 'revoke']);
 
 /** Actions the anonymisation writes over. The rest survive it, on purpose. */
 export const REWRITTEN_ACTIONS = new Set(['subject', 'erase', 'address']);
+
+/**
+ * Work the shop would still do for the person once they are erased, closed in
+ * the same statement that rewrites the table.
+ *
+ * Not personal columns, so not in `COLUMN_POLICY`: what they hold is a queue.
+ * A notification still `pending` (or `processing` under a lease) is retried by
+ * the cron, and it reads its recipient from the order at send time — the
+ * pseudonym the erasure has just written (certification step 8: a receipt
+ * Resend had refused kept retrying to `…@exemple.invalid` until its fifth
+ * attempt). Closed as `skipped`, the state the outbox itself gives a message it
+ * decided not to send; one already sent keeps its history.
+ */
+export const CLOSED_ON_ERASURE = {
+  order_notifications: {
+    open: "state IN ('pending', 'processing')",
+    set: { state: "'skipped'", lease_expires_at: 'NULL' },
+  },
+};

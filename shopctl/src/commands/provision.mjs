@@ -50,6 +50,7 @@ import {
   workerExists,
 } from '../cloudflare.mjs';
 import { ShopctlError, verificationError } from '../errors.mjs';
+import { applyScript, query } from '../backup/store.mjs';
 import { requireEnvironment, resolveShop } from '../shop.mjs';
 import { renderWrangler, resourceNames, wranglerSubstitutions } from '../../../scripts/manifest.mjs';
 import { DEFAULT_KEEP_DAYS } from '../backup/archive.mjs';
@@ -294,9 +295,19 @@ export function runProvision(args, reporter) {
     else if (imagesExposure.devUrl) {
       reporter.warn(
         `${names.images} est servi par son URL r2.dev (${imagesExposure.devUrl}).`,
-        'Elle convient à un essai mais n\'est pas un domaine de production : préférez un domaine personnalisé, et renseignez IMAGE_BASE_URL.',
+        'Elle convient à un essai mais n\'est pas un domaine de production : préférez un domaine personnalisé, déclaré dans cloudflare.imagesDomain.',
       );
     } else reporter.ok(`${names.images} — images servies par le Worker (aucun domaine d'images)`);
+  }
+  // Declared, the domain is what production's images link to, so `deploy`
+  // refuses until it is attached. The bucket exists from here on: this is the
+  // moment to attach it, not the morning of the launch.
+  const declaredImagesDomain = env === 'production' ? (manifest.cloudflare.imagesDomain ?? null) : null;
+  if (declaredImagesDomain && !imagesExposure?.domains.includes(declaredImagesDomain)) {
+    reporter.todo(
+      `cloudflare.imagesDomain annonce ${declaredImagesDomain} : attachez-le à ${names.images} avant le déploiement.`,
+      `Tableau de bord → R2 → ${names.images} → Settings → Custom Domains. \`shopctl deploy --env production\` refuse tant qu'il n'y est pas.`,
+    );
   }
 
   // ── Retention of the backups ──────────────────────────────────────────────
@@ -330,12 +341,14 @@ export function runProvision(args, reporter) {
   // ── Configuration, migrations, secrets ────────────────────────────────────
   let config = null;
   let migrations = 'skipped';
+  let demoCheckout = null;
   const secrets = { present: [], created: [], pending: [] };
 
   if (dryRun) {
     reporter.section('Simulation : rien n\'a été écrit');
     reporter.todo(`wrangler.jsonc serait rendu pour ${names.worker}`);
     reporter.todo('les migrations seraient appliquées à la base distante');
+    if (env === 'production') reporter.todo('la démonstration de paiement serait coupée, si la boutique n\'est pas encore installée');
     reporter.todo(`les secrets internes manquants seraient posés : ${INTERNAL_SECRETS.map(([name]) => name).join(', ')}`);
   } else if (failures.length === 0) {
     reporter.section('Configuration et migrations');
@@ -345,6 +358,7 @@ export function runProvision(args, reporter) {
     applyMigrations({ cwd: root, remote: true });
     migrations = 'applied';
     reporter.ok(`migrations appliquées à ${names.database}`);
+    if (env === 'production') demoCheckout = closeDemoCheckout({ root, database: names.database, reporter });
 
     reporter.section('Secrets internes');
     const known = listSecrets(names.worker, { cwd: root });
@@ -390,6 +404,7 @@ export function runProvision(args, reporter) {
     retention,
     config: config?.out ?? null,
     migrations,
+    demoCheckout,
     secrets,
     workerDeployed: dryRun ? null : workerExists(names.worker, { cwd: root }),
   });
@@ -409,4 +424,69 @@ export function runProvision(args, reporter) {
     );
   }
   return 0;
+}
+
+/** The setting Admin → Réglages → Paiements writes: the methods switched OFF. */
+const DISABLED_METHODS = 'payment_methods_disabled';
+
+/** The settings rows provisioning itself may write. `restore` does not count
+ *  them as the shop's data when it asks whether its target is empty. */
+export const PROVISIONED_SETTINGS = [DISABLED_METHODS];
+
+/**
+ * The demo checkout, switched off in a production nobody has installed yet.
+ *
+ * Demo is the rail a shop falls back to while no real one is configured
+ * (src/features/payments/index.ts). Behind a staging's Access application it is
+ * how a fresh shop is tried end to end. On a production it is a public form
+ * that takes an order without a payment — it holds stock, sends a confirmation
+ * to whatever address was typed, and lands in the back office — from the first
+ * deploy until Stripe is configured, hours later on step 9's sequence
+ * (certification, rehearsal of 2026-10-20).
+ *
+ * So the production database is born with demo switched off, in the row the
+ * admin writes. Only while the shop has never been installed: once
+ * `setup_complete` exists the setting is the merchant's, and a re-run must not
+ * overturn it. The merchant switches demo back on in one click to try a
+ * purchase before Stripe; once Stripe is configured it is withdrawn anyway.
+ *
+ * A failure is a warning with its manual remedy, not a failed provisioning:
+ * everything else is in place, and the switch is one click in the admin.
+ */
+function closeDemoCheckout({ root, database, reporter }) {
+  const read = () => {
+    const [rows] = query([`SELECT key, value FROM settings WHERE key IN ('setup_complete', '${DISABLED_METHODS}')`], {
+      cwd: root,
+      remote: true,
+      what: 'les moyens de paiement coupés',
+    });
+    const values = new Map(rows.map((row) => [row.key, String(row.value ?? '')]));
+    return { installed: values.has('setup_complete'), disabled: values.get(DISABLED_METHODS) ?? null };
+  };
+  const demoOff = (value) => (value ?? '').split(',').map((method) => method.trim()).includes('demo');
+  try {
+    const before = read();
+    if (before.installed || before.disabled !== null) {
+      reporter.ok(
+        demoOff(before.disabled)
+          ? `${database} — démonstration de paiement déjà coupée`
+          : `${database} — moyens de paiement laissés au réglage du marchand`,
+      );
+      return demoOff(before.disabled) ? 'keep' : 'merchant';
+    }
+    applyScript([`INSERT INTO settings (key, value) VALUES ('${DISABLED_METHODS}', 'demo') ON CONFLICT(key) DO NOTHING;`], {
+      cwd: root,
+      remote: true,
+    });
+    if (!demoOff(read().disabled)) throw verificationError(`le réglage relu dans ${database} ne coupe pas la démonstration.`);
+    reporter.ok(`${database} — démonstration de paiement coupée : le panier n'offre rien tant que Stripe n'est pas configuré`);
+    return 'create';
+  } catch (error) {
+    if (!(error instanceof ShopctlError)) throw error;
+    reporter.warn(
+      `la démonstration de paiement n'a pas pu être coupée dans ${database} : ${error.message}`,
+      'Coupez-la dans Réglages → Paiements avant d\'ouvrir la boutique : sinon le panier prend des commandes sans paiement.',
+    );
+    return 'unverified';
+  }
 }

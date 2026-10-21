@@ -15,6 +15,8 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
+import { OPERATOR_ENV } from './operator-env.mjs';
+
 const CORE = new URL('../../', import.meta.url).pathname;
 
 /**
@@ -38,7 +40,7 @@ export function nextMinor(version = CORE_VERSION) {
 }
 
 /** Git needs an identity to commit, and a test must not depend on the one the
- *  developer happens to have configured. Nor on the operator's account: every
+ *  developer happens to have configured. Nor on the operator's shell: every
  *  certification sheet exports CLOUDFLARE_ACCOUNT_ID, `shopctl new` takes it as
  *  the shop's default account, and `shopctl deploy` — which runs this suite
  *  through `npm run verify` — failed on the manifest it then wrote. */
@@ -48,8 +50,7 @@ export const GIT_ENV = {
   GIT_AUTHOR_EMAIL: 'tests@example.com',
   GIT_COMMITTER_NAME: 'Minshop Tests',
   GIT_COMMITTER_EMAIL: 'tests@example.com',
-  CLOUDFLARE_ACCOUNT_ID: '',
-  CLOUDFLARE_API_TOKEN: '',
+  ...OPERATOR_ENV,
 };
 
 export function git(args, cwd) {

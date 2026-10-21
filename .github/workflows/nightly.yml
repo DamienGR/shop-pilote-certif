@@ -19,11 +19,24 @@
 #     the webhook gives its unit back, and a test e-mail through the saved
 #     configuration.
 #
-# Staging, never production — with ONE read-only exception: production's
-# error rate and quotas (`shopctl monitor`, docs/operations/README.md), read
-# with a token that can read analytics and nothing else. Not through the
+# Staging, never production — with TWO exceptions, neither through the
 # `production` environment: its required reviewers would hold the run for an
 # approval every night, and the deploy token it carries can write.
+#
+#   - production's error rate and quotas (`shopctl monitor`,
+#     docs/operations/README.md), read with a token that can read analytics
+#     and nothing else;
+#   - production's backup (ADR 0005: RPO 24 h), taken in the `backup`
+#     environment `shopctl repo` limits to the default branch, with a token
+#     that reads D1 and writes R2 and cannot deploy. The archive goes to
+#     production's own `-backups` bucket and is verified with the key on the
+#     runner; it is never restored there (`restore` refuses a production
+#     archive locally). Until certification step 9 the staging half covers
+#     the RPO; from then on, with staging destroyed, this job does.
+#
+# Once staging is destroyed (`shopctl destroy --env staging`, at the launch —
+# ADR 0015), the repository variable STAGING_RETIRED — the date it went — turns
+# the staging half off, said in the run rather than red every night.
 #
 # Each check that needs a credential runs only when its credential is
 # configured, and says so when it is skipped rather than passing silently:
@@ -41,10 +54,21 @@
 #   vars.STAGING_URL              the staging origin, when the manifest
 #                                 declares no stagingDomain (a workers.dev URL)
 #
+# in the `backup` environment, placed by `shopctl repo` from
+# CLOUDFLARE_API_TOKEN_BACKUP:
+#
+#   CLOUDFLARE_API_TOKEN          on the account production lives on: D1 Read,
+#                                 Workers R2 Storage Write, Account Settings
+#                                 Read, plus the user's Memberships and User
+#                                 Details: Read for wrangler whoami
+#   CLOUDFLARE_ACCOUNT_ID, SHOPCTL_BACKUP_KEY
+#
 # and, as repository secrets for the production watch:
 #
-#   MONITOR_CLOUDFLARE_API_TOKEN  Account Analytics: Read and D1: Read, on the
-#                                 account production lives on — nothing more
+#   MONITOR_CLOUDFLARE_API_TOKEN  read-only, on the account production lives on:
+#                                 Account Analytics, D1 and Account Settings:
+#                                 Read, plus the user's Memberships and User
+#                                 Details: Read for wrangler whoami — nothing more
 #   MONITOR_CLOUDFLARE_ACCOUNT_ID that account
 #
 # GitHub suspends a schedule after sixty days without activity in a public
@@ -130,11 +154,17 @@ jobs:
 
       - name: Read the manifest
         id: shop
+        env:
+          STAGING_RETIRED: ${{ vars.STAGING_RETIRED }}
         run: |
           if [ -f client/client.yaml ]; then
             slug="$(node --input-type=module -e "import { resolveShop } from './shopctl/src/shop.mjs'; console.log(resolveShop(process.cwd()).manifest.client.slug)")"
             echo "slug=$slug" >> "$GITHUB_OUTPUT"
-            echo "Boutique : $slug — les contrôles de staging tournent."
+            if [ -n "$STAGING_RETIRED" ]; then
+              echo "::notice::Staging détruit le $STAGING_RETIRED (variable STAGING_RETIRED) : ses contrôles ne tournent plus ; la production est sauvegardée et surveillée."
+            else
+              echo "Boutique : $slug — les contrôles de staging tournent."
+            fi
           else
             echo "Pas de client/client.yaml : le socle n'a pas de staging à interroger."
           fi
@@ -142,7 +172,7 @@ jobs:
   staging:
     name: Staging (${{ needs.detect.outputs.shop }})
     needs: detect
-    if: ${{ needs.detect.outputs.shop != '' }}
+    if: ${{ needs.detect.outputs.shop != '' && vars.STAGING_RETIRED == '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: staging
@@ -269,6 +299,70 @@ jobs:
             monitor.json
           retention-days: 30
           if-no-files-found: warn
+
+  production-backup:
+    name: Production backup (${{ needs.detect.outputs.shop }})
+    needs: detect
+    if: ${{ needs.detect.outputs.shop != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: backup
+
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      SHOPCTL_BACKUP_KEY: ${{ secrets.SHOPCTL_BACKUP_KEY }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      # wrangler, for the database and the buckets; nothing else is used.
+      - name: Install dependencies
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: npm ci
+
+      # To production's own `-backups` bucket, private and in its jurisdiction,
+      # like the archive every production deploy takes first. Never to a GitHub
+      # artifact.
+      - name: Back up production
+        id: backup
+        run: |
+          set -euo pipefail
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN absent de l'environnement backup : la production n'est pas sauvegardée cette nuit (ADR 0005). Posez CLOUDFLARE_API_TOKEN_BACKUP et relancez shopctl repo."
+            exit 0
+          fi
+          node shopctl/bin/shopctl.mjs backup --env production --upload --json | tee backup-production.json
+          echo "id=$(node -p "JSON.parse(require('node:fs').readFileSync('backup-production.json','utf8')).id")" >> "$GITHUB_OUTPUT"
+
+      # Opened with the key and every digest re-derived from the rows, without
+      # restoring it: a production archive is never restored on a runner.
+      - name: Verify the archive
+        if: ${{ steps.backup.outputs.id != '' }}
+        env:
+          ARCHIVE: ${{ steps.backup.outputs.id }}
+        run: |
+          set -euo pipefail
+          node shopctl/bin/shopctl.mjs backup verify "$ARCHIVE" --json | tee verify-production.json
+
+      - name: Keep the reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-${{ needs.detect.outputs.shop }}-production-backup-${{ github.run_id }}
+          path: |
+            backup-production.json
+            verify-production.json
+          retention-days: 30
+          if-no-files-found: ignore
 
   production-watch:
     name: Production error rate and quotas (${{ needs.detect.outputs.shop }})
