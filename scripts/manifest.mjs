@@ -255,7 +255,11 @@ export function wranglerSubstitutions(manifest, { databaseId = '00000000-0000-00
   // keeps workers.dev, because that is then the only way to reach it at all.
   const host = environmentHost(manifest, env);
   const routes = host ? [{ pattern: host, custom_domain: true }] : [];
-  const imagesDomain = manifest.cloudflare.imagesDomain ?? null;
+  // The images domain is attached to PRODUCTION's images bucket, so only the
+  // production render names it. A staging that did would show production's
+  // objects — or a broken image for every one uploaded to staging — and so
+  // would a local build (certification step 9, rehearsal of 2026-10-20).
+  const imagesDomain = env === 'production' ? (manifest.cloudflare.imagesDomain ?? null) : null;
   // The Access application in front of the staging hostname. Behind it, every
   // request carries an assertion, and the Worker refuses one it has no issuer
   // and audience to verify (src/features/auth/accessGate.ts) — so a gated

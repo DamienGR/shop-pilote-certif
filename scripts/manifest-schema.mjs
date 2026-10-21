@@ -178,7 +178,7 @@ export const MANIFEST_SPEC = {
         optional: true,
         schema: { type: 'string', pattern: DOMAIN, minLength: 4, maxLength: 253 },
         description:
-          'Public custom domain of the images bucket, when one is attached. Absent means product images are served through the Worker, which is the default and is never wrong — only slower.',
+          'Public custom domain of the production images bucket, when one is attached. Only the production render uses it; staging and local builds serve images through the Worker. Absent means product images are served through the Worker, which is the default and is never wrong — only slower.',
       },
       stagingDomain: {
         optional: true,

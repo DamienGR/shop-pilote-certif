@@ -82,8 +82,13 @@ Turnstile. D'ici là, le paiement répond en erreur.
 
 Restaurer dans un environnement neuf, c'est aussi le déployer :
 `shopctl deploy --env <env>` (`--yes` en production) pose ses secrets
-internes et lie le Worker à la nouvelle base. Le rapport de la répétition de
-l'étape 8 de la certification donne l'ordre de grandeur de chaque étape.
+internes et lie le Worker à la nouvelle base. Sur un compte où personne n'a
+encore ouvert Workers & Pages, l'ouvrir une fois avant : sans sous-domaine
+workers.dev, Cloudflare refuse le cron après avoir téléversé le Worker (code
+10063), et `deploy` s'arrête avant de poser les secrets internes ; le relancer
+une fois la page ouverte. Les preuves de l'étape 8 de la certification
+(`client/certification/etape-8/` du pilote) donnent le temps réel de chaque
+étape : 29 minutes, du premier `provision` au test de fumée vert.
 
 ## 4. Revenir à la normale
 

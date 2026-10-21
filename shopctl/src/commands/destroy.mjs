@@ -211,7 +211,11 @@ export function runDestroy(args, reporter) {
       // `--remote` is not optional: wrangler 4 runs `r2 object` against the
       // local simulator by default, where the delete succeeds on nothing and
       // the next run is refused by the same bucket.
-      reporter.step(`    npx wrangler r2 object delete ${name}/<clé> --remote -J ${jurisdiction}  — ou videz-le dans le tableau de bord.`);
+      reporter.step(`    npx wrangler r2 object delete ${name}/<clé> --remote -J ${jurisdiction}  — pour un objet dont vous connaissez la clé ;`);
+      // wrangler 4 lists no object, so a key nobody printed — a nightly
+      // archive, an image uploaded through the admin — is one only the
+      // dashboard shows (certification step 9, rehearsal of 2026-10-20).
+      reporter.step(`    sinon le tableau de bord : R2 → ${name} → Settings → Empty Bucket, qui le vide en une fois.`);
     }
   }
 
@@ -253,6 +257,13 @@ export function runDestroy(args, reporter) {
     reporter.section(
       `${env} supprimé pour ${manifest.client.slug}. Le dépôt Git et son historique ne sont pas touchés.`,
     );
+    // The Nightly asks its questions of staging, and would be red every night
+    // from now on. Said here, because this is the moment it becomes true.
+    if (env === 'staging') {
+      reporter.step(
+        `    Le Nightly du dépôt interroge encore ce staging : posez la variable de dépôt STAGING_RETIRED (gh variable set STAGING_RETIRED --body ${new Date().toISOString().slice(0, 10)}) pour qu'il cesse.`,
+      );
+    }
   }
   return 0;
 }

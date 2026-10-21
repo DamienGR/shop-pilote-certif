@@ -148,6 +148,19 @@ describe('shopctl monitor', () => {
     expect(result.stderr).toMatch(/Workers Paid/);
   });
 
+  // Certification step 8: a token holding « Account Analytics : Read » alone,
+  // as this command's help asked, and the run stopped on "wrangler n'est pas
+  // authentifié" with `wrangler login` as the remedy. The token reaches wrangler
+  // too, for `whoami` and `d1 list`, and those want rights of their own.
+  it('names the rights wrangler wants when it refuses the token', () => {
+    const target = provisioned();
+    target.account({ authenticated: false });
+    const result = target.run(['monitor', '--env', 'staging'], { CLOUDFLARE_API_TOKEN: 'analytics-read-token' });
+    expect(result.status).toBe(EXIT_CODES.precondition);
+    expect(result.stderr).toMatch(/Memberships : Read/);
+    expect(result.stderr).not.toMatch(/wrangler login/);
+  });
+
   // "Could not ask" must never render as "nothing to report".
   it('treats a refusal from the API as a failure, not a quiet night', async () => {
     const target = provisioned();

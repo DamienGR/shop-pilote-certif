@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 // .mjs like its neighbours: tsconfig pins `types` to the Cloudflare types, so
 // node builtins have no declarations in a .ts file here.
+import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -334,7 +335,11 @@ describe('the smoke test against a live origin', () => {
   it('gives up after the wait, on a verdict that names Cloudflare', async () => {
     unserved = -1;
     try {
-      const report = await runSmoke(origin, { waitMs: 50, intervalMs: 10 });
+      // Room for a second attempt even on a loaded machine: the deadline runs
+      // from the start, and one attempt is five requests in a row. At 50 ms,
+      // the first one alone sometimes used it up, and `npm run verify`, which
+      // a production `deploy` runs, went red one time in five.
+      const report = await runSmoke(origin, { waitMs: 500, intervalMs: 50 });
       expect(report).toMatchObject({ ok: false, notServed: true });
       expect(report.attempts).toBeGreaterThan(1);
       expect(report.results.every((result) => result.message?.includes('error code: 1042'))).toBe(true);
@@ -673,6 +678,31 @@ describe('shopctl deploy', () => {
       expect(upload).toBeLessThan(migrated);
     });
 
+    // Certification step 9: rendered into production's configuration, the
+    // images domain is where every product image points. Declared and not
+    // attached, the shop would open on a catalogue of broken images.
+    it('refuses production when the declared images domain is not attached', () => {
+      const target = provisioned('production', { cloudflare: { imagesDomain: 'images.boutique.example.fr' } });
+      const before = target.read();
+      const result = target.run(['deploy', '--env', 'production', '--yes', ...FAST, '--skip-smoke']);
+      expect(result.status).toBe(EXIT_CODES.verification);
+      expect(result.stderr).toMatch(/images\.boutique\.example\.fr, qui n'est pas attaché/);
+      const after = target.read();
+      expect(after.deploys ?? []).toEqual([]);
+      expect(after.migrationsApplied).toBe(before.migrationsApplied);
+    });
+
+    it('serves production\u2019s images from its domain once it is attached', () => {
+      const target = provisioned('production', { cloudflare: { imagesDomain: 'images.boutique.example.fr' } });
+      const bucket = names(target.slug, 'production').images;
+      target.account({
+        r2: target.read().r2.map((entry) => (entry.name === bucket ? { ...entry, domains: ['images.boutique.example.fr'] } : entry)),
+      });
+      const result = target.run(['deploy', '--env', 'production', '--yes', ...FAST, '--skip-smoke']);
+      expect(result.status, result.stderr).toBe(EXIT_CODES.ok);
+      expect(readFileSync(join(target.root, 'wrangler.jsonc'), 'utf8')).toContain('"IMAGE_BASE_URL": "https://images.boutique.example.fr"');
+    });
+
     it('refuses production when the backups bucket is missing', () => {
       const target = provisioned('production');
       const bucket = names(target.slug, 'production').backups;
@@ -699,6 +729,22 @@ describe('shopctl deploy', () => {
     it('refuses a production dry run without a backup key too', () => {
       const target = provisioned('production', { key: false });
       expect(target.run(['deploy', '--env', 'production', '--dry-run', ...FAST]).status).toBe(EXIT_CODES.precondition);
+    });
+
+    // Certification step 8: the restore sheet exports SHOPCTL_BACKUP_KEY in a
+    // fresh tree, then `deploy` runs this suite through `npm run verify`. The
+    // key reached every spawned shopctl, eight tests saw it, and the deploy
+    // stopped on its own gate.
+    it('does not hand the operator’s exported backup key to the shop under test', () => {
+      const target = provisioned('production', { key: false });
+      const previous = process.env.SHOPCTL_BACKUP_KEY;
+      process.env.SHOPCTL_BACKUP_KEY = randomBytes(32).toString('base64');
+      try {
+        expect(target.run(['deploy', '--env', 'production', '--dry-run', ...FAST]).status).toBe(EXIT_CODES.precondition);
+      } finally {
+        if (previous === undefined) delete process.env.SHOPCTL_BACKUP_KEY;
+        else process.env.SHOPCTL_BACKUP_KEY = previous;
+      }
     });
 
     it('stops before the first write when the backup fails', () => {
@@ -760,6 +806,21 @@ describe('shopctl deploy', () => {
       const result = target.run(['deploy', '--env', 'staging', ...FAST]);
       expect(result.status).toBe(EXIT_CODES.verification);
       expect(result.stderr).toMatch(/aucune URL/);
+    });
+  });
+
+  describe('when wrangler refuses', () => {
+    // Certification step 8: the report said "was only partially updated:" and
+    // stopped there. The cause and its remedy were four lines further down,
+    // and only wrangler's own log file still had them.
+    it('relays the API’s sentence and its code, not the line announcing a failure', () => {
+      const target = provisioned();
+      target.account({ workersDevSubdomain: false });
+      const result = target.json(['deploy', '--env', 'staging', ...FAST, '--skip-smoke']);
+      expect(result.status).toBe(EXIT_CODES.external);
+      expect(result.report.error.hint).toBe(
+        'You need a workers.dev subdomain in order to proceed. Please go to the dashboard and open the Workers menu. Opening the Workers landing page for the first time will create a workers.dev subdomain automatically. [code: 10063]',
+      );
     });
   });
 });

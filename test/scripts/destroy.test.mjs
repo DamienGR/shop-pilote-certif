@@ -113,6 +113,18 @@ describe('shopctl destroy', () => {
       expect(state.r2.map((bucket) => bucket.name)).toEqual([production.images, production.files, production.backups]);
     });
 
+    // The Nightly asks its questions of staging: from the teardown on, it
+    // would be red every night. The command that makes that true says so.
+    it('tells the operator to retire the Nightly\u2019s staging checks, and only for staging', () => {
+      const target = provisioned();
+      target.run(['provision', '--env', 'production']);
+      const staging = target.run(['destroy', '--env', 'staging', ...CONFIRM(target)]);
+      expect(staging.stdout).toMatch(/gh variable set STAGING_RETIRED --body \d{4}-\d{2}-\d{2}/);
+      const production = target.run(['destroy', '--env', 'production', '--yes', ...CONFIRM(target)]);
+      expect(production.status, production.stderr).toBe(EXIT_CODES.ok);
+      expect(production.stdout).not.toMatch(/STAGING_RETIRED/);
+    });
+
     it('deletes the Worker before anything else', () => {
       const target = deployed();
 
@@ -219,6 +231,8 @@ describe('shopctl destroy', () => {
       const result = target.run(['destroy', '--env', 'staging', ...CONFIRM(target)]);
       expect(result.stdout).toMatch(/R2 refuse un bucket non vide/);
       expect(result.stdout).toMatch(/wrangler r2 object delete/);
+      // wrangler lists no object: a key nobody printed is the dashboard's.
+      expect(result.stdout).toMatch(/Settings → Empty Bucket/);
       // Nothing was emptied on the operator's behalf.
       expect(target.read().calls.some(({ argv }) => argv.join(' ').startsWith('r2 object delete'))).toBe(false);
     });

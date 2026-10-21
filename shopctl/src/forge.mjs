@@ -213,8 +213,11 @@ export function environments(nameWithOwner, { cwd } = {}) {
  *
  * @param {Array<{ type: 'User'|'Team', id: number }>} reviewers
  */
-export function putEnvironment(nameWithOwner, name, { cwd, reviewers = [] } = {}) {
-  const body = reviewers.length > 0 ? { reviewers } : {};
+export function putEnvironment(nameWithOwner, name, { cwd, reviewers = [], branchPolicy = false } = {}) {
+  // `custom_branch_policies` is the switch; the branches themselves are added
+  // one by one, by `restrictEnvironment`.
+  const policy = branchPolicy ? { deployment_branch_policy: { protected_branches: false, custom_branch_policies: true } } : {};
+  const body = { ...(reviewers.length > 0 ? { reviewers } : {}), ...policy };
   const result = gh(
     ['api', '--method', 'PUT', `repos/${nameWithOwner}/environments/${name}`, '--input', '-'],
     { cwd, input: JSON.stringify(body), allowFailure: reviewers.length > 0 },
@@ -226,7 +229,7 @@ export function putEnvironment(nameWithOwner, name, { cwd, reviewers = [] } = {}
   // what carries the secrets, and say so — never silently.
   gh(['api', '--method', 'PUT', `repos/${nameWithOwner}/environments/${name}`, '--input', '-'], {
     cwd,
-    input: JSON.stringify({}),
+    input: JSON.stringify(policy),
   });
   return {
     name,
@@ -234,6 +237,33 @@ export function putEnvironment(nameWithOwner, name, { cwd, reviewers = [] } = {}
     protected: false,
     refusal: firstLine(result.stderr) ?? 'GitHub a refusé les relecteurs obligatoires.',
   };
+}
+
+/**
+ * Limit an environment to the branches named: a workflow run on any other
+ * branch is refused the environment, and with it its secrets.
+ *
+ * Asked before written, like everything here: the policies already present
+ * are listed, and only the missing ones are added. The environment must have
+ * been put with `branchPolicy: true` first, or GitHub refuses the branches.
+ */
+export function restrictEnvironment(nameWithOwner, name, branches, { cwd } = {}) {
+  const path = `repos/${nameWithOwner}/environments/${name}/deployment-branch-policies`;
+  const listed = gh(['api', path], { cwd, allowFailure: true });
+  let present = [];
+  if (listed.status === 0) {
+    try {
+      const document = JSON.parse(listed.stdout.slice(listed.stdout.search(/[[{]/)));
+      present = (document.branch_policies ?? []).map((entry) => entry.name);
+    } catch {
+      present = [];
+    }
+  }
+  const added = branches.filter((branch) => !present.includes(branch));
+  for (const branch of added) {
+    gh(['api', '--method', 'POST', path, '--input', '-'], { cwd, input: JSON.stringify({ name: branch, type: 'branch' }) });
+  }
+  return { branches, added };
 }
 
 /** Secrets an environment already holds, by name. Never their values —

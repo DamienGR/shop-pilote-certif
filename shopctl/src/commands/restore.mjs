@@ -43,11 +43,11 @@ import { join, resolve } from 'node:path';
 import { applyMigrations, listBuckets, listDatabases, expectedAccount, resolveAccount, whoami } from '../cloudflare.mjs';
 import { ShopctlError, inputError, preconditionError, verificationError } from '../errors.mjs';
 import { requireEnvironment } from '../shop.mjs';
-import { renderEnvironmentConfig } from './provision.mjs';
+import { PROVISIONED_SETTINGS, renderEnvironmentConfig } from './provision.mjs';
 import { resourceNames } from '../../../scripts/manifest.mjs';
 import { restoreScript, tableDigest } from '../backup/dump.mjs';
 import { classifyTables, generatedColumns, orderTables, seededTables } from '../backup/schema.mjs';
-import { applyScript, countRows, putObject, readSchema, readTables } from '../backup/store.mjs';
+import { applyScript, countRows, putObject, query, readSchema, readTables } from '../backup/store.mjs';
 import { DATA_FILE, authenticatedHeader, readArchive } from '../backup/archive.mjs';
 import { keyId, keyMatches, loadKey, open } from '../backup/crypto.mjs';
 import { backupContext } from './backup.mjs';
@@ -243,6 +243,18 @@ export function runRestore(args, reporter) {
     : new Set();
   const targetOrder = orderTables(tables).order;
   const counts = countRows(targetOrder, { cwd: root, remote });
+  // `provision` writes rows of its own into a production nobody has installed
+  // yet — the demo checkout, switched off. Like the migrations' seeds they are
+  // the tooling's, not the shop's: a production provisioned five minutes ago
+  // is an empty one, which is what the restore drill and the corrupted-base
+  // runbook restore into. The restore replaces them with the archive's.
+  if (counts.settings > 0) {
+    const [[row]] = query(
+      [`SELECT COUNT(*) AS n FROM settings WHERE key NOT IN (${PROVISIONED_SETTINGS.map((key) => `'${key}'`).join(', ')})`],
+      { cwd: root, remote, what: 'les réglages de la cible' },
+    );
+    counts.settings = Number(row?.n ?? 0);
+  }
   const occupied = Object.entries(counts).filter(([name, count]) => count > 0 && !seeded.has(name));
   if (occupied.length > 0 && args.values['--overwrite'] !== true) {
     throw preconditionError(

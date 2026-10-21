@@ -11,6 +11,10 @@
 # Requires Cloudflare account access (wrangler) — only the store owner can run it;
 # it is NOT a public "forgot password" endpoint. After running, open /admin/setup
 # and set a new password promptly (the wizard is open until you do).
+#
+# For a DEPLOYED store, prefer `npm run shopctl -- admin password --env <env>`:
+# it writes the new hash without ever reopening the wizard to the public
+# (docs/operations/runbooks/mot-de-passe-admin.md).
 set -euo pipefail
 
 REMOTE=0

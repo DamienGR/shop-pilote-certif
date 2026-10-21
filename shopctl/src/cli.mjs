@@ -28,6 +28,7 @@ import { PRIVACY_FLAGS, PRIVACY_OPTIONS, privacyUsage, runPrivacy } from './comm
 import { CORE_FLAGS, CORE_OPTIONS, coreUsage, runCore } from './commands/core.mjs';
 import { FLEET_FLAGS, FLEET_OPTIONS, fleetUsage, runFleet } from './commands/fleet.mjs';
 import { MONITOR_OPTIONS, monitorUsage, runMonitor } from './commands/monitor.mjs';
+import { ADMIN_FLAGS, ADMIN_OPTIONS, adminUsage, runAdmin } from './commands/admin.mjs';
 
 export const usage = `shopctl — création et exploitation des boutiques Minshop.
 
@@ -40,6 +41,7 @@ Usage: shopctl <commande> [options]
   repo                Créer le dépôt GitHub, ses environnements et leurs secrets
   provision           Créer ou confirmer les ressources Cloudflare d'un environnement
   deploy              Vérifier, migrer, construire, téléverser et tester la boutique
+  admin password      Poser le mot de passe de l'administration, sans assistant ouvert
   backup              Sauvegarder, lister, contrôler et faire expirer les archives
   restore             Restaurer une sauvegarde dans un environnement
   privacy             Exporter ou anonymiser les données d'une personne
@@ -77,6 +79,7 @@ export const COMMANDS = {
   restore: { run: runRestore, usage: restoreUsage, values: RESTORE_OPTIONS, flags: RESTORE_FLAGS },
   privacy: { run: runPrivacy, usage: privacyUsage, values: PRIVACY_OPTIONS, flags: PRIVACY_FLAGS },
   monitor: { run: runMonitor, usage: monitorUsage, values: MONITOR_OPTIONS, flags: [] },
+  admin: { run: runAdmin, usage: adminUsage, values: ADMIN_OPTIONS, flags: ADMIN_FLAGS },
   destroy: { run: runDestroy, usage: destroyUsage, values: DESTROY_OPTIONS, flags: ['--dry-run', '--yes'] },
   core: { run: runCore, usage: coreUsage, values: CORE_OPTIONS, flags: CORE_FLAGS },
   fleet: { run: runFleet, usage: fleetUsage, values: FLEET_OPTIONS, flags: FLEET_FLAGS },

@@ -19,6 +19,10 @@ from an argument: `BASE_URL`, and behind a private preview
   which a service token would open, fails it. It also posts unsigned and
   forged events to every webhook (Access lets them through on a bypass, the
   Worker must refuse them), and checks that no page asks for a card number.
+  A shop with no payment method yet — a production before Stripe, its demo
+  checkout switched off by `provision` — has no express page: the cart says
+  the order is unavailable and `/express` redirects back, which the check
+  accepts and names, to be re-run once Stripe is configured.
   `-- --limiteurs` adds the rate limiters last, tripped to a 429 each. Search
   and checkout are held by Cloudflare's limiter, permissive by design (per
   location, cached per machine), so they are flooded fifty at a time up to
@@ -72,12 +76,16 @@ ASYNCHRONOUSLY on purpose: the stand-ins answer from the parent, and a
 `.github/workflows/nightly.yml` strings them together every night (plan
 §7.3): everywhere, `npm run verify` on a clean D1 and `npm audit`; in a shop
 repository, against staging, backup, `restore --local`, the remote gates,
-`shopctl monitor`, Stripe and e-mail — and `shopctl monitor --env production`,
-the one production read, with a repository-level analytics-read token
-(`MONITOR_CLOUDFLARE_API_TOKEN`) rather than through the `production`
-environment, whose reviewers would hold every night. A check whose credential
-is absent is skipped with a warning, never passed silently.
+`shopctl monitor`, Stripe and e-mail — and two production reads, neither
+through the `production` environment, whose reviewers would hold every night:
+`shopctl monitor --env production` with a repository-level analytics-read
+token (`MONITOR_CLOUDFLARE_API_TOKEN`), and `shopctl backup --env production
+--upload` then `backup verify` in the `backup` environment, limited to the
+default branch, with a token that reads D1 and writes R2 (ADR 0005's RPO once
+staging is gone). Once staging is destroyed at the launch, the repository
+variable `STAGING_RETIRED` turns the staging half off, with a notice. A check
+whose credential is absent is skipped with a warning, never passed silently.
 `test/scripts/nightly.test.mjs` pins what makes it safe: staging only but for
-that read, shopctl
+those reads, shopctl
 rather than raw wrangler, `pipefail` under every `tee`, no expression
 substituted into a script, and the archive never uploaded as an artifact.

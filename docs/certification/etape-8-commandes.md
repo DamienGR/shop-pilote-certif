@@ -18,6 +18,11 @@ production provisionnée sur B, restaurée, déployée, détruite ; rotation de
 anonymisation ; seuil du monitor abaissé contre une API GraphQL de doublure.
 Tout est passé une fois les trois défauts corrigés.
 
+Passée en réel le même jour, l'après-midi : chaque ligne tenue, RTO de
+29 minutes, preuves dans la pull request #20 de `shop-pilote-certif`. Ce que
+le passage a trouvé est noté à sa section ; les défauts du socle sont corrigés
+dans `v0.3.13` (`docs/migrations/v0.3.13.md`).
+
 ## Ce que la répétition a trouvé
 
 Corrigé dans `v0.3.12` (`docs/migrations/v0.3.12.md`) :
@@ -190,6 +195,18 @@ remplacé » : c'est la clé de l'étape 2, celle que `shopctl repo` a posée da
 GitHub, et c'est la garantie qu'on veut voir. La sauvegarde en `0`, envoyée
 dans `minshop-pilote-certif-staging-backups`.
 
+Au passage réel, l'arbre du pilote était un clone refait après l'étape 2 :
+sans `.shopctl/backup.key`, `keygen` en aurait écrit une nouvelle, différente
+de celle du nocturne. **Avant `keygen`**, vérifier que le fichier existe ;
+sinon, le reposer depuis le coffre (0600), puis l'éprouver sur l'archive de
+la nuit avant d'en prendre une :
+
+```sh
+ls -l .shopctl/backup.key
+N=$(node -p 'require(process.argv[1]).id' "$(ls "$E"/nocturne-*/*/backup.json | tail -1)")   # l'archive de la dernière nuit
+npm run -s shopctl -- backup pull "$N" --env staging && npm run -s shopctl -- backup verify "$N"   # « Archive complète et cohérente »
+```
+
 Le second arbre est un autre poste en tout sauf le matériel : un clone neuf,
 sans archive et sans clé, la clé collée depuis le coffre où elle est rangée.
 
@@ -205,7 +222,13 @@ npm run -s shopctl -- backup verify "$ID" --json > "$E/verify.json"; echo $?
 
 Attendu : `0` deux fois ; le pull compare taille et empreinte du corps et
 chaque objet ; le verify ouvre le corps (« corps ouvert ») et compte les lignes
-table par table, « Archive complète et cohérente ». Si la clé n'est pas dans le
+table par table, « Archive complète et cohérente ».
+
+Jusqu'à `v0.3.12`, cette variable exportée gagnait les tests que `deploy`
+relance par `npm run verify` : huit rouges, et la section 4 s'arrêtait à son
+premier `deploy` (passage réel : 14:17, rien de téléversé). `v0.3.13` les en
+protège ; sur un socle plus ancien, poser la clé en fichier dans
+`$Q/.shopctl/backup.key` et retirer la variable avant la section 4. Si la clé n'est pas dans le
 coffre, `export SHOPCTL_BACKUP_KEY="$(cat "$P/.shopctl/backup.key")"` fait la
 même chose, et c'est une trouvaille pour le README des preuves : une clé
 rangée sur un seul poste perd toutes les archives avec lui.
@@ -231,7 +254,9 @@ Attendu, dans l'ordre :
 
 - `provision` en `0` sur **Client (B)**, que le manifeste nomme : la base, les
   trois buckets en `eu`, les 46 migrations. Si R2 n'est pas activé sur B, il
-  échoue au premier bucket : l'activer, relancer ;
+  échoue au premier bucket : l'activer, relancer. Avant de lancer le
+  chronomètre, ouvrir une fois **Workers & Pages** sur B : sans sous-domaine
+  workers.dev, Cloudflare refuse le cron au `deploy` (passage réel ci-dessous) ;
 - `restore` en `0` : l'avertissement « l'archive vient du compte Agence (A) »,
   les instructions appliquées, les images reversées dans
   `minshop-pilote-certif-production-images` (le correctif 2), « 26 table(s)
@@ -273,6 +298,16 @@ bucket de B. Le RTO va de la ligne « début » de `chrono.txt` à la ligne
 « déployé » du passage vert, la relance s'il y en a eu une : il doit rester
 sous 60 minutes.
 
+Au passage réel, **29 min 21 s**, avec deux arrêts du `deploy`. Le premier à
+14:17, sur son `verify` : la clé exportée à la section 3 (corrigé en
+`v0.3.13`). Le second à 14:33, après le téléversement : « Trigger
+configuration … was only partially updated », Cloudflare refusant le cron d'un
+compte sans sous-domaine workers.dev (code 10063), le Worker déjà servi sur le
+domaine mais sans ses secrets internes. Workers & Pages ouvert sur B, la
+relance `--skip-verify --skip-build` était verte à 14:38. Sans incident, la
+chaîne tient en un quart d'heure : `provision` 68 s, `restore` 52 s,
+`deploy` 13 min, dont 6 de `verify`.
+
 Les clés ne se ressaisissent pas ici : la boutique part à la section suivante.
 
 ## 5. Détruire la production de B
@@ -286,7 +321,7 @@ Attendu : la simulation liste six ressources (Worker, namespace des sessions,
 trois buckets, base). Le premier passage sort en `6` : le Worker, le namespace
 et le bucket de fichiers partent ; R2 refuse le bucket d'images (les images
 restaurées) et celui des sauvegardes (l'archive de `deploy`), cette fois avec
-sa propre phrase et son code `10014` ; la base reste.
+sa propre phrase et son code `10008` ; la base reste.
 
 Vider les deux buckets :
 
@@ -302,7 +337,10 @@ echo "production $(curl -s -o /dev/null -w '%{http_code}' "$PROD/")" | tee "$E/d
 ```
 
 Attendu : `0`, `removed` = les deux buckets puis la base ; plus de boutique
-sur le domaine. Dans le tableau de bord de B : Workers & Pages vide, et la
+sur le domaine. Juste après, le domaine peut répondre encore `530` (erreur
+1016) quelques minutes : au passage réel, il ne résolvait plus vingt minutes
+plus tard, et l'export de la zone ne gardait que les enregistrements d'envoi
+de Resend (`send.`, `rsend.`, `resend._domainkey.`), à garder pour l'étape 9. Dans le tableau de bord de B : Workers & Pages vide, et la
 zone ne garde aucun enregistrement pour `certif-minshop` (un domaine
 personnalisé part avec son Worker) ; s'il en reste un, le supprimer et le
 noter, sans quoi l'étape 9 le trouvera en travers. Si R2 refuse encore un
@@ -374,7 +412,9 @@ l'assistant refermé (`303` vers `/admin/login`), l'ancienne session tombée
 (`303`), la nouvelle connexion en `303` puis l'administration en `200`. Le
 secret du nocturne remplacé, sans quoi l'e-mail de test de la nuit suivante
 échoue. Ce qui a accroché, ou ce qui diffère du runbook, va dans le README
-des preuves : c'est ce qui le corrige.
+des preuves : c'est ce qui le corrige. Au passage réel : `wrangler.jsonc`
+reste rendu pour le staging, `git restore wrangler.jsonc` avant le commit des
+preuves (le runbook le dit désormais).
 
 ## 8. Export puis anonymisation d'un acheteur de test
 
@@ -401,12 +441,26 @@ Stripe signalés comme une demande à faire chez Stripe ; l'anonymisation en
 `0`, « plus rien sous cette adresse » ; le second export en `0` avec
 `found: false`. Dans l'administration, la commande garde son numéro, ses
 montants et sa TVA, sous une adresse `anonymise-…@exemple.invalid`, et son
-pays seul pour adresse ; son lien de suivi ne s'ouvre plus.
+pays seul pour adresse ; son lien de suivi ne s'ouvre plus : il répond la même
+page qu'un jeton inventé, « Confirmation de votre commande… », sans article ni
+montant.
+
+Au passage réel, le reçu de l'achat a été refusé par Resend (403, « Testing
+domain restriction ») : le staging envoyait depuis `onboarding@resend.dev`,
+qui ne livre qu'au titulaire du compte Resend. Vérifier avant l'achat, dans
+Admin → Réglages → E-mail, que l'expéditeur est sur le domaine vérifié
+(`email.from` du manifeste). Le reçu refusé restait en attente, et le cron le
+retentait vers le pseudonyme après l'effacement : `v0.3.13` clôt ces
+notifications avec l'anonymisation.
 
 ## 9. Le monitor contre la vraie API, et un seuil abaissé
 
-Avec le jeton API de staging (« Account Analytics » en lecture), le temps de
-ces deux commandes :
+Avec un jeton API du compte A, le temps de ces deux commandes. `monitor` le
+passe aussi à `wrangler whoami` et `wrangler d1 list` : il lui faut « Account
+Analytics », « D1 » et « Account Settings » en lecture, et côté utilisateur
+« Memberships » et « User Details » en lecture. Au passage réel, un jeton
+« Account Analytics » seul s'arrêtait en `4` sur « wrangler n'est pas
+authentifié » ; `v0.3.13` nomme les droits manquants.
 
 ```sh
 read -rs CLOUDFLARE_API_TOKEN                        # coller, Entrée : rien à l'écran
@@ -477,6 +531,10 @@ git add client/certification && git commit -m "Certification, étape 8 : exploit
 git push -u origin certification-etape-8
 gh pr create --fill
 ```
+
+`git restore wrangler.jsonc` d'abord si la section 7 l'a laissé rendu, et un
+journal de wrangler gardé en preuve prend l'extension `.txt` : le `.gitignore`
+de la boutique écarte les `*.log` sans le dire.
 
 Dans `client/certification/etape-8/README.md`, ce qui ne laisse pas de
 fichier : le temps de chaque étape de la restauration et le RTO, ce que wrangler

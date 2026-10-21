@@ -21,6 +21,12 @@ shopctl/src/privacy/   map      ← declared, and GATED
   justifies the VAT rate applied), and everything naming a parcel at a carrier
   goes to NULL. Exactly one row is deleted: `order_guest_access` — a token whose
   order was anonymised is still a working key to that order's page.
+- **what would still go out to the person is closed.** A notification still
+  `pending` or `processing` reads its recipient from the order when it is sent:
+  after the rewrite, that is the pseudonym. `CLOSED_ON_ERASURE` turns it to
+  `skipped` in the same statement that erases its `last_error`; a sent one
+  keeps its history (certification step 8, a refused receipt retried to
+  `…@exemple.invalid`).
 - **the pseudonym is drawn from the CSPRNG, one per ROW.** A hash of the address
   is not anonymous — the set of a shop's buyer addresses enumerates, so a
   merchant with a mailing list reads the anonymised orders straight back. One

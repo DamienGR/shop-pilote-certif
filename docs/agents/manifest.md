@@ -27,7 +27,9 @@ than a discovery.
 Every field a shop DECIDES is required. The six `optional` ones under
 `cloudflare` are values a shop LEARNS: `accountId` exists only after
 provisioning has run, `productionAccountId` only once the client's own account
-does (ADR 0015), `imagesDomain` only if a domain was ever attached,
+does (ADR 0015), `imagesDomain` only if a domain was ever attached to
+production's images bucket (only the production render names it, and a
+production `deploy` refuses it unattached),
 `stagingDomain` only for a private preview, and `stagingAccessTeam` /
 `stagingAccessAud` only once an Access application stands in front of it. A new
 optional field is a deliberate act; `test/scripts/manifest.test.mjs` pins the

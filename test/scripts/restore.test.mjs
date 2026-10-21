@@ -296,6 +296,22 @@ describe('shopctl restore', () => {
       expect(contents(target).products).toEqual(staging.products);
     });
 
+    // Provisioning switches the demo checkout off in a production nobody has
+    // installed (certification step 9). That row is the tooling's, like the
+    // migrations' seeds: the target is still empty, and the archive's
+    // settings replace it.
+    it('reads a production provisioning just wrote into as empty, and replaces its row', () => {
+      const target = productionShop();
+      expect(target.query("SELECT value FROM settings WHERE key = 'payment_methods_disabled'")).toEqual([{ value: 'demo' }]);
+      target.run(['provision', '--env', 'staging']);
+      const id = takeBackup(target);
+      target.run(['provision', '--env', 'production']);
+
+      const { status } = target.json(['restore', '--env', 'production', '--from', id, '--allow-production', '--confirm', 'atelier-test']);
+      expect(status).toBe(EXIT_CODES.ok);
+      expect(target.query("SELECT value FROM settings WHERE key = 'payment_methods_disabled'")).toEqual([]);
+    });
+
     // Certification step 8, served after the restore: the vault came along, the
     // KEK did not, and Turnstile with an unreadable secret refuses every admin
     // login. The restore cannot open the keys either; it can say so, and name

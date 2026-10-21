@@ -18,7 +18,9 @@ certification).
 | Des données personnelles ont été exposées | [violation-de-donnees](runbooks/violation-de-donnees.md) |
 | Le mot de passe d'administration est perdu | [mot-de-passe-admin](runbooks/mot-de-passe-admin.md) |
 
-Et une procédure qui n'est pas un incident : le [départ d'un client](sortie-client.md).
+Et deux procédures qui ne sont pas des incidents : la
+[mise en ligne](mise-en-ligne.md), checklist de lancement de chaque boutique,
+et le [départ d'un client](sortie-client.md).
 
 Quatre règles valent pour tous :
 
@@ -75,12 +77,22 @@ Elle échoue (code 6) quand :
 Une analytique injoignable ou refusée est un échec (code 5), jamais un vert.
 
 Le workflow `Nightly` la lance sur staging avec le jeton de l'environnement, et
-sur la production avec un jeton à part, en lecture seule (« Account
-Analytics : Read » et « D1 : Read »), posé en secrets du dépôt
+sur la production avec un jeton à part, en lecture seule (Account Analytics, D1
+et Account Settings : Read, plus Memberships et User Details : Read côté
+utilisateur, pour `wrangler whoami`), posé en secrets du dépôt
 `MONITOR_CLOUDFLARE_API_TOKEN` et `MONITOR_CLOUDFLARE_ACCOUNT_ID` : l'environnement
 `production` porte des relecteurs obligatoires qui retiendraient le run chaque
 nuit, et un jeton de déploiement qui peut écrire. Sans ce secret, le job le dit
 dans un avertissement plutôt que de passer.
+
+Le même run sauvegarde la production (ADR 0005 : RPO de 24 h) dans
+l'environnement GitHub `backup`, que `shopctl repo` limite à la branche par
+défaut et pose sans relecteur, avec son propre jeton (`CLOUDFLARE_API_TOKEN_BACKUP` :
+D1 en lecture, Workers R2 Storage en écriture, Account Settings, Memberships et
+User Details en lecture). L'archive part dans le bucket `-backups` de la
+production et `backup verify` l'ouvre avec la clé ; elle n'est jamais restaurée
+sur le runner. Une fois le staging détruit (étape 9), la variable de dépôt
+`STAGING_RETIRED` éteint ses contrôles, ce que le run annonce.
 
 Le run nocturne qui échoue est une notification que GitHub envoie déjà ; il n'y
 a pas de second canal à entretenir.

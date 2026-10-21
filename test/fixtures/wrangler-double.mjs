@@ -30,6 +30,8 @@
  *                                            versions oldest first, `active`
  *                                            the one deployed
  *   reportsD1Jurisdiction  boolean           `d1 info` publishes the field or not
+ *   workersDevSubdomain    boolean           false: `deploy` uploads, then fails
+ *                                            on the cron as a fresh account does
  *   failAt          "d1 create" | …          one command that dies, for the
  *                                            interrupted-run test
  *   calls           [{ argv, stdin }]        appended to on every invocation
@@ -551,7 +553,10 @@ if (command.startsWith('r2 bucket delete')) {
   // R2 refuses a bucket that still holds objects. The double refuses it too,
   // because that refusal is the one branch of the teardown that has a remedy
   // the operator has to be told about.
-  if ((state.r2[index].objects ?? 0) > 0) fail('The bucket you tried to delete is not empty. [code: 10014]');
+  // The sentence and code R2 gave at certification step 8.
+  if ((state.r2[index].objects ?? 0) > 0) {
+    fail(`The bucket you tried to delete (${state.r2[index].name}) is not empty (account ${state.accounts?.[0]?.id ?? 'account'}). [code: 10008]`);
+  }
   state.r2.splice(index, 1);
   done(`Deleted bucket '${name}'.`);
 }
@@ -607,6 +612,19 @@ if (positionals[0] === 'deploy') {
   const session = `${name}-session`;
   if (!(state.kv ?? []).some((namespace) => namespace.title === session)) {
     state.kv = [...(state.kv ?? []), { id: uuid(session).replaceAll('-', ''), title: session }];
+  }
+  // An account nobody has opened Workers & Pages on has no workers.dev
+  // subdomain, and Cloudflare refuses the cron AFTER the upload: the version is
+  // live, the command fails, and the reason is four lines below the first one,
+  // in colour (certification step 8, account B).
+  if (state.workersDevSubdomain === false) {
+    fail(
+      `\u001B[31m✘ \u001B[41;31m[\u001B[41;97mERROR\u001B[41;31m]\u001B[0m \u001B[1mTrigger configuration for "${name}" was only partially updated:\u001B[0m\n\n` +
+        `    Cron schedules:\n` +
+        `      - A request to the Cloudflare API (/accounts/${state.accounts?.[0]?.id ?? 'account'}/workers/scripts/${name}/schedules) failed.\n` +
+        `        - You need a workers.dev subdomain in order to proceed. Please go to the dashboard and open the Workers menu. Opening the Workers landing page for the first time will create a workers.dev subdomain automatically. [code: 10063]\n\n` +
+        `  Successful trigger changes were not rolled back.`,
+    );
   }
   // The targets, listed as wrangler lists them: the workers.dev URL only while
   // that door is open, and a custom domain BARE, with no scheme. A double that

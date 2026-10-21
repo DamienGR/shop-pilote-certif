@@ -17,16 +17,41 @@ describe('the nightly workflow', () => {
 
   // The night's questions are asked of staging. A production that answered
   // them would be a production that took a test session and a test e-mail.
-  // Its one exception reads analytics, with a token that can do nothing else,
-  // and outside the `production` environment, whose deploy token can write.
-  it('reaches staging through its GitHub Environment, and production only to read its analytics', () => {
+  // Its two exceptions read: analytics, with a token that can do nothing else,
+  // and its own database, for the backup. Both outside the `production`
+  // environment, whose deploy token can write.
+  it('reaches staging through its GitHub Environment, and production only to read its analytics and back it up', () => {
     expect(workflow).toMatch(/environment: staging/);
     expect(workflow).not.toMatch(/environment: production/);
     const production = [...workflow.matchAll(/^.*--env production.*$/gm)].map((match) => match[0].trim());
-    expect(production).toEqual(['node shopctl/bin/shopctl.mjs monitor --env production --hours 24 --json | tee monitor-production.json']);
+    expect(production).toEqual([
+      'node shopctl/bin/shopctl.mjs backup --env production --upload --json | tee backup-production.json',
+      'node shopctl/bin/shopctl.mjs monitor --env production --hours 24 --json | tee monitor-production.json',
+    ]);
     const watch = workflow.slice(workflow.indexOf('production-watch:'));
     expect(watch).toMatch(/CLOUDFLARE_API_TOKEN: \$\{\{ secrets\.MONITOR_CLOUDFLARE_API_TOKEN \}\}/);
     expect(watch).not.toMatch(/environment:/);
+  });
+
+  // ADR 0005's RPO once staging is gone (certification step 9). In the
+  // environment `shopctl repo` limits to the default branch, never restored on
+  // the runner, and kept in the bucket rather than as an artifact.
+  it('backs production up every night from the backup environment, and verifies the archive without restoring it', () => {
+    const job = workflow.slice(workflow.indexOf('production-backup:'), workflow.indexOf('production-watch:'));
+    expect(job).toMatch(/environment: backup\n/);
+    expect(job).toMatch(/shopctl\.mjs backup verify "\$ARCHIVE"/);
+    expect(job).not.toMatch(/shopctl\.mjs restore/);
+    expect(job).not.toMatch(/backups\//);
+  });
+
+  // Destroyed at the launch (ADR 0015), staging would turn the run red every
+  // night. A repository variable retires it, and the run says so.
+  it('retires the staging checks once staging is destroyed, and says so', () => {
+    const staging = workflow.slice(workflow.indexOf('  staging:'), workflow.indexOf('production-backup:'));
+    expect(staging).toMatch(/if: \$\{\{ needs\.detect\.outputs\.shop != '' && vars\.STAGING_RETIRED == '' \}\}/);
+    const detect = workflow.slice(workflow.indexOf('  detect:'), workflow.indexOf('  staging:'));
+    expect(detect).toMatch(/STAGING_RETIRED: \$\{\{ vars\.STAGING_RETIRED \}\}/);
+    expect(detect).toMatch(/::notice::Staging détruit/);
   });
 
   it('runs the operator’s own commands rather than its own wrangler calls', () => {
@@ -38,7 +63,7 @@ describe('the nightly workflow', () => {
 
   it('reads each command’s exit status and not the pipe’s', () => {
     const piped = runs.filter((body) => body.includes('| tee'));
-    expect(piped).toHaveLength(4);
+    expect(piped).toHaveLength(6);
     for (const body of piped) expect(body).toContain('set -euo pipefail');
   });
 

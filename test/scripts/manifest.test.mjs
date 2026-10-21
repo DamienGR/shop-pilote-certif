@@ -318,10 +318,20 @@ describe('fleet identifiers', () => {
   // `env.IMAGE_BASE_URL ?? ''` and serves images through the Worker, which is
   // slower and always correct.
   it('serves images from the Worker unless the manifest names a domain', () => {
-    expect(wranglerSubstitutions(base()).__IMAGE_BASE_URL__).toBe('');
+    expect(wranglerSubstitutions(base(), { env: 'production' }).__IMAGE_BASE_URL__).toBe('');
     const withDomain = base();
     withDomain.cloudflare.imagesDomain = 'images.example.fr';
-    expect(wranglerSubstitutions(withDomain).__IMAGE_BASE_URL__).toBe('https://images.example.fr');
+    expect(wranglerSubstitutions(withDomain, { env: 'production' }).__IMAGE_BASE_URL__).toBe('https://images.example.fr');
+  });
+
+  // The domain is attached to production's images bucket. Named in a staging
+  // or a local render, it would serve production's objects there — and a
+  // broken image for every one uploaded anywhere else.
+  it('names the images domain in the production render only', () => {
+    const withDomain = base();
+    withDomain.cloudflare.imagesDomain = 'images.example.fr';
+    expect(wranglerSubstitutions(withDomain, { env: 'staging' }).__IMAGE_BASE_URL__).toBe('');
+    expect(wranglerSubstitutions(withDomain).__IMAGE_BASE_URL__).toBe('');
   });
 
   // Plan §5.3 names them `minshop-{slug}-{env}…`. The environment qualifies the

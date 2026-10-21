@@ -25,6 +25,7 @@ import { randomBytes } from 'node:crypto';
 import { identifier, literal } from '../backup/dump.mjs';
 import {
   ADDRESS_KEPT,
+  CLOSED_ON_ERASURE,
   COLUMN_POLICY,
   EXTRA_LINKS,
   ORDER_TABLE,
@@ -265,7 +266,16 @@ export function anonymizeScript(predicates, records, mint = pseudonym) {
     // rewrite is the same everywhere — a NULL — is one statement.
     const perRow = columns.some(([, entry]) => entry.action === 'subject' || entry.action === 'address');
     if (!perRow) {
-      const assignments = columns.map(([column]) => `${identifier(column)} = NULL`);
+      // Closed in the same statement as the erasure: a run interrupted between
+      // two would leave a message queued for an address that no longer exists.
+      // SQLite reads every CASE against the row as it was before the UPDATE.
+      const closing = CLOSED_ON_ERASURE[table];
+      const assignments = [
+        ...columns.map(([column]) => `${identifier(column)} = NULL`),
+        ...Object.entries(closing?.set ?? {}).map(
+          ([column, value]) => `${identifier(column)} = CASE WHEN ${closing.open} THEN ${value} ELSE ${identifier(column)} END`,
+        ),
+      ];
       updates.push(`UPDATE ${identifier(table)} SET ${assignments.join(', ')} WHERE ${where};`);
       continue;
     }
@@ -302,7 +312,10 @@ export function anonymizePlan(predicates, records) {
         action: revoked.length > 0 ? 'supprimée' : 'réécrite',
         columns: revoked.length > 0
           ? revoked.map(([column]) => column)
-          : Object.entries(policy).filter(([, entry]) => REWRITTEN_ACTIONS.has(entry.action)).map(([column]) => column),
+          : [
+              ...Object.entries(policy).filter(([, entry]) => REWRITTEN_ACTIONS.has(entry.action)).map(([column]) => column),
+              ...Object.keys(CLOSED_ON_ERASURE[table]?.set ?? {}),
+            ],
       };
     })
     .filter((entry) => entry.columns.length > 0);

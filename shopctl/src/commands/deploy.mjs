@@ -230,6 +230,29 @@ export async function runDeploy(args, reporter) {
     reporter.ok(`${names.files} — toujours privé`);
   }
 
+  // The images domain is rendered into production's configuration, and from
+  // then on every product image is a link to it. Declared in the manifest but
+  // not attached to the bucket, that is a catalogue of broken images on the
+  // day the shop opens — refused here, before the backup and the migrations,
+  // rather than discovered by the first visitor (certification step 9).
+  const imagesDomain = env === 'production' ? (manifest.cloudflare.imagesDomain ?? null) : null;
+  if (imagesDomain) {
+    const imagesExposure = bucketExposure(names.images, { cwd: root, jurisdiction });
+    if (!imagesExposure.known) {
+      reporter.warn(
+        `${names.images} — les domaines attachés n'ont pas pu être lus ; ${imagesDomain} n'est pas vérifié.`,
+        `Le déploiement continue ; ouvrez une image produit sur https://${imagesDomain} avant d'annoncer la boutique.`,
+      );
+    } else if (!imagesExposure.domains.includes(imagesDomain)) {
+      throw verificationError(
+        `cloudflare.imagesDomain annonce ${imagesDomain}, qui n'est pas attaché à ${names.images}${imagesExposure.domains.length > 0 ? ` (attaché : ${imagesExposure.domains.join(', ')})` : ''}.`,
+        `Chaque image du catalogue serait cassée. Attachez le domaine au bucket (tableau de bord → R2 → ${names.images} → Settings → Custom Domains), ou retirez cloudflare.imagesDomain du manifeste : les images passent alors par le Worker.`,
+      );
+    } else {
+      reporter.ok(`${names.images} — domaine d'images ${imagesDomain} attaché`);
+    }
+  }
+
   // ── Configuration ─────────────────────────────────────────────────────────
   reporter.section('Configuration');
   renderEnvironmentConfig({ root, manifest, env, databaseId });
