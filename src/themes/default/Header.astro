@@ -4,6 +4,7 @@ import StoreNav from '../../features/storefront/controls/StoreNav.astro';
 import StoreSearch from '../../features/storefront/controls/StoreSearch.astro';
 import StoreCartControl from '../../features/storefront/controls/StoreCartControl.astro';
 import StoreAccountControl from '../../features/storefront/controls/StoreAccountControl.astro';
+import StoreSearchLink from '../../features/storefront/controls/StoreSearchLink.astro';
 import { t } from '../../features/i18n';
 
 /**
@@ -77,10 +78,12 @@ const { model } = Astro.props;
       class="ml-auto flex min-w-0 shrink-0 items-center gap-4 text-xs uppercase tracking-widest text-muted sm:gap-6"
     >
       <StoreNav links={model.headerLinks} />
-      {/* Search input is desktop-only; give mobile a link to the search page. */}
-      <a href={model.search.action} class="hover:text-brand sm:hidden">{t('shell.search.link')}</a>
-      {model.cart.enabled && <StoreCartControl href={model.cart.href} />}
-      {model.account.enabled && <StoreAccountControl href={model.account.href} />}
+      {/* Search input is desktop-only; give mobile a link to the search page.
+          Below sm the controls are icons: spelled out, they cut the store name
+          on a phone (certification, étape 9). */}
+      <StoreSearchLink href={model.search.action} class="hover:text-brand sm:hidden" />
+      {model.cart.enabled && <StoreCartControl href={model.cart.href} iconBelow="sm" />}
+      {model.account.enabled && <StoreAccountControl href={model.account.href} iconBelow="sm" />}
     </nav>
   </div>
 </header>

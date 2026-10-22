@@ -2,7 +2,7 @@
 
 Fiche de passage pour le poste de Damien. Elle suit l'étape 9 du
 [plan](plan.md#étape-9--bascule-sur-le-compte--client-) : le pilote monte en
-`v0.3.16` ; les trois achats manuels qui restaient de l'étape 6 se font sur le
+`v0.3.17` ; les trois achats manuels qui restaient de l'étape 6 se font sur le
 staging pendant qu'il existe ; la production de `pilote-certif` est créée sur
 le compte B, son mot de passe posé avant tout déploiement, déployée par le
 workflow `Deploy`, installée et saisie sur B, contrôlée par la porte distante
@@ -55,13 +55,34 @@ Non répétés, faute de doublure : le domaine de production et son certificat
 sur B, le domaine d'images, l'approbation GitHub, le vrai Resend, le vrai
 Turnstile, Access.
 
+## Ce que le passage réel a trouvé
+
+Le passage des 2026-10-21 et 2026-10-22 a fait publier trois versions du
+socle, chacune avant la section qu'elle protégeait :
+
+1. **`v0.3.15`** : l'alerte `markdown-it` du `Nightly`, sans laquelle le job
+   `Dependency audit` est rouge aux sections 9 et 10 ;
+2. **`v0.3.16`** : le navigateur versait le mot de passe de l'administration
+   dans les champs de clé de Réglages, et l'enregistrement remplaçait la clé
+   (Resend a refusé l'e-mail de test du staging) ;
+3. **`v0.3.17`** : trois défauts de la vitrine, vus pendant les achats de la
+   section 2. Sur un téléphone, le menu d'`atelier` s'ouvrait hors de l'écran,
+   et « Rechercher » et « Panier » en toutes lettres coupaient le nom de la
+   boutique ; partout, une quantité tapée dans le panier sans « Mettre à
+   jour » était perdue au paiement.
+
+Et trois trous de cette fiche, corrigés ci-dessous : `gh` refusait de choisir
+entre les deux remotes du clone (section 0), `catalog import` attendait une
+configuration que rien ne rendait plus (section 7), et le contrôle du panier
+lisait un panier vide (section 8).
+
 ## Ce que l'étape crée, et ce qu'elle ne touche pas
 
 | Où | Ce qui est créé, modifié ou détruit |
 |---|---|
 | Cloudflare B | **créé et gardé** : Worker `minshop-pilote-certif-production` sur `certif-minshop.miijot.fr`, sa base, ses trois buckets en juridiction `eu`, le domaine d'images `images-certif-minshop.miijot.fr` attaché au bucket d'images, son namespace KV de sessions, ses secrets internes, un cron ; deux jetons API (déploiement, sauvegarde) ; les archives de `deploy` et du nocturne dans `-backups` |
 | Cloudflare A | **détruit** : le staging du pilote (Worker, base, trois buckets, namespace KV) ; le jeton de staging révoqué ; les applications Access de la preview et leurs jetons de service supprimés |
-| GitHub `shop-pilote-certif` | la pull request `socle/v0.3.16` ; une pull request qui déclare `imagesDomain` ; l'environnement `backup` et ses trois secrets ; le jeton de l'environnement `production` réécrit ; la variable `STAGING_RETIRED` ; l'environnement `staging` supprimé ; une pull request de preuves |
+| GitHub `shop-pilote-certif` | la pull request `socle/v0.3.17` ; une pull request qui déclare `imagesDomain` ; l'environnement `backup` et ses trois secrets ; le jeton de l'environnement `production` réécrit ; la variable `STAGING_RETIRED` ; l'environnement `staging` supprimé ; une pull request de preuves |
 | Stripe test | trois paiements (section 2) ; l'endpoint de webhook de la preview supprimé |
 | Resend | le domaine d'envoi vérifié s'il ne l'est pas ; des e-mails réels vers les adresses de Damien |
 | Stripe live | rien : l'étape 10 |
@@ -72,12 +93,9 @@ paiement, la démonstration coupée).
 
 ## 0. Shell propre, et ce qui doit exister avant
 
-Prérequis : le tag `v0.3.16`, publié par le workflow `Release` du socle. Il
-reprend `v0.3.14` et ferme deux défauts trouvés le jour du passage :
-l'alerte `markdown-it` du `Nightly` (`v0.3.15`), sans laquelle le job
-`Dependency audit` est rouge aux sections 9 et 10, et le mot de passe que le
-navigateur versait dans les champs de clé de Réglages (`v0.3.16`), qui aurait
-remplacé les clés saisies à la section 7.
+Prérequis : le tag `v0.3.17`, publié par le workflow `Release` du socle. Il
+reprend `v0.3.14` et les trois versions que le passage réel a fait publier
+(ci-dessus).
 
 Sur B, dans le tableau de bord, avant de commencer :
 
@@ -100,6 +118,7 @@ Sur B, dans le tableau de bord, avant de commencer :
 P=<chemin>/shop-pilote-certif
 git -C "$P" switch main && git -C "$P" pull && git -C "$P" status --short     # rien
 cd "$P" && nvm use 22
+gh repo set-default DamienGR/shop-pilote-certif     # le clone a deux remotes, core et origin : sans cela, chaque gh de la fiche refuse
 unset CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID    # shopctl lit le compte de chaque environnement dans le manifeste
 COMPTE_A=$(awk '/^  accountId:/ {print $2}' client/client.yaml)
 COMPTE_B=$(awk '/^  productionAccountId:/ {print $2}' client/client.yaml)
@@ -111,21 +130,27 @@ echo "$COMPTE_A $COMPTE_B $PILOTE $PROD"
 npx wrangler whoami                                  # la session voit A et B
 ```
 
-## 1. Monter le pilote en `v0.3.16`
+## 1. Monter le pilote en `v0.3.17`
 
 ```sh
-npm run shopctl -- core upgrade --to v0.3.16 --open-pr
-gh pr checks socle/v0.3.16 --watch
-gh pr merge socle/v0.3.16 --merge
+npm run shopctl -- core upgrade --to v0.3.17 --open-pr
+gh pr checks socle/v0.3.17 --watch
+gh pr merge socle/v0.3.17 --merge
 git switch main && git pull && npm ci && npm ci --prefix mcp
-npm run shopctl -- core status                       # v0.3.16
-npm run -s shopctl -- deploy --env staging --json > "$E/deploy-staging-v0.3.16.json"; echo $?
+npm run shopctl -- core status                       # v0.3.17
+npm run -s shopctl -- deploy --env staging --json > "$E/deploy-staging-v0.3.17.json"; echo $?
 ```
 
-Attendu : la pull request verte, avec les notes de `v0.3.13` à `v0.3.16`
+Attendu : la pull request verte, avec les notes de `v0.3.13` à `v0.3.17`
 pour un pilote resté en `v0.3.12` ; `deploy` en `0`
 sur A. Le staging sert maintenant ses images par le Worker, même une fois
 `imagesDomain` déclaré.
+
+Le thème `pilote-certif` est une copie d'`atelier`, et il appartient à la
+boutique : la montée ne le touche pas. L'en-tête corrigé d'`atelier` s'y
+reporte dans une pull request de la boutique, avec sa signature
+(`docs/migrations/v0.3.17.md`, « À faire dans la boutique »), avant le
+déploiement du staging.
 
 ## 2. Avant que le staging ne parte : les trois achats de l'étape 6
 
@@ -260,7 +285,13 @@ certificat) : relancer le workflow, rien n'est à défaire.
 
 Le catalogue, saisi sur B par l'import, pas recopié depuis A :
 
+`catalog import` vérifie que `wrangler.jsonc` décrit la production, mais ne
+le rend pas, et chaque section l'a restauré : `provision` le rend, sans rien
+créer, et confirme au passage les deux secrets que le premier déploiement a
+posés.
+
 ```sh
+npm run -s shopctl -- provision --env production --json > "$E/provision-3.json"; echo $?
 C=test/fixtures/clients/pilot-fr/catalogue/catalog.csv
 npm run -s shopctl -- catalog import $C --remote --env production --create-categories --dry-run --json > "$E/catalogue-simulation.json"; echo $?
 npm run -s shopctl -- catalog import $C --remote --env production --create-categories --json > "$E/catalogue-1.json"; echo $?
@@ -268,8 +299,9 @@ npm run -s shopctl -- catalog import $C --remote --env production --create-categ
 git restore wrangler.jsonc
 ```
 
-Attendu : le premier crée 20 produits, 9 variantes, 4 catégories et envoie
-8 images dans le bucket de B ; le second a `statements: 0`.
+Attendu : `provision-3.json` en `0`, `AUTH_SECRET` et `SECRETS_KEK` « déjà
+posé » ; le premier import crée 20 produits, 9 variantes, 4 catégories et
+envoie 8 images dans le bucket de B ; le second a `statements: 0`.
 
 Le second déploiement, pour un test de fumée sans avertissement :
 
@@ -286,12 +318,15 @@ gh run watch "$R"; echo $? && gh run download "$R" -D "$E/deploy-2"
 curl -s "$PROD/api/products?limit=100" > "$J/produits.json"
 F=$(node -p 'require(process.argv[1]).products.find((p) => p.image.startsWith("https://images-certif-minshop.miijot.fr/"))?.slug' "$J/produits.json")
 I=$(node -p 'require(process.argv[1]).products.find((p) => p.slug === process.argv[2]).image' "$J/produits.json" "$F")
+# Le panier ne dit la commande indisponible qu'avec un article : vide, il dit qu'il est vide.
+A=$(node -p 'require(process.argv[1]).products.find((p) => p.slug === process.argv[2]).id' "$J/produits.json" "$F")
+curl -s -o /dev/null -c "$J/panier.jar" -H "Origin: $PROD" --data "_action=add&product_id=$A" "$PROD/api/cart"
 {
   echo "vitrine   $(curl -s -o /dev/null -w '%{http_code}' "$PROD/")"
   echo "catalogue $(curl -s -o /dev/null -w '%{http_code}' "$PROD/products")"
   echo "fiche     $(curl -s -o /dev/null -w '%{http_code}' "$PROD/products/$F")"
   echo "image     $(curl -s -o /dev/null -w '%{http_code} %{content_type}' "$I")  ${I%%/media*}"
-  echo "panier    $(curl -s "$PROD/cart" | grep -c 'momentanément indisponible')"
+  echo "panier    $(curl -s -b "$J/panier.jar" "$PROD/cart" | grep -c 'momentanément indisponible')"
   echo "setup     $(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' "$PROD/admin/setup")"
 } | tee "$E/servie.txt"
 BASE_URL=$PROD npm run -s test:security:remote -- --limiteurs 2>&1 | tee "$E/porte-distante.txt"; echo $?

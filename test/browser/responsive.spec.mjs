@@ -53,6 +53,14 @@ for (const [label, width] of [['200 %', 640]]) {
   });
 }
 
+/**
+ * The header wordmark: the one link home that carries the store name as its
+ * label, in every shipped theme. `header a[href="/"]` alone matched a merchant
+ * menu link to the home page first — hidden at phone width, so on atelier the
+ * long-name test below injected into an invisible link and measured nothing.
+ */
+const WORDMARK = 'header a[href="/"][aria-label]';
+
 test('un nom de boutique très long ne fait pas déborder l’en-tête', async ({ page }) => {
   await page.goto('/');
   await settle(page);
@@ -63,13 +71,60 @@ test('un nom de boutique très long ne fait pas déborder l’en-tête', async (
   // min-width:auto, so one that cannot shrink pushes the cart off the right
   // edge at phone width. Injected rather than seeded: what is under test is the
   // theme's CSS, and the store name is a runtime setting, not a fixture shape.
-  await page.evaluate(() => {
-    const mark = document.querySelector('header a[href="/"]');
+  await page.evaluate((selector) => {
+    const mark = document.querySelector(selector);
     const text = mark?.querySelector('span') ?? mark;
     if (text) text.textContent = 'Atelier de céramique de Haute-Provence';
-  });
+  }, WORDMARK);
 
   expect(await overflowOf(page)).toBe(0);
+});
+
+test('un nom de boutique ordinaire tient en entier sur un téléphone', async ({ page }) => {
+  test.skip((page.viewportSize()?.width ?? 0) >= 640, 'la question ne se pose qu’à la largeur d’un téléphone');
+  // 360 px, not the project's 412: most Android phones lay out at 360 to 393,
+  // and the pilot's production header cut its name at 360 and kept it at 384.
+  await page.setViewportSize({ width: 360, height: page.viewportSize()?.height ?? 800 });
+  await page.goto('/');
+  await settle(page);
+
+  // The test above only proves a long name does not push the cart off screen,
+  // which `truncate` guarantees by cutting the name. A fifteen-letter name is
+  // not long, and the first deployed shop's lost its tail on a phone behind
+  // "Rechercher" and "Panier" written out in full (certification, étape 9):
+  // below the search field's breakpoint the store controls are icons.
+  const cut = await page.evaluate((selector) => {
+    const mark = document.querySelector(selector);
+    const text = mark?.querySelector('span') ?? mark;
+    if (!mark || !text || mark.querySelector('img')) return null;
+    text.textContent = 'Atelier Lumière';
+    return mark.scrollWidth > mark.clientWidth;
+  }, WORDMARK);
+  test.skip(cut === null, 'l’en-tête montre un logo, pas le nom');
+  expect(cut, 'le nom de la boutique est coupé dans l’en-tête').toBe(false);
+});
+
+test('le menu replié s’ouvre dans l’écran', async ({ page }) => {
+  await page.goto('/');
+  await settle(page);
+
+  const disclosure = page.locator('[data-nav-disclosure]');
+  const summary = disclosure.locator('summary');
+  test.skip((await disclosure.count()) === 0, 'menu d’en-tête vide : aucun lien dans Admin → Navigation');
+  test.skip(!(await summary.isVisible().catch(() => false)), 'pas de menu replié à cette largeur');
+
+  await summary.click();
+  const panel = disclosure.locator('summary + *');
+  await expect(panel).toBeVisible();
+  // An absolutely positioned panel that hangs past the LEFT edge adds no
+  // scrollbar — negative overflow is unscrollable — so the overflow checks
+  // above never saw atelier's, whose button sits at the left of the row while
+  // the panel was anchored to its right edge (certification, étape 9).
+  const box = await panel.boundingBox();
+  const width = page.viewportSize()?.width ?? 0;
+  expect(box, 'le menu ouvert n’a pas de boîte').not.toBeNull();
+  expect(box.x, 'le menu ouvert dépasse à gauche').toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width, 'le menu ouvert dépasse à droite').toBeLessThanOrEqual(width);
 });
 
 test('un nom de produit très long ne fait pas déborder sa vignette', async ({ page }) => {

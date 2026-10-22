@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
-import { readCart, writeCart, CART_QTY_MAX } from '../../features/cart/cart';
+import { applySubmittedQuantities, readCart, writeCart, CART_QTY_MAX } from '../../features/cart/cart';
 import { cartKey, parseCartKey } from '../../features/cart/key';
 import { getProductByPublicId } from '../../features/products/db';
 import { listVariants, getExtrasByPublicIds } from '../../features/products/variants';
@@ -25,6 +25,16 @@ export const POST: APIRoute = async ({ request, cookies, url, redirect }) => {
   }
   const done = () =>
     partial ? new Response(null, { status: 204 }) : redirect('/cart', 303);
+
+  // ── update_all: every line's `qty:<key>` field at once ──────────────────────
+  // What the cart page and the drawer submit, so a quantity typed on one line
+  // is not lost by pressing a button on another. The drawer's "Commander" posts
+  // here with then=express; `then` names a page, never a URL.
+  if (action === 'update_all') {
+    if (applySubmittedQuantities(cart, form)) writeCart(cookies, cart, url.protocol === 'https:');
+    if (!partial && form.get('then') === 'express') return redirect('/express', 303);
+    return done();
+  }
 
   // ── update / remove: operate on the exact line key ──────────────────────────
   if (action === 'update' || action === 'remove') {

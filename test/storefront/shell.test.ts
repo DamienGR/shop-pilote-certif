@@ -4,6 +4,8 @@ import Header from '#theme/Header.astro';
 import Footer from '#theme/Footer.astro';
 import AltHeader from './fixtures/shell/AltHeader.astro';
 import StoreNav from '../../src/features/storefront/controls/StoreNav.astro';
+import StoreCartControl from '../../src/features/storefront/controls/StoreCartControl.astro';
+import StoreSearchLink from '../../src/features/storefront/controls/StoreSearchLink.astro';
 import { buildShellModel, type ShellInput } from '../../src/features/storefront/shell';
 import type { MenuItem } from '../../src/features/navigation/db';
 
@@ -120,6 +122,34 @@ describe('the store-owned header', () => {
     expect(html).toContain('custom-inline');
     expect(html).toContain('custom-disclosure');
     expect(html).toContain('data-nav-disclosure');
+  });
+
+  it('opens the disclosure panel on the side its button sits', async () => {
+    // A panel anchored to the right of a button at the LEFT of the row opens
+    // off the screen (atelier, certification étape 9).
+    const container = await AstroContainer.create();
+    const links = [{ text: 'About', href: '/pages/about' }];
+    const end = await container.renderToString(StoreNav as never, { props: { links } });
+    const start = await container.renderToString(StoreNav as never, { props: { links, align: 'start' } });
+
+    expect(end).toMatch(/class="absolute right-0 /);
+    expect(start).toMatch(/class="absolute left-0 /);
+  });
+
+  it('names an icon-only store control for screen readers', async () => {
+    const container = await AstroContainer.create();
+    const cart = await container.renderToString(StoreCartControl as never, {
+      props: { href: '/cart', iconBelow: 'md' },
+    });
+    const search = await container.renderToString(StoreSearchLink as never, { props: { href: '/search' } });
+
+    // The word is what a screen reader announces; the icon is decoration.
+    expect(cart).toMatch(/<span class="max-md:sr-only">Panier<\/span>/);
+    expect(cart).toMatch(/<span class="hidden h-6 w-6 [^"]*max-md:inline-flex" aria-hidden="true">/);
+    expect(cart).toContain('data-cart-open');
+    expect(cart).toContain('data-cart-count-label');
+    expect(search).toMatch(/<span class="sr-only">Rechercher<\/span>/);
+    expect(search).toMatch(/<span class="[^"]*" aria-hidden="true">\s*<svg/);
   });
 
   it('shows the mobile disclosure only when there is navigation to disclose', async () => {

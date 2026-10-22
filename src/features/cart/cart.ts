@@ -87,6 +87,32 @@ export function clearCart(cookies: AstroCookies): void {
   cookies.delete(COUNT_COOKIE, { path: '/' });
 }
 
+/**
+ * Apply the quantities a cart form submitted, one `qty:<cartKey>` field per
+ * line, to `cart` in place. Returns whether anything changed.
+ *
+ * The cart page posts them with its checkout buttons as well as with its update
+ * buttons: a shopper who types 3 and goes straight to payment means 3, and a
+ * checkout that re-read the cookie charged for 1 (certification, étape 9).
+ * Only lines already in the cart are touched — adding goes through `add`, which
+ * validates the variant and extras against D1.
+ */
+export function applySubmittedQuantities(cart: Cart, form: FormData): boolean {
+  let changed = false;
+  for (const [name, value] of form.entries()) {
+    if (!name.startsWith('qty:')) continue;
+    const key = name.slice('qty:'.length);
+    if (!Object.hasOwn(cart, key) || !parseCartKey(key)) continue;
+    const qty = Number(value);
+    const next = Number.isInteger(qty) && qty > 0 ? Math.min(qty, MAX_QTY) : 0;
+    if (next === cart[key]) continue;
+    if (next > 0) cart[key] = next;
+    else delete cart[key];
+    changed = true;
+  }
+  return changed;
+}
+
 export function cartCount(cart: Cart): number {
   return Object.values(cart).reduce((sum, q) => sum + q, 0);
 }
