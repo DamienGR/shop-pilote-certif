@@ -4,6 +4,7 @@ import StoreNav from '../../features/storefront/controls/StoreNav.astro';
 import StoreSearch from '../../features/storefront/controls/StoreSearch.astro';
 import StoreCartControl from '../../features/storefront/controls/StoreCartControl.astro';
 import StoreAccountControl from '../../features/storefront/controls/StoreAccountControl.astro';
+import StoreSearchLink from '../../features/storefront/controls/StoreSearchLink.astro';
 import { t } from '../../features/i18n';
 
 /**
@@ -75,10 +76,14 @@ const small = 'text-[11px] uppercase tracking-[0.18em] text-muted hover:text-bra
          de repère vide et nommé est une promesse que rien ne tient. */
       model.headerLinks.length > 0 && (
         <nav aria-label={t('shell.nav.primary')} class="flex min-w-0 items-center">
+          {/* align="start" : le bouton du menu est au bord GAUCHE de la rangée,
+              le panneau s'ouvre donc vers la droite. Ancré à droite, il partait
+              hors de l'écran (certification, étape 9). */}
           <StoreNav
             links={model.headerLinks}
             class={`hidden min-w-0 items-center gap-6 lg:flex ${small}`}
             disclosureClass={`relative lg:hidden ${small}`}
+            align="start"
           />
         </nav>
       )
@@ -114,14 +119,17 @@ const small = 'text-[11px] uppercase tracking-[0.18em] text-muted hover:text-bra
         inputClass="w-full bg-transparent px-0 py-0.5 text-sm focus:outline-none"
       />
       {/* Le champ est réservé aux écrans larges ; ailleurs la page de recherche
-          reste atteignable par un lien. */}
-      <a href={model.search.action} class={`${small} md:hidden`}>{t('shell.search.link')}</a>
-      {model.account.enabled && <StoreAccountControl href={model.account.href} class={small} />}
+          reste atteignable par un lien. Sous `md`, des icônes : en toutes
+          lettres, « Rechercher » et « Panier » coupaient le nom de la boutique
+          sur un téléphone (certification, étape 9). */}
+      <StoreSearchLink href={model.search.action} class={`${small} md:hidden`} />
+      {model.account.enabled && <StoreAccountControl href={model.account.href} class={small} iconBelow="md" />}
       {
         model.cart.enabled && (
           <StoreCartControl
             href={model.cart.href}
             class="inline-flex items-center text-[11px] uppercase tracking-[0.18em] text-ink hover:text-brand"
+            iconBelow="md"
           />
         )
       }
