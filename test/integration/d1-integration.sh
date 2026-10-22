@@ -602,6 +602,56 @@ if [[ "$cart_fragment" != *"Sample Tee"* ]]; then
   exit 1
 fi
 
+# The quantity a shopper types goes with the button they press next, payment
+# included. Both cart surfaces post one `qty:<line key>` field per line; a
+# checkout that re-read the cookie instead charged for the old quantity
+# (certification, étape 9). The simple product's line key is its public ID.
+cart_count_is() {
+  local got
+  got="$(curl --max-time 30 --fail --silent --show-error --cookie "$cookie_jar" \
+    "http://127.0.0.1:$test_port/partials/cart-count" |
+    node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s).count)))')"
+  if [[ "$got" != "$1" ]]; then
+    echo "D1 integration failed: $2 (cart count $got, expected $1)" >&2
+    exit 1
+  fi
+}
+qty_checkout_location="$(curl --max-time 30 --silent --output /dev/null --write-out '%{http_code} %{redirect_url}' \
+  --cookie "$cookie_jar" --cookie-jar "$cookie_jar" \
+  -H 'content-type: application/x-www-form-urlencoded' \
+  -H "origin: http://127.0.0.1:$test_port" \
+  --data "source=cart&method=demo&qty:$sample_id=3" \
+  "http://127.0.0.1:$test_port/api/checkout")"
+# Shipping is on, so demo goes to the address step first: nothing is reserved.
+if [[ "$qty_checkout_location" != "303 http://127.0.0.1:$test_port/checkout?method=demo" ]]; then
+  echo "D1 integration failed: cart checkout with a typed quantity returned $qty_checkout_location" >&2
+  exit 1
+fi
+cart_count_is 3 "a cart checkout dropped the quantity typed on the cart page"
+drawer_location="$(curl --max-time 30 --silent --output /dev/null --write-out '%{http_code} %{redirect_url}' \
+  --cookie "$cookie_jar" --cookie-jar "$cookie_jar" \
+  -H 'content-type: application/x-www-form-urlencoded' \
+  -H "origin: http://127.0.0.1:$test_port" \
+  --data "_action=update_all&then=express&qty:$sample_id=2" \
+  "http://127.0.0.1:$test_port/api/cart")"
+if [[ "$drawer_location" != "303 http://127.0.0.1:$test_port/express" ]]; then
+  echo "D1 integration failed: the drawer's checkout button did not lead to /express ($drawer_location)" >&2
+  exit 1
+fi
+cart_count_is 2 "the drawer's checkout button dropped the typed quantity"
+# `then` names a page of this shop, never a URL: anything else stays on the cart.
+open_redirect="$(curl --max-time 30 --silent --output /dev/null --write-out '%{redirect_url}' \
+  --cookie "$cookie_jar" --cookie-jar "$cookie_jar" \
+  -H 'content-type: application/x-www-form-urlencoded' \
+  -H "origin: http://127.0.0.1:$test_port" \
+  --data "_action=update_all&then=https://evil.example/&qty:$sample_id=1" \
+  "http://127.0.0.1:$test_port/api/cart")"
+if [[ "$open_redirect" != "http://127.0.0.1:$test_port/cart" ]]; then
+  echo "D1 integration failed: /api/cart followed an arbitrary then= ($open_redirect)" >&2
+  exit 1
+fi
+cart_count_is 1 "update_all did not apply the typed quantity"
+
 storefront_headers="$state_dir/storefront-headers.txt"
 storefront_body="$state_dir/storefront.html"
 curl --max-time 30 --fail --silent --show-error \

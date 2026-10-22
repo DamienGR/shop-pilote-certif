@@ -1,5 +1,6 @@
 ---
 import { t } from '../../i18n';
+import { COMPACT, type CompactBelow } from './compact';
 /**
  * The account link. Thin, but it keeps the destination upstream: account URLs
  * are guarded by middleware, and a template inventing its own path would send
@@ -8,9 +9,36 @@ import { t } from '../../i18n';
 interface Props {
   href: string;
   class?: string;
+  /** Below this breakpoint, a person icon; the word stays for screen readers. */
+  iconBelow?: CompactBelow;
 }
 
-const { href, class: className = 'hover:text-brand' } = Astro.props;
+const { href, class: className = 'hover:text-brand', iconBelow } = Astro.props;
+const compact = iconBelow ? COMPACT[iconBelow] : null;
 ---
 
-<a href={href} class={className}>{t('shell.account.link')}</a>
+<a href={href} class={className}>
+  {
+    compact ? (
+      <Fragment>
+        <span class={`hidden h-6 w-6 items-center justify-center ${compact.icon}`} aria-hidden="true">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+          >
+            <circle cx="10" cy="6.5" r="3.5" />
+            <path d="M3.5 17.5c.8-3.3 3.4-5 6.5-5s5.7 1.7 6.5 5" />
+          </svg>
+        </span>
+        <span class={compact.label}>{t('shell.account.link')}</span>
+      </Fragment>
+    ) : (
+      t('shell.account.link')
+    )
+  }
+</a>

@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures.mjs';
-import { FIXTURE, settle } from './pages.mjs';
+import { FIXTURE, REMOTE, settle } from './pages.mjs';
 
 /**
  * Adding to the cart, with scripts and without — invariant 1 as a test rather
@@ -27,6 +27,32 @@ test('avec JavaScript, l’ajout ouvre le tiroir sans quitter la page', async ({
   // moved, the script is decorating a full page load rather than replacing it.
   expect(page.url()).toBe(url);
   await expect(page.locator('[data-cart-count-label]')).toContainText('1');
+});
+
+/**
+ * The quantity a shopper types goes with the button they press next.
+ *
+ * Both cart surfaces had an "update" button per line and a checkout control
+ * that re-read the cookie, so typing 2 and going straight to payment bought 1
+ * (certification, étape 9). Locally only: against a deployed shop the payment
+ * step would open a real provider session and hold stock.
+ */
+test('avec JavaScript, la quantité saisie dans le tiroir part avec la commande', async ({ page }) => {
+  test.skip(!FIXTURE.simple || REMOTE, 'catalogue local avec un produit simple en stock');
+  await page.goto(`/products/${FIXTURE.simple.slug}`);
+  await settle(page);
+  await page.getByRole('button', { name: /panier/i }).first().click();
+
+  const drawer = page.locator('[data-cart-drawer]');
+  await expect(drawer).not.toHaveClass(/invisible/);
+  await drawer.locator('input[type="number"]').first().fill('2');
+  await Promise.all([
+    page.waitForURL('**/express'),
+    drawer.getByRole('button', { name: /commander/i }).click(),
+  ]);
+
+  await page.goto('/cart');
+  await expect(page.locator('main input[type="number"]').first()).toHaveValue('2');
 });
 
 test.describe('sans JavaScript', () => {
@@ -67,6 +93,27 @@ test.describe('sans JavaScript', () => {
       form.getByRole('button', { name: /panier/i }).first().click(),
     ]);
     await expect(page.locator('body')).toContainText(FIXTURE.simple.name);
+  });
+
+  test('la quantité saisie sur le panier part avec le paiement', async ({ page }) => {
+    test.skip(!FIXTURE.simple || REMOTE, 'catalogue local avec un produit simple en stock');
+    await page.goto(`/products/${FIXTURE.simple.slug}`);
+    await settle(page);
+    await Promise.all([
+      page.waitForURL('**/cart'),
+      page.locator('form[action="/api/cart"]').getByRole('button', { name: /panier/i }).first().click(),
+    ]);
+
+    const pay = page.locator('form[action="/api/checkout"] button[name="method"]').first();
+    test.skip((await pay.count()) === 0, 'aucun moyen de paiement offert par ce catalogue');
+    const terms = page.locator('input[name="accept_terms"]');
+    if (await terms.count()) await terms.check();
+    // Typed, never "updated": the shopper goes straight to payment.
+    await page.locator('main input[type="number"]').first().fill('2');
+    await Promise.all([page.waitForURL((u) => u.pathname !== '/cart'), pay.click()]);
+
+    await page.goto('/cart');
+    await expect(page.locator('main input[type="number"]').first()).toHaveValue('2');
   });
 
   // Both forms of the hero: a gallery, and a single image — the form most

@@ -14,7 +14,7 @@ import {
 } from '../../features/orders/guestAccess.ts';
 import { lineUnitPriceCents } from '../../features/cart/key';
 import { productImageUrl } from '../../features/products/image';
-import { readCart, resolveCart } from '../../features/cart/cart';
+import { applySubmittedQuantities, readCart, resolveCart, writeCart } from '../../features/cart/cart';
 import {
   getPaymentProvider,
   enabledMethods,
@@ -184,7 +184,12 @@ export const POST: APIRoute = async ({ request, cookies, url, redirect }) => {
     cancelUrl = `${origin}/products/${product.slug}?canceled=1`;
     errorPath = `/products/${product.slug}`;
   } else {
-    const { lines: cartLines } = await resolveCart(env.DB, readCart(cookies));
+    // The cart page's quantity fields belong to this form: what the shopper
+    // typed is what they buy, whether or not they pressed "update" first. Saved
+    // too, so the address step and a canceled payment see the same cart.
+    const cart = readCart(cookies);
+    if (applySubmittedQuantities(cart, form)) writeCart(cookies, cart, url.protocol === 'https:');
+    const { lines: cartLines } = await resolveCart(env.DB, cart);
     lines = cartLines.map((l) => ({
       product: l.product,
       qty: l.qty,

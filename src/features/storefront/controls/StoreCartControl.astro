@@ -1,5 +1,6 @@
 ---
 import { t } from '../../i18n';
+import { COMPACT, type CompactBelow } from './compact';
 /**
  * The header cart link and its live count badge.
  *
@@ -14,13 +15,39 @@ import { t } from '../../i18n';
 interface Props {
   href: string;
   class?: string;
+  /** Below this breakpoint, a bag icon; the word stays for screen readers. */
+  iconBelow?: CompactBelow;
 }
 
-const { href, class: className = 'inline-flex items-center hover:text-brand' } = Astro.props;
+const { href, class: className = 'inline-flex items-center hover:text-brand', iconBelow } = Astro.props;
+const compact = iconBelow ? COMPACT[iconBelow] : null;
 ---
 
 <a href={href} data-cart-open class={className}>
-  {t('shell.cart.link')}
+  {
+    compact ? (
+      <Fragment>
+        <span class={`hidden h-6 w-6 items-center justify-center ${compact.icon}`} aria-hidden="true">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M4.5 6.5h11l-.9 10.5H5.4z" />
+            <path d="M7.5 6.5V5a2.5 2.5 0 0 1 5 0v1.5" />
+          </svg>
+        </span>
+        <span class={compact.label}>{t('shell.cart.link')}</span>
+      </Fragment>
+    ) : (
+      t('shell.cart.link')
+    )
+  }
   <span
     data-cart-count-label
     class="inline-block min-w-[4ch] tabular-nums"

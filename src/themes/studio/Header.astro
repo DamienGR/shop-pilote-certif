@@ -4,6 +4,7 @@ import StoreNav from '../../features/storefront/controls/StoreNav.astro';
 import StoreSearch from '../../features/storefront/controls/StoreSearch.astro';
 import StoreCartControl from '../../features/storefront/controls/StoreCartControl.astro';
 import StoreAccountControl from '../../features/storefront/controls/StoreAccountControl.astro';
+import StoreSearchLink from '../../features/storefront/controls/StoreSearchLink.astro';
 import { t } from '../../features/i18n';
 
 /**
@@ -65,13 +66,16 @@ const small =
         class={`hidden min-w-0 items-center gap-6 xl:flex ${small}`}
         disclosureClass={`relative order-last xl:hidden ${small}`}
       />
-      <a href={model.search.action} class={`${small} sm:hidden`}>{t('shell.search.link')}</a>
-      {model.account.enabled && <StoreAccountControl href={model.account.href} class={small} />}
+      {/* Below sm, icons: the words cut the store name on a phone
+          (certification, étape 9). */}
+      <StoreSearchLink href={model.search.action} class={`${small} sm:hidden`} />
+      {model.account.enabled && <StoreAccountControl href={model.account.href} class={small} iconBelow="sm" />}
       {
         model.cart.enabled && (
           <StoreCartControl
             href={model.cart.href}
             class="inline-flex items-center text-[10px] font-medium uppercase tracking-[0.24em] text-[color:var(--studio-bone)] hover:text-brand"
+            iconBelow="sm"
           />
         )
       }

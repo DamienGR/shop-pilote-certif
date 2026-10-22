@@ -20,12 +20,20 @@ interface Props {
    */
   class?: string;
   disclosureClass?: string;
+  /**
+   * Which edge of the button the open panel lines up with. `end` suits a
+   * button at the right of the row, the default; a theme that puts it at the
+   * LEFT needs `start`, or the panel opens leftward off the screen — atelier's
+   * did, on the first deployed shop's phones (certification, étape 9).
+   */
+  align?: 'start' | 'end';
 }
 
 const {
   links,
   class: inlineClass = 'hidden min-w-0 items-center gap-4 xl:flex xl:gap-6',
   disclosureClass = 'relative order-last xl:hidden',
+  align = 'end',
 } = Astro.props;
 ---
 
@@ -74,7 +82,7 @@ const {
         </svg>
       </summary>
       <div
-        class="absolute right-0 z-40 mt-3 flex min-w-44 flex-col gap-3 border border-line bg-surface p-4 shadow-lg"
+        class={`absolute ${align === 'start' ? 'left-0' : 'right-0'} z-40 mt-3 flex min-w-44 max-w-[calc(100vw-2rem)] flex-col gap-3 border border-line bg-surface p-4 shadow-lg`}
       >
         {links.map((link) => (
           <a href={link.href} class="hover:text-brand">

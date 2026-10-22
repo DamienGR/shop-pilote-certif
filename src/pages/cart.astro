@@ -56,6 +56,11 @@ const shopHref = catalogPath(Astro.locals.settings?.homePage);
 // Same predicate the server enforces (features/legal/terms.ts): the box appears
 // exactly when a checkout without it would be refused.
 const terms = await readTermsGate(env.DB, getConfig().legal);
+// Every quantity field belongs to ONE form, the checkout form when there is
+// one, so a quantity typed and never "updated" still goes with the payment
+// button (certification, étape 9). The update buttons post the same fields to
+// /api/cart through `formaction`.
+const linesForm = 'cart-lines';
 ---
 
 <Layout title={t('cart.title')}>
@@ -121,25 +126,31 @@ const terms = await readTermsGate(env.DB, getConfig().legal);
               </a>
 
               <div class="ml-auto flex items-center gap-4">
-                <form method="POST" action="/api/cart" class="flex items-center gap-2">
-                  <input type="hidden" name="_action" value="update" />
-                  <input type="hidden" name="key" value={l.key} />
+                <div class="flex items-center gap-2">
                   <input
                     type="number"
-                    name="qty"
+                    form={linesForm}
+                    name={`qty:${l.key}`}
                     min="0"
                     max="99"
                     value={l.qty}
                     aria-label={t('cart.quantity')}
                     class="w-14 border-b border-line bg-transparent py-1 text-center tabular-nums focus:border-brand focus:outline-none"
                   />
+                  {/* formnovalidate: the terms box is required for paying, not
+                      for changing a quantity. */}
                   <button
                     type="submit"
+                    form={linesForm}
+                    formaction="/api/cart"
+                    formnovalidate
+                    name="_action"
+                    value="update_all"
                     class="text-xs uppercase tracking-widest text-faint hover:text-brand"
                   >
                     {t('cart.update')}
                   </button>
-                </form>
+                </div>
                 <span class="w-20 text-right tabular-nums">{formatPrice(l.lineTotalCents)}</span>
                 <form method="POST" action="/api/cart" class="flex items-center">
                   <input type="hidden" name="_action" value="remove" />
@@ -167,11 +178,15 @@ const terms = await readTermsGate(env.DB, getConfig().legal);
             </div>
 
             {methods.length === 0 ? (
-              <p class="mt-4 rounded-lg border border-dashed border-line px-5 py-4 text-center text-sm text-muted">
-                {t('cart.unavailable')}
-              </p>
+              <Fragment>
+                <p class="mt-4 rounded-lg border border-dashed border-line px-5 py-4 text-center text-sm text-muted">
+                  {t('cart.unavailable')}
+                </p>
+                {/* Nothing to pay with, but quantities still change. */}
+                <form id={linesForm} method="POST" action="/api/cart"></form>
+              </Fragment>
             ) : (
-            <form method="POST" action="/api/checkout" class="mt-4 space-y-2">
+            <form id={linesForm} method="POST" action="/api/checkout" class="mt-4 space-y-2">
               <input type="hidden" name="source" value="cart" />
               {destination.showSelect && (
                 <label class="mb-2 flex items-center justify-between gap-2 text-xs uppercase tracking-widest text-muted">

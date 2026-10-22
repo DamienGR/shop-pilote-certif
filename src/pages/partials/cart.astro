@@ -19,6 +19,10 @@ const [{ lines, subtotalCents }, imageDeliverySetting] = await Promise.all([
 ]);
 const imageDelivery = imageDeliverySetting === 'cloudflare' ? 'cloudflare' : 'original';
 const count = cartCount(cart);
+// As on the cart page: one form owns every quantity field, and "Commander"
+// submits it (data-fullpage, so the drawer script lets it navigate), so the
+// quantities typed here reach /express instead of the cookie's.
+const linesForm = 'drawer-lines';
 ---
 
 <div data-cart-count={count}>
@@ -56,12 +60,11 @@ const count = cartCount(cart);
                   {formatPrice(l.unitPriceCents)}
                 </span>
                 <div class="mt-auto flex items-center gap-4 pt-2">
-                  <form method="POST" action="/api/cart" class="flex items-center gap-2">
-                    <input type="hidden" name="_action" value="update" />
-                    <input type="hidden" name="key" value={l.key} />
+                  <div class="flex items-center gap-2">
                     <input
                       type="number"
-                      name="qty"
+                      form={linesForm}
+                      name={`qty:${l.key}`}
                       min="0"
                       max="99"
                       value={l.qty}
@@ -70,11 +73,12 @@ const count = cartCount(cart);
                     />
                     <button
                       type="submit"
+                      form={linesForm}
                       class="text-xs uppercase tracking-widest text-faint hover:text-brand"
                     >
                       {t('cart.update')}
                     </button>
-                  </form>
+                  </div>
                   <form method="POST" action="/api/cart" class="flex items-center">
                     <input type="hidden" name="_action" value="remove" />
                     <input type="hidden" name="key" value={l.key} />
@@ -97,12 +101,18 @@ const count = cartCount(cart);
             <span class="text-xs uppercase tracking-widest text-muted">{t('cart.subtotal')}</span>
             <span class="text-lg tabular-nums">{formatPrice(subtotalCents)}</span>
           </div>
-          <a
-            href="/express"
-            class="mt-4 block w-full rounded-md bg-brand px-6 py-3 text-center text-sm font-medium uppercase tracking-wider text-on-brand hover:bg-brand-hover"
-          >
-            {t('cart.checkout')}
-          </a>
+          <form id={linesForm} method="POST" action="/api/cart">
+            <input type="hidden" name="_action" value="update_all" />
+            <button
+              type="submit"
+              name="then"
+              value="express"
+              data-fullpage
+              class="mt-4 block w-full rounded-md bg-brand px-6 py-3 text-center text-sm font-medium uppercase tracking-wider text-on-brand hover:bg-brand-hover"
+            >
+              {t('cart.checkout')}
+            </button>
+          </form>
           <a
             href="/cart"
             class="mt-3 block text-center text-xs uppercase tracking-widest text-faint hover:text-brand"
