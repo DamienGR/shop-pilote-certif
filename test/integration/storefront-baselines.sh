@@ -20,7 +20,7 @@ test_port="${STOREFRONT_TEST_PORT:-8792}"
 
 cleanup() {
   if [[ -n "$worker_pid" ]] && kill -0 "$worker_pid" 2>/dev/null; then
-    kill "$worker_pid" 2>/dev/null || true
+    kill -- "-$worker_pid" 2>/dev/null || true
     wait "$worker_pid" 2>/dev/null || true
   fi
   rm -rf "$state_dir"
@@ -40,14 +40,21 @@ npx wrangler d1 execute DB --local --persist-to "$state_dir" --file ./seed.sql >
 npx wrangler d1 execute DB --local --persist-to "$state_dir" \
   --file ./test/fixtures/storefront-states.sql >/dev/null
 
+# `npx` does not pass a signal on: killing it left wrangler and its workerd
+# running under init, holding the port for the next run (certification step 9).
+# Job control gives the server a process group of its own, which cleanup stops
+# whole; stdin from /dev/null, because a background job under job control
+# that reads the terminal (wrangler's hotkeys) is stopped.
+set -m
 npx wrangler dev \
   --config dist/server/wrangler.json \
   --persist-to "$state_dir" \
   --var CANONICAL_ORIGIN:https://canonical.example \
   --var AUTH_SECRET:integration-auth-secret \
   --ip 127.0.0.1 \
-  --port "$test_port" >"$worker_log" 2>&1 &
+  --port "$test_port" </dev/null >"$worker_log" 2>&1 &
 worker_pid="$!"
+set +m
 
 # Every curl is bounded with --max-time. The readiness loop below bounds RETRIES,
 # not individual requests: if wrangler accepts the connection and then never

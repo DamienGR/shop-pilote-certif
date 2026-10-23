@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 // Deliberately .mjs, not .ts: this is the one storefront test that spawns a
 // process, and `tsconfig.compilerOptions.types` is pinned to the Cloudflare
@@ -8,6 +8,12 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const run = promisify(execFile);
+
+// Every test spawns the checker, which walks every set. "scans every set" walks
+// them twice, 4.5 s under the load of a full verify, against vitest's 5 s
+// default: it timed out once while v0.3.18 was being prepared, on a machine
+// that was also restoring a snapshot.
+vi.setConfig({ testTimeout: 30_000 });
 
 async function check(...paths) {
   try {

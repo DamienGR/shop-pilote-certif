@@ -220,12 +220,14 @@ export function clientSlugs(cwd = process.cwd()) {
  *  placeholder the manifest cannot fill would otherwise reach Wrangler as a
  *  literal resource name. */
 export function renderWrangler(template, substitutions) {
-  let out = template;
-  for (const [token, value] of Object.entries(substitutions)) out = out.split(token).join(value);
-  const leftover = out.match(/__[A-Z_]+__/g);
-  if (leftover) {
+  // Read from the template, not the output: a value is free text (the store
+  // name), and one that reads like `__X__` is still a value.
+  const leftover = (template.match(/__[A-Z_]+__/g) ?? []).filter((token) => !Object.hasOwn(substitutions, token));
+  if (leftover.length) {
     throw new Error(`wrangler.template.jsonc has placeholders no manifest value fills: ${[...new Set(leftover)].join(', ')}`);
   }
+  let out = template;
+  for (const [token, value] of Object.entries(substitutions)) out = out.split(token).join(value);
   return out;
 }
 
@@ -285,6 +287,9 @@ export function wranglerSubstitutions(manifest, { databaseId = '00000000-0000-00
     // Cloudflare's.
     __ACCESS_TEAM_DOMAIN__: access.stagingAccessTeam ? `https://${access.stagingAccessTeam}.cloudflareaccess.com` : '',
     __ACCESS_AUD__: access.stagingAccessAud ?? '',
+    // The name the setup wizard proposes, and the sender name until Settings
+    // names one. Inside a JSON string in the template, so escaped as one.
+    __STORE_NAME__: JSON.stringify(manifest.client.displayName).slice(1, -1),
   };
 }
 

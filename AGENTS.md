@@ -125,7 +125,9 @@ is the list; `npm run check:paths` fails on a path no rule covers, and
 In a shop repository (one with `client/client.yaml`), a pull request touching a
 core file needs a `core-change` label or an `Approves-core-change:` trailer —
 except where the file holds exactly the content of a core release merged in the
-range (`shopctl core upgrade`), which is an upgrade, not a divergence. In
+range (`shopctl core upgrade`), which is an upgrade, not a divergence. A
+generated `wrangler.jsonc` passes the same way when it is exactly what
+`prepare-client.mjs` renders from the tree's template and manifest. In
 this repository the gate reports but does not block — every change here is a
 core change.
 

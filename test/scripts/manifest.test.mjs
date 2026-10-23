@@ -26,6 +26,7 @@ import {
   environmentAccount,
   isShopRepository,
   loadManifest,
+  renderWrangler,
   resourceNames,
   wranglerSubstitutions,
 } from '../../scripts/manifest.mjs';
@@ -293,7 +294,28 @@ describe('fleet identifiers', () => {
       // only the staging render carries it.
       __ACCESS_TEAM_DOMAIN__: '',
       __ACCESS_AUD__: '',
+      __STORE_NAME__: 'Boutique Pilote',
     });
+  });
+
+  // The setup wizard proposes STORE_NAME, and it read "Ma boutique" on the
+  // first production of the certification (step 9): the template wrote the
+  // core's placeholder, and the manifest's name never reached it.
+  it('gives the store the name the manifest declares, as a JSON string', () => {
+    const named = base();
+    named.client.displayName = 'L’atelier "Côté \\ jardin"';
+    const rendered = renderWrangler(read('wrangler.template.jsonc'), wranglerSubstitutions(named));
+    const literal = rendered.match(/"STORE_NAME": ("(?:[^"\\]|\\.)*")/)?.[1];
+    expect(literal && JSON.parse(literal)).toBe('L’atelier "Côté \\ jardin"');
+  });
+
+  // A display name is free text. One that happens to read like a placeholder
+  // is still a value, not a token the template forgot to fill.
+  it('renders a display name that looks like a placeholder', () => {
+    const named = base();
+    named.client.displayName = 'Boutique __NOM__';
+    const rendered = renderWrangler(read('wrangler.template.jsonc'), wranglerSubstitutions(named));
+    expect(rendered).toContain('"STORE_NAME": "Boutique __NOM__"');
   });
 
   /**

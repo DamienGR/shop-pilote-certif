@@ -25,7 +25,8 @@ limiteurs existaient et répondaient sans erreur, mais celui de Cloudflare
 comptait trop large pour arrêter un essai patient de mots de passe. En
 `v0.3.5`, la boutique compte elle-même les tentatives de connexion, et la porte
 l'a vue refuser la sixième. La production de l'étape 9 n'a pas Access devant
-son administration : la même porte s'y rejoue.
+son administration : la même porte s'y est rejouée le 2026-10-21, 17
+contrôles sur 17.
 
 ## Les neuf lignes
 
@@ -104,4 +105,10 @@ l'étape 3 cite est archivé hors du dépôt.
    `BASE_URL=… npm run test:security:remote -- --limiteurs` contre le staging.
    Fait le 2026-10-15 : 18 contrôles sur 18 ;
 3. la même porte contre la production, à l'étape 9, puisque c'est elle qui n'a
-   pas Access. Reste à faire : c'est une case de l'étape 9 du plan.
+   pas Access. Fait le 2026-10-21 contre `certif-minshop.miijot.fr`, sur le
+   compte B : 17 contrôles sur 17 (celui de la preview restée privée n'a pas
+   lieu d'être sans Access). La recherche refuse dans ses 450 premières
+   requêtes, le checkout dans ses 150 premières sans rien réserver, la
+   connexion au plus tard à la sixième tentative, pour un quart d'heure.
+   Preuve : `client/certification/etape-9/porte-distante.txt` de
+   `shop-pilote-certif` (pull request #27).

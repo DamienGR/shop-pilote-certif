@@ -47,7 +47,7 @@
           "maxLength": 32
         },
         "displayName": {
-          "description": "Human name of the shop, as shown to operators.",
+          "description": "Human name of the shop, as shown to operators, and the store name the setup wizard proposes.",
           "type": "string",
           "minLength": 2,
           "maxLength": 60

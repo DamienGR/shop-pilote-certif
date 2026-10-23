@@ -162,7 +162,7 @@ jobs:
       # its jurisdiction (decided 2026-10-06), never to a GitHub artifact.
       - name: Keep the deployment reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: deploy-${{ inputs.shop }}-${{ inputs.environment }}-${{ github.run_id }}
           path: |

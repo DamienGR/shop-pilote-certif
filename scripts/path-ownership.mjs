@@ -243,21 +243,29 @@ export function renderCodeowners(rules = OWNERSHIP_RULES, owners = CORE_OWNERS) 
  * reported, never gated — without them every upgrade pull request needed an
  * approval, and an approval asked on every upgrade is one nobody reads.
  *
- * @param {{ paths: string[], isShop: boolean, approval: {by: string}|null, carried?: string[] }} input
- * @returns {{ ok: boolean, enforced: boolean, core: string[], carried: string[], changed: Array<{path: string, owner: string|null}> }}
+ * `rendered` are the changed GENERATED paths whose content is exactly what
+ * their generator renders from this tree. `wrangler.jsonc` is rendered for one
+ * shop, so no release ever carries it as the shop has it; a render is no hand
+ * edit, and its inputs (the template, the manifest) are gated on their own. A
+ * path of another owner is never taken for a render.
+ *
+ * @param {{ paths: string[], isShop: boolean, approval: {by: string}|null, carried?: string[], rendered?: string[] }} input
+ * @returns {{ ok: boolean, enforced: boolean, core: string[], carried: string[], rendered: string[], changed: Array<{path: string, owner: string|null}> }}
  */
-export function coreChangeGate({ paths, isShop, approval = null, carried = [] }) {
+export function coreChangeGate({ paths, isShop, approval = null, carried = [], rendered = [] }) {
   const changed = paths.map((path) => ({ path, owner: classifyPath(path)?.owner ?? null }));
   const fromCore = new Set(carried);
+  const fromRender = new Set(changed.filter((entry) => entry.owner === 'generated' && rendered.includes(entry.path)).map((entry) => entry.path));
   // An unclassified path counts as core: the fail-closed reading is the only
   // one that cannot be exploited by adding a file the rules do not cover.
   const notClient = changed.filter((entry) => entry.owner !== 'client').map((entry) => entry.path);
-  const core = notClient.filter((path) => !fromCore.has(path));
+  const core = notClient.filter((path) => !fromCore.has(path) && !fromRender.has(path));
   return {
     ok: !isShop || core.length === 0 || approval !== null,
     enforced: isShop,
     core,
     carried: notClient.filter((path) => fromCore.has(path)),
+    rendered: notClient.filter((path) => fromRender.has(path) && !fromCore.has(path)),
     changed,
   };
 }

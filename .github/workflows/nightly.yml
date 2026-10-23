@@ -170,7 +170,9 @@ jobs:
           fi
 
   staging:
-    name: Staging (${{ needs.detect.outputs.shop }})
+    # Static names: GitHub evaluates a job's name only when the job runs, and a
+    # skipped one showed its expression verbatim. The shop is the repository.
+    name: Staging
     needs: detect
     if: ${{ needs.detect.outputs.shop != '' && vars.STAGING_RETIRED == '' }}
     runs-on: ubuntu-latest
@@ -290,7 +292,7 @@ jobs:
       # The reports, not the data: identifiers, counts, digests, verdicts.
       - name: Keep the nightly reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nightly-${{ needs.detect.outputs.shop }}-${{ github.run_id }}
           path: |
@@ -301,7 +303,7 @@ jobs:
           if-no-files-found: warn
 
   production-backup:
-    name: Production backup (${{ needs.detect.outputs.shop }})
+    name: Production backup
     needs: detect
     if: ${{ needs.detect.outputs.shop != '' }}
     runs-on: ubuntu-latest
@@ -355,7 +357,7 @@ jobs:
 
       - name: Keep the reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nightly-${{ needs.detect.outputs.shop }}-production-backup-${{ github.run_id }}
           path: |
@@ -365,7 +367,7 @@ jobs:
           if-no-files-found: ignore
 
   production-watch:
-    name: Production error rate and quotas (${{ needs.detect.outputs.shop }})
+    name: Production error rate and quotas
     needs: detect
     if: ${{ needs.detect.outputs.shop != '' }}
     runs-on: ubuntu-latest
@@ -402,7 +404,7 @@ jobs:
 
       - name: Keep the report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nightly-${{ needs.detect.outputs.shop }}-production-${{ github.run_id }}
           path: monitor-production.json
