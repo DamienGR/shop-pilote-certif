@@ -1,0 +1,49 @@
+{
+  "command": "deploy",
+  "ok": true,
+  "dryRun": false,
+  "shop": "pilote-certif",
+  "env": "staging",
+  "account": {
+    "id": "e11ea775b0317980f1f70960d1000d09",
+    "name": "<email>'s Account"
+  },
+  "resources": {
+    "worker": "minshop-pilote-certif-staging",
+    "database": "minshop-pilote-certif-staging-db",
+    "images": "minshop-pilote-certif-staging-images",
+    "files": "minshop-pilote-certif-staging-files",
+    "backups": "minshop-pilote-certif-staging-backups",
+    "sessions": "minshop-pilote-certif-staging-session"
+  },
+  "databaseId": "42136d04-8561-487d-bf2d-044ce11ea2ea",
+  "backup": null,
+  "bookmark": null,
+  "origin": "https://preview.studiomaestro.fr",
+  "secrets": {
+    "present": [
+      "AUTH_SECRET",
+      "SECRETS_KEK"
+    ],
+    "created": []
+  },
+  "smoke": {
+    "origin": "https://preview.studiomaestro.fr",
+    "gated": true,
+    "attempts": 1,
+    "ok": true,
+    "notServed": false,
+    "results": [
+      {
+        "id": "gated",
+        "path": "/",
+        "what": "la preview est fermée aux requêtes non authentifiées",
+        "severity": "fail",
+        "ok": true,
+        "status": 302,
+        "message": null
+      }
+    ]
+  },
+  "rollbackTo": "79cc6e1e-de11-4ca5-92f3-5dce37a60b87"
+}

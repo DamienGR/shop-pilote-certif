@@ -1,0 +1,24 @@
+{
+  "ok": true,
+  "file": "test/fixtures/clients/pilot-fr/catalogue/catalog.csv",
+  "target": "remote",
+  "env": "production",
+  "dryRun": false,
+  "applied": true,
+  "summary": {
+    "productsCreated": 0,
+    "productsUpdated": 0,
+    "productsUnchanged": 20,
+    "variantsCreated": 0,
+    "variantsUpdated": 0,
+    "variantsDeactivated": 0,
+    "categoriesCreated": 0,
+    "mediaUploaded": 0,
+    "mediaReused": 8
+  },
+  "changes": [],
+  "refusals": [],
+  "warnings": [],
+  "untouched": [],
+  "statements": 0
+}

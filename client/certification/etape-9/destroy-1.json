@@ -1,0 +1,31 @@
+{
+  "command": "destroy",
+  "ok": false,
+  "dryRun": false,
+  "shop": "pilote-certif",
+  "env": "staging",
+  "account": {
+    "id": "e11ea775b0317980f1f70960d1000d09",
+    "name": "<email>'s Account"
+  },
+  "removed": [
+    "minshop-pilote-certif-staging",
+    "minshop-pilote-certif-staging-session",
+    "minshop-pilote-certif-staging-files"
+  ],
+  "remaining": [
+    "minshop-pilote-certif-staging-images",
+    "minshop-pilote-certif-staging-backups",
+    "minshop-pilote-certif-staging-db"
+  ],
+  "failures": [
+    {
+      "name": "minshop-pilote-certif-staging-images",
+      "reason": "The bucket you tried to delete (minshop-pilote-certif-staging-images) is not empty (account e11ea775b0317980f1f70960d1000d09). [code: 10008]"
+    },
+    {
+      "name": "minshop-pilote-certif-staging-backups",
+      "reason": "The bucket you tried to delete (minshop-pilote-certif-staging-backups) is not empty (account e11ea775b0317980f1f70960d1000d09). [code: 10008]"
+    }
+  ]
+}

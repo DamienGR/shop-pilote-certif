@@ -1,0 +1,59 @@
+{
+  "command": "backup pull",
+  "ok": true,
+  "id": "pilote-certif-staging-20261021T084158Z",
+  "path": "~/shop-pilote-certif/backups/pilote-certif-staging-20261021T084158Z",
+  "bucket": "minshop-pilote-certif-staging-backups",
+  "checks": [
+    {
+      "name": "taille du corps",
+      "ok": true,
+      "detail": "12572 octet(s), le manifeste en annonce 12572"
+    },
+    {
+      "name": "empreinte du corps",
+      "ok": true,
+      "detail": "e7d7f08cd6913705d9893a21fe0e767e6ffc81f912e07f4d24ba95af88b629b0"
+    },
+    {
+      "name": "objet media/053b6b97fc5ccaf2b08c.png",
+      "ok": true,
+      "detail": "intact"
+    },
+    {
+      "name": "objet media/57d97735a1aad93e22d6.png",
+      "ok": true,
+      "detail": "intact"
+    },
+    {
+      "name": "objet media/9a337e73d21f749e20e3.png",
+      "ok": true,
+      "detail": "intact"
+    },
+    {
+      "name": "objet media/b630063abd1cec42c79d.png",
+      "ok": true,
+      "detail": "intact"
+    },
+    {
+      "name": "objet media/bde9ce8d5d67b3a6925c.png",
+      "ok": true,
+      "detail": "intact"
+    },
+    {
+      "name": "objet media/c305815dae2ad10c293b.png",
+      "ok": true,
+      "detail": "intact"
+    },
+    {
+      "name": "objet media/c35201cd8b09cc286be4.png",
+      "ok": true,
+      "detail": "intact"
+    },
+    {
+      "name": "objet media/e9df9de207b06c5bf0b8.png",
+      "ok": true,
+      "detail": "intact"
+    }
+  ]
+}

@@ -1,0 +1,95 @@
+{
+  "command": "deploy",
+  "ok": true,
+  "dryRun": false,
+  "shop": "pilote-certif",
+  "env": "production",
+  "account": {
+    "id": "b8505b293a291d9d82edf5417b02084d",
+    "name": "Miijot"
+  },
+  "resources": {
+    "worker": "minshop-pilote-certif-production",
+    "database": "minshop-pilote-certif-production-db",
+    "images": "minshop-pilote-certif-production-images",
+    "files": "minshop-pilote-certif-production-files",
+    "backups": "minshop-pilote-certif-production-backups",
+    "sessions": "minshop-pilote-certif-production-session"
+  },
+  "databaseId": "e4996e2f-b035-4e9a-a331-452fd74f7cdd",
+  "backup": {
+    "id": "pilote-certif-production-20261021T194104Z",
+    "path": "/home/runner/work/shop-pilote-certif/shop-pilote-certif/backups/pilote-certif-production-20261021T194104Z",
+    "bytes": 7039,
+    "schema": "0045_history_indexes.sql",
+    "uploaded": {
+      "bucket": "minshop-pilote-certif-production-backups",
+      "prefix": "pilote-certif-production-20261021T194104Z/",
+      "files": 10
+    }
+  },
+  "bookmark": "00000016-00000000-0000510b-4de29a07a7576917b8ee7beebdf2220a",
+  "origin": "https://certif-minshop.miijot.fr",
+  "secrets": {
+    "present": [
+      "AUTH_SECRET",
+      "SECRETS_KEK"
+    ],
+    "created": []
+  },
+  "smoke": {
+    "origin": "https://certif-minshop.miijot.fr",
+    "gated": false,
+    "attempts": 1,
+    "ok": true,
+    "notServed": false,
+    "results": [
+      {
+        "id": "storefront",
+        "path": "/",
+        "what": "la vitrine répond et se déclare française",
+        "severity": "fail",
+        "ok": true,
+        "status": 200,
+        "message": null
+      },
+      {
+        "id": "catalogue",
+        "path": "/products",
+        "what": "le catalogue rend, donc la base D1 répond",
+        "severity": "fail",
+        "ok": true,
+        "status": 200,
+        "message": null
+      },
+      {
+        "id": "robots",
+        "path": "/robots.txt",
+        "what": "les fichiers de service sont servis",
+        "severity": "fail",
+        "ok": true,
+        "status": 200,
+        "message": null
+      },
+      {
+        "id": "admin-closed",
+        "path": "/admin",
+        "what": "l'administration n'est pas ouverte",
+        "severity": "fail",
+        "ok": true,
+        "status": 303,
+        "message": null
+      },
+      {
+        "id": "admin-setup-open",
+        "path": "/admin/setup",
+        "what": "l'assistant de première installation est refermé",
+        "severity": "warn",
+        "ok": true,
+        "status": 303,
+        "message": null
+      }
+    ]
+  },
+  "rollbackTo": "c4cab23a-828c-47da-a287-11c22c6257d1"
+}

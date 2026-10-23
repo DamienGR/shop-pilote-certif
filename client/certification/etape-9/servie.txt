@@ -1,0 +1,7 @@
+vitrine   200
+catalogue 200
+fiche     200
+image     200 image/png  https://images-certif-minshop.miijot.fr
+panier    0  (panier vide : le message ne s'affiche qu'avec un article)
+panier    1  (un savon dans le panier)
+setup     303 https://certif-minshop.miijot.fr/admin/login

@@ -1,0 +1,6 @@
+preview 000
+2026-10-23T15:48Z getent hosts preview.studiomaestro.fr: pas de résolution
+2026-10-23T15:48Z curl https://preview.studiomaestro.fr/: (6) Could not resolve host
+le domaine personnalisé du Worker est parti avec lui, et son enregistrement DNS aussi : la preview ne répond plus du tout
+environnements du dépôt après suppression: ["backup","production"]
+STAGING_RETIRED 2026-10-23

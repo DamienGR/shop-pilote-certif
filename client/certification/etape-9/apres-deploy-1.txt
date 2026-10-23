@@ -1,0 +1,2 @@
+setup 303 https://certif-minshop.miijot.fr/admin/login
+vitrine 302 https://certif-minshop.miijot.fr/admin/setup

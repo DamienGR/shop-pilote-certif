@@ -1,0 +1,67 @@
+{
+  "command": "repo",
+  "ok": true,
+  "dryRun": false,
+  "shop": "pilote-certif",
+  "repository": {
+    "owner": "DamienGR",
+    "repo": "shop-pilote-certif",
+    "nameWithOwner": "DamienGR/shop-pilote-certif",
+    "url": "https://github.com/DamienGR/shop-pilote-certif.git",
+    "created": false,
+    "derived": false,
+    "visibility": "public"
+  },
+  "branch": {
+    "name": "main",
+    "pushed": false
+  },
+  "environments": [
+    {
+      "env": "staging",
+      "action": "keep",
+      "protected": false,
+      "refusal": null
+    },
+    {
+      "env": "production",
+      "action": "keep",
+      "protected": true,
+      "refusal": null
+    },
+    {
+      "env": "backup",
+      "action": "create",
+      "protected": false,
+      "refusal": null,
+      "branches": [
+        "main"
+      ]
+    }
+  ],
+  "secrets": [
+    {
+      "env": "production",
+      "set": [
+        "CLOUDFLARE_API_TOKEN",
+        "CLOUDFLARE_ACCOUNT_ID",
+        "SHOPCTL_BACKUP_KEY"
+      ],
+      "from": "CLOUDFLARE_API_TOKEN_PRODUCTION",
+      "replaced": []
+    },
+    {
+      "env": "backup",
+      "set": [
+        "CLOUDFLARE_API_TOKEN",
+        "CLOUDFLARE_ACCOUNT_ID",
+        "SHOPCTL_BACKUP_KEY"
+      ],
+      "from": "CLOUDFLARE_API_TOKEN_BACKUP",
+      "replaced": []
+    }
+  ],
+  "missingTokens": [
+    "staging"
+  ]
+}
