@@ -114,7 +114,7 @@ export const MANIFEST_SPEC = {
       },
       displayName: {
         schema: { type: 'string', minLength: 2, maxLength: 60 },
-        description: 'Human name of the shop, as shown to operators.',
+        description: 'Human name of the shop, as shown to operators, and the store name the setup wizard proposes.',
       },
       locale: { schema: { type: 'string', enum: ['fr-FR'] }, description: 'Storefront locale. Single-valued while the offer is France-only.' },
       timezone: { schema: { type: 'string', enum: ['Europe/Paris'] }, description: 'Business time zone used for order timestamps and reports.' },

@@ -212,6 +212,9 @@ describe('private deliverable provisioning', () => {
     const renderSites = [
       '.github/actions/run-verify/action.yml',
       '.github/workflows/verify.yml',
+      '.github/workflows/d1-flake-probe.yml',
+      'scripts/check-clean-clone.sh',
+      'scripts/provision-cf.sh',
     ];
     expect(placeholders.length).toBeGreaterThan(0);
     for (const site of renderSites) {

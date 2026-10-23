@@ -77,10 +77,12 @@ socle, chacune avant la section qu'elle protégeait :
    pour les lecteurs d'écran de `market`. Aucune porte ne lisait la vitrine :
    le contrôle de langue ne couvrait que l'administration.
 
-Et trois trous de cette fiche, corrigés ci-dessous : `gh` refusait de choisir
+Et quatre trous de cette fiche, corrigés ci-dessous : `gh` refusait de choisir
 entre les deux remotes du clone (section 0), `catalog import` attendait une
-configuration que rien ne rendait plus (section 7), et le contrôle du panier
-lisait un panier vide (section 8).
+configuration que rien ne rendait plus (section 7), le contrôle du panier
+lisait un panier vide (section 8), et la clé Resend du staging n'était pas
+révoquée (section 10). Après la destruction, la preview ne résout plus du
+tout : son enregistrement DNS est parti avec le domaine du Worker.
 
 ## Ce que l'étape crée, et ce qu'elle ne touche pas
 
@@ -399,7 +401,9 @@ Et, à la main :
   (la preview et le contournement du webhook) et les jetons de service
   « pilote-certif » qui restent ;
 - Stripe test → Développeurs → Webhooks : supprimer l'endpoint qui visait
-  `preview.studiomaestro.fr/api/webhook`.
+  `preview.studiomaestro.fr/api/webhook` ;
+- Resend → API Keys : révoquer la clé du staging, garder celle que les
+  Réglages de B portent.
 
 Une dernière nuit, à la main, pour voir le staging éteint :
 

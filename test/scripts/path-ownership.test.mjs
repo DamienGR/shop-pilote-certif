@@ -16,6 +16,7 @@ import {
   matchGlob,
   renderCodeowners,
 } from '../../scripts/path-ownership.mjs';
+import { loadManifest, renderWrangler, wranglerSubstitutions } from '../../scripts/manifest.mjs';
 import { RESERVED_THEME_IDS } from '../../scripts/themes.mjs';
 
 const root = new URL('../../', import.meta.url).pathname;
@@ -152,6 +153,30 @@ describe('the core-change gate', () => {
       paths: ['scripts/themes.mjs', 'src/features/payments/stripe.ts'],
       isShop: true,
       carried: ['scripts/themes.mjs'],
+    });
+    expect(result.ok).toBe(false);
+    expect(result.core).toEqual(['src/features/payments/stripe.ts']);
+  });
+
+  // `wrangler.jsonc` is rendered for ONE shop, so no release ever carries it as
+  // the shop has it. A render is no hand edit; its inputs are gated on their own.
+  it('passes a generated file that is exactly its render, and reports it', () => {
+    const result = coreChangeGate({
+      paths: ['wrangler.template.jsonc', 'wrangler.jsonc'],
+      isShop: true,
+      carried: ['wrangler.template.jsonc'],
+      rendered: ['wrangler.jsonc'],
+    });
+    expect(result.ok).toBe(true);
+    expect(result.core).toEqual([]);
+    expect(result.rendered).toEqual(['wrangler.jsonc']);
+  });
+
+  it('takes nothing but a generated file for a render', () => {
+    const result = coreChangeGate({
+      paths: ['src/features/payments/stripe.ts'],
+      isShop: true,
+      rendered: ['src/features/payments/stripe.ts'],
     });
     expect(result.ok).toBe(false);
     expect(result.core).toEqual(['src/features/payments/stripe.ts']);
@@ -303,6 +328,55 @@ describe('check:paths', () => {
       run(['checkout', '-q', '-b', 'merges-side', 'main'], dir);
       run(['-c', 'user.name=t', '-c', 'user.email=t@example.com', 'merge', '-q', '--no-ff', '--no-edit', 'side'], dir);
       expect(gate(dir).core).toEqual(['src/features/payments/stripe.ts']);
+    });
+
+    // The pilot's upgrade to v0.3.19 was red here: the release changed the
+    // template, `shopctl core upgrade` re-rendered `wrangler.jsonc`, and no
+    // release holds that file as one shop renders it.
+    describe('whose release changes the Wrangler template', () => {
+      const render = (dir) => {
+        const { manifest } = loadManifest('client/client.yaml', { root: dir, checkTheme: false });
+        return renderWrangler(readFileSync(join(dir, 'wrangler.template.jsonc'), 'utf8'), wranglerSubstitutions(manifest));
+      };
+      const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
+
+      const renderedShop = () => {
+        const dir = mkdtempSync(join(tmpdir(), 'paths-render-'));
+        run(['init', '-q', '-b', 'core'], dir);
+        put(dir, 'package.json', `${JSON.stringify({ version })}\n`);
+        put(dir, 'wrangler.template.jsonc', '{ "name": "__NAME__" }\n');
+        put(dir, 'wrangler.jsonc', '{ "name": "minshop" }\n');
+        commit(dir, 'core 1');
+        run(['checkout', '-q', '-b', 'main'], dir);
+        put(dir, 'client/client.yaml', readFileSync(join(root, 'test/fixtures/clients/pilot-fr/client.yaml'), 'utf8'));
+        put(dir, 'wrangler.jsonc', render(dir));
+        commit(dir, 'shop');
+        run(['checkout', '-q', 'core'], dir);
+        put(dir, 'wrangler.template.jsonc', '{ "name": "__NAME__", "vars": { "STORE_NAME": "__STORE_NAME__" } }\n');
+        commit(dir, 'core 2');
+        run(['checkout', '-q', '-b', 'upgrade', 'main'], dir);
+        run(['-c', 'user.name=t', '-c', 'user.email=t@example.com', 'merge', '-q', '--no-edit', 'core'], dir);
+        put(dir, 'wrangler.jsonc', render(dir));
+        commit(dir, 'render');
+        return dir;
+      };
+
+      it('passes the configuration the upgrade re-rendered', () => {
+        const result = gate(renderedShop());
+        expect(result.ok).toBe(true);
+        expect(result.core).toEqual([]);
+        expect(result.carried).toEqual(['wrangler.template.jsonc']);
+        expect(result.rendered).toEqual(['wrangler.jsonc']);
+      });
+
+      it('still refuses a hand edit in the rendered configuration', () => {
+        const dir = renderedShop();
+        put(dir, 'wrangler.jsonc', render(dir).replace('"STORE_NAME"', '"MINE": "1", "STORE_NAME"'));
+        commit(dir, 'hand edit');
+        const result = gate(dir);
+        expect(result.ok).toBe(false);
+        expect(result.core).toEqual(['wrangler.jsonc']);
+      });
     });
   });
 });

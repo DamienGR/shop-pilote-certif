@@ -50,6 +50,14 @@ export const GIT_ENV = {
   GIT_AUTHOR_EMAIL: 'tests@example.com',
   GIT_COMMITTER_NAME: 'Minshop Tests',
   GIT_COMMITTER_EMAIL: 'tests@example.com',
+  // No maintenance after a commit. Since git 2.47 it runs detached, after the
+  // commit has returned, and takes a lock in `.git/objects` that vanished from
+  // under `cloneCoreTemplate`'s copy (ENOENT, CI of the pilot's step-9
+  // evidence). Through the environment, so every git a suite spawns — shopctl's
+  // included — inherits it.
+  GIT_CONFIG_COUNT: '1',
+  GIT_CONFIG_KEY_0: 'maintenance.auto',
+  GIT_CONFIG_VALUE_0: 'false',
   ...OPERATOR_ENV,
 };
 

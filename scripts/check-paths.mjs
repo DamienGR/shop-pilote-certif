@@ -33,7 +33,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { OWNERS, classifyPaths, coreChangeGate, renderCodeowners } from './path-ownership.mjs';
-import { isShopRepository } from './manifest.mjs';
+import { CLIENT_MANIFEST, isShopRepository, loadManifest, renderWrangler, wranglerSubstitutions } from './manifest.mjs';
 
 const args = process.argv.slice(2);
 const asJson = args.includes('--json');
@@ -43,6 +43,8 @@ const base = args.includes('--base') ? args[args.indexOf('--base') + 1] : 'origi
 const root = process.cwd();
 
 export const CODEOWNERS_FILE = '.github/CODEOWNERS';
+const WRANGLER_FILE = 'wrangler.jsonc';
+const WRANGLER_TEMPLATE = 'wrangler.template.jsonc';
 
 const git = (...argv) => execFileSync('git', argv, { cwd: root, encoding: 'utf8' }).trim();
 
@@ -124,6 +126,26 @@ function carriedFromCore(merge, paths) {
   return paths.filter((path) => cores.some((blobs) => blobs.get(path) === ours.get(path)));
 }
 
+/**
+ * The changed Wrangler configuration, when it is exactly what
+ * `prepare-client.mjs <slug>` renders from this tree's template and manifest.
+ * Rendered for one shop, it never matches a release's copy, so
+ * `carriedFromCore` cannot vouch for it. Anything that does not render, an
+ * invalid manifest or a leftover placeholder, vouches for nothing.
+ */
+function renderedFromTree(paths) {
+  const output = resolve(root, WRANGLER_FILE);
+  if (!paths.includes(WRANGLER_FILE) || !existsSync(output)) return [];
+  try {
+    const { manifest, errors } = loadManifest(CLIENT_MANIFEST, { root, checkTheme: false });
+    if (!manifest || errors.length > 0) return [];
+    const rendered = renderWrangler(readFileSync(resolve(root, WRANGLER_TEMPLATE), 'utf8'), wranglerSubstitutions(manifest));
+    return readFileSync(output, 'utf8') === rendered ? [WRANGLER_FILE] : [];
+  } catch {
+    return [];
+  }
+}
+
 function approval(merge) {
   if (process.env.MINSHOP_CORE_CHANGE === 'approved') return { by: 'MINSHOP_CORE_CHANGE=approved' };
   const trailer = git('log', '--format=%(trailers:key=Approves-core-change,valueonly)', `${merge}..HEAD`)
@@ -144,7 +166,8 @@ if (changed) {
   const approved = approval(merge);
   const paths = changedPaths(merge);
   const carried = shop ? carriedFromCore(merge, paths) : [];
-  gate = { base, approved, ...coreChangeGate({ paths, isShop: shop, approval: approved, carried }) };
+  const rendered = shop ? renderedFromTree(paths) : [];
+  gate = { base, approved, ...coreChangeGate({ paths, isShop: shop, approval: approved, carried, rendered }) };
 }
 
 const ok = map.unclassified.length === 0 && codeowners.ok && (gate === null || gate.ok);
@@ -172,7 +195,8 @@ if (gate) {
     console.log(`• core-change gate: not enforced here (this is the core repository, not a shop) — ${gate.core.length} core path(s) in ${gate.changed.length} changed since ${base}`);
   } else if (gate.core.length === 0) {
     const fromCore = gate.carried.length > 0 ? `, ${gate.carried.length} core path(s) as a merged core release has them` : '';
-    console.log(`✓ core-change gate: ${gate.changed.length} changed path(s) since ${base}, none edited by the shop${fromCore}`);
+    const fromRender = gate.rendered.length > 0 ? `, ${gate.rendered.join(', ')} as rendered from this tree` : '';
+    console.log(`✓ core-change gate: ${gate.changed.length} changed path(s) since ${base}, none edited by the shop${fromCore}${fromRender}`);
   } else if (gate.approved) {
     console.log(`✓ core-change gate: ${gate.core.length} core path(s) changed, approved by ${gate.approved.by}`);
   } else {

@@ -23,11 +23,12 @@ d'implémentation compris.
 
 ## Verdict
 
-Quatre lignes sur cinq tiennent. La porte navigateur, rouge en `v0.3.8` sur
-le contraste de la page CGV, est verte en `v0.3.9`. Lighthouse dépasse 90
+Les cinq lignes tiennent. La porte navigateur, rouge en `v0.3.8` sur le
+contraste de la page CGV, est verte en `v0.3.9`. Lighthouse dépasse 90
 partout, la charge passe sans une erreur, et la dernière unité ne se vend
-qu'une fois. Reste ouverte la ligne des **parcours d'achat à la main** : une
-commande payée sur les quatre navigateurs demandés.
+qu'une fois. Les **parcours d'achat à la main** tiennent sur trois navigateurs
+sur quatre, les deux derniers repassés à l'étape 9 ; Safari sur iPhone, faute
+d'appareil, est sous dérogation (plan, §6, écrite le 2026-10-23).
 
 Le CPU n'est pas une ligne du plan mais la question que l'étape devait
 trancher. À chaud, la vitrine tient sous 10 ms en médiane ; à froid, elle les
@@ -40,7 +41,7 @@ ci-dessous ; le choix revient à Damien.
 | Ligne du plan | État | Ce qui a été mesuré | Preuve |
 |---|---|---|---|
 | porte navigateur contre le staging (§8.5) | tenue en `v0.3.9` | en `v0.3.8`, 83 passés et 2 échecs : axe sur la page CGV, le bandeau « Brouillon » à 4,37:1 sur le papier du thème et 4,43:1 dans son `code`. En `v0.3.9`, 85 passés, 5 sautés avec leur raison (signature du design ×2, catalogue vide ×2, menu replié sur desktop) ; la citation mesurée à 7,06:1, son code à 6,41:1. Le menu d'en-tête porte trois liens, et son test clavier tourne sur téléphone | `porte-navigateur.txt`, `porte-navigateur-v0.3.9.txt` |
-| parcours d'achat à la main, quatre navigateurs | **ouverte** | passés à la main par Damien sans relevé sur le moment ; l'administration ne montre qu'une commande payée ce jour-là, #6 (`ord_r0rgn4xrwc`). Rien de cassé signalé | `README.md` des preuves |
+| parcours d'achat à la main, quatre navigateurs | tenue sur trois, Safari sur iPhone sous dérogation (plan, §6) | Chrome sur le poste : #6 (`ord_r0rgn4xrwc`), rien de cassé signalé. À l'étape 9, sur le staging : Firefox sur le poste et Chrome sur Android, qui ont trouvé trois défauts de la vitrine (menu hors de l'écran et nom de la boutique coupé sur téléphone, quantité tapée perdue au paiement), corrigés dans `v0.3.17` ; Chrome Android 155 refait ensuite, commande `g984x8qpm2`, sans défaut. Safari sur iPhone non fait, faute d'appareil. Versions et numéros des premiers achats non relevés | `README.md` des preuves ; étape 9, `README.md` et `achats/` |
 | Lighthouse mobile ≥ 90, LCP, CLS, INP relevés | tenue | 100 / 100 / 92 sur l'accueil, une catégorie, une fiche et le panier garni ; LCP 1,0 à 1,6 s, CLS 0, TBT 0 ms ; aucune requête hors de la boutique. INP 24 ms | `lighthouse-*.report.json`, `lighthouse-*.report.html` |
 | charge de quinze minutes, aucune erreur, consommation relevée | tenue | vingt acheteurs, 6 528 requêtes (7,1 par seconde), 0 erreur, 0 réponse 429 ; p99 de 245 à 311 ms selon l'étape du parcours. Monitor sur trois heures, la charge comprise : 0 erreur sur 7 307 requêtes, 0 invocation arrêtée, D1 à 16 % du quota quotidien en lecture | `charge.json`, `monitor.json` |
 | cinq checkouts concurrents sur la dernière unité | tenue | une session Stripe, quatre `409`, stock à 0 ; l'unité revenue à l'expiration de la session, le stock remis | `derniere-unite.txt` |
@@ -142,8 +143,9 @@ avant que la production n'en partage un.
 
 ## Ce qui reste
 
-1. Les trois achats manquants, chacun avec son navigateur, sa version et son
-   numéro de commande, et une capture de la confirmation sur les téléphones.
-   La ligne se coche alors.
-2. La décision sur le CPU, entre les trois issues ci-dessus, avec sa
+1. La décision sur le CPU, entre les trois issues ci-dessus, avec sa
    dérogation écrite si c'est la première.
+
+L'achat sur Safari, iPhone, est sous dérogation depuis le 2026-10-23 (plan,
+§6) : à rouvrir dès qu'un iPhone est disponible, ou si la porte navigateur
+gagne un projet WebKit.
