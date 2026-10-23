@@ -13,7 +13,7 @@ le vrai formulaire.
 | Ligne | Preuve | Résultat |
 |---|---|---|
 | porte navigateur contre le staging (§8.5) | `porte-navigateur.txt`, `porte-navigateur-v0.3.9.txt` | rouge en `v0.3.8` : 83 passés, 2 échecs, le contraste de la page de contenu (« Défauts » 1) ; **verte en `v0.3.9`** : 85 passés, 5 sautés avec leur raison (signature ×2, catalogue vide ×2, menu replié sur desktop). Le menu d'en-tête n'est plus vide, et son test clavier tourne sur téléphone |
-| parcours d'achat sur quatre navigateurs | ci-dessous | **ouverte** : une commande payée sur quatre (#6) ; les trois autres achats restent à faire |
+| parcours d'achat sur quatre navigateurs | ci-dessous | **trois sur quatre** : Chrome (#6), puis Firefox et Chrome Android repassés à l'étape 9 ; Safari sur iPhone non fait, aucun iPhone à disposition |
 | Lighthouse mobile ≥ 90, LCP, CLS, INP relevés | `lighthouse-*.report.json`, `lighthouse-*.report.html` | 100 / 100 / 92 sur les quatre pages ; aucune requête hors de la boutique ; INP 24 ms (ci-dessous) |
 | charge de quinze minutes, aucune erreur, consommation relevée | `charge.json`, `monitor.json` | 6 528 requêtes, 0 erreur, 0 réponse 429 ; le monitor vert sur les trois heures de l'étape, une fois son jeton corrigé (« Défauts » 4) : ci-dessous |
 | CPU par page, à froid et à chaud | `cpu-froid.txt`, `cpu-chaud.txt` | aucune invocation arrêtée, à froid comme à chaud ; les chiffres ci-dessous |
@@ -123,16 +123,18 @@ Passés à la main par Damien le 2026-10-19, sans relevé des navigateurs ni des
 versions sur le moment. L'administration ne montre qu'une commande payée ce
 jour-là : **#6** (`ord_r0rgn4xrwc`, 65,70 €, 19:59). Rien de cassé signalé.
 
-La ligne reste ouverte : trois achats de bout en bout manquent, à repasser en
-notant pour chacun le navigateur, sa version, le numéro de commande et une
-capture de la confirmation sur les téléphones.
+Les achats qui manquaient ont été repassés sur le staging à l'étape 9, avant
+sa destruction (`../etape-9/README.md`). Ils ont trouvé trois défauts de la
+vitrine, corrigés dans `v0.3.17`, et l'achat Chrome Android a été refait après
+la correction, le 2026-10-22.
 
 | Navigateur | Version | Commande | Ce qui a accroché |
 |---|---|---|---|
-| _à relever_ | | #6 `ord_r0rgn4xrwc` | rien de signalé |
-| _à faire_ | | | |
-| _à faire_ | | | |
-| _à faire_ | | | |
+| Chrome, poste | non relevée | #6 `ord_r0rgn4xrwc` | rien de signalé |
+| Firefox, poste | non relevée | non relevée | la quantité tapée sans « Mettre à jour » perdue au paiement (`v0.3.17`) |
+| Chrome Android, premier passage | non relevée | non relevée | le menu ouvert hors de l'écran ; « Rechercher » et « Panier » coupaient le nom de la boutique ; la quantité perdue (`v0.3.17`) |
+| Chrome Android, après `v0.3.17` | 155.0.8059.84 | `g984x8qpm2` | rien ; e-mail reçu ; capture `../etape-9/achats/chrome-android-g984x8qpm2.jpg`, l'adresse masquée |
+| Safari, iPhone | | | **non fait** : aucun iPhone à disposition |
 
 ## Défauts
 

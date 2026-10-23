@@ -1,0 +1,109 @@
+{
+  "command": "provision",
+  "ok": true,
+  "dryRun": false,
+  "shop": "pilote-certif",
+  "env": "production",
+  "account": {
+    "id": "b8505b293a291d9d82edf5417b02084d",
+    "name": "Miijot"
+  },
+  "jurisdiction": "eu",
+  "resources": {
+    "worker": "minshop-pilote-certif-production",
+    "database": "minshop-pilote-certif-production-db",
+    "images": "minshop-pilote-certif-production-images",
+    "files": "minshop-pilote-certif-production-files",
+    "backups": "minshop-pilote-certif-production-backups",
+    "sessions": "minshop-pilote-certif-production-session"
+  },
+  "databaseId": "e4996e2f-b035-4e9a-a331-452fd74f7cdd",
+  "steps": [
+    {
+      "resource": "base D1",
+      "name": "minshop-pilote-certif-production-db",
+      "action": "create",
+      "detail": "juridiction eu, e4996e2f-b035-4e9a-a331-452fd74f7cdd"
+    },
+    {
+      "resource": "bucket images",
+      "name": "minshop-pilote-certif-production-images",
+      "action": "create",
+      "detail": "juridiction eu"
+    },
+    {
+      "resource": "bucket fichiers",
+      "name": "minshop-pilote-certif-production-files",
+      "action": "create",
+      "detail": "juridiction eu"
+    },
+    {
+      "resource": "bucket sauvegardes",
+      "name": "minshop-pilote-certif-production-backups",
+      "action": "create",
+      "detail": "juridiction eu"
+    }
+  ],
+  "jurisdictionChecks": [
+    {
+      "resource": "minshop-pilote-certif-production-db",
+      "expected": "eu",
+      "reported": "eu",
+      "ok": true
+    },
+    {
+      "resource": "minshop-pilote-certif-production-images",
+      "expected": "eu",
+      "reported": "eu",
+      "ok": true
+    },
+    {
+      "resource": "minshop-pilote-certif-production-files",
+      "expected": "eu",
+      "reported": "eu",
+      "ok": true
+    },
+    {
+      "resource": "minshop-pilote-certif-production-backups",
+      "expected": "eu",
+      "reported": "eu",
+      "ok": true
+    }
+  ],
+  "exposure": {
+    "files": {
+      "devUrl": null,
+      "domains": [],
+      "public": false,
+      "known": true
+    },
+    "images": {
+      "devUrl": null,
+      "domains": [],
+      "public": false,
+      "known": true
+    },
+    "backups": {
+      "devUrl": null,
+      "domains": [],
+      "public": false,
+      "known": true
+    }
+  },
+  "retention": {
+    "days": 90,
+    "action": "create"
+  },
+  "config": "wrangler.jsonc",
+  "migrations": "applied",
+  "demoCheckout": "create",
+  "secrets": {
+    "present": [],
+    "created": [],
+    "pending": [
+      "AUTH_SECRET",
+      "SECRETS_KEK"
+    ]
+  },
+  "workerDeployed": false
+}

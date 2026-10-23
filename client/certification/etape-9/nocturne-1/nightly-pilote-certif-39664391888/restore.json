@@ -1,0 +1,130 @@
+{
+  "command": "restore",
+  "ok": true,
+  "dryRun": false,
+  "shop": "pilote-certif",
+  "env": "staging",
+  "from": "pilote-certif-staging-20261021T194624Z",
+  "local": true,
+  "account": null,
+  "statements": 44,
+  "objects": 8,
+  "uncarried": [],
+  "tables": [
+    {
+      "name": "admin_login_attempts",
+      "rows": 0
+    },
+    {
+      "name": "categories",
+      "rows": 4
+    },
+    {
+      "name": "checkout_reservations",
+      "rows": 20
+    },
+    {
+      "name": "media",
+      "rows": 8
+    },
+    {
+      "name": "menu_items",
+      "rows": 7
+    },
+    {
+      "name": "order_guest_access",
+      "rows": 19
+    },
+    {
+      "name": "order_item_ids",
+      "rows": 22
+    },
+    {
+      "name": "order_reference_aliases",
+      "rows": 0
+    },
+    {
+      "name": "orders",
+      "rows": 7
+    },
+    {
+      "name": "pages",
+      "rows": 4
+    },
+    {
+      "name": "pending_payments",
+      "rows": 0
+    },
+    {
+      "name": "products",
+      "rows": 25
+    },
+    {
+      "name": "refund_sync_events",
+      "rows": 3
+    },
+    {
+      "name": "settings",
+      "rows": 15
+    },
+    {
+      "name": "sweep_cursors",
+      "rows": 2
+    },
+    {
+      "name": "order_inventory_exceptions",
+      "rows": 0
+    },
+    {
+      "name": "order_items",
+      "rows": 9
+    },
+    {
+      "name": "order_notifications",
+      "rows": 16
+    },
+    {
+      "name": "page_media",
+      "rows": 0
+    },
+    {
+      "name": "product_categories",
+      "rows": 28
+    },
+    {
+      "name": "product_extras",
+      "rows": 0
+    },
+    {
+      "name": "product_images",
+      "rows": 10
+    },
+    {
+      "name": "product_variants",
+      "rows": 9
+    },
+    {
+      "name": "refunds",
+      "rows": 3
+    },
+    {
+      "name": "shipping_label_attempts",
+      "rows": 0
+    },
+    {
+      "name": "shipping_labels",
+      "rows": 0
+    }
+  ],
+  "differences": [],
+  "vault": {
+    "keys": [
+      "resend_api_key",
+      "stripe_secret_key",
+      "stripe_webhook_secret",
+      "turnstile_secret_key"
+    ],
+    "turnstile": true,
+    "readable": false
+  }
+}

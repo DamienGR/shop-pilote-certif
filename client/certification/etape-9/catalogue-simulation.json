@@ -1,0 +1,336 @@
+{
+  "ok": true,
+  "file": "test/fixtures/clients/pilot-fr/catalogue/catalog.csv",
+  "target": "remote",
+  "env": "production",
+  "dryRun": true,
+  "applied": false,
+  "summary": {
+    "productsCreated": 20,
+    "productsUpdated": 0,
+    "productsUnchanged": 0,
+    "variantsCreated": 9,
+    "variantsUpdated": 0,
+    "variantsDeactivated": 0,
+    "categoriesCreated": 4,
+    "mediaUploaded": 8,
+    "mediaReused": 0
+  },
+  "changes": [
+    {
+      "kind": "category.create",
+      "subject": "maison"
+    },
+    {
+      "kind": "category.create",
+      "subject": "textile"
+    },
+    {
+      "kind": "category.create",
+      "subject": "papeterie"
+    },
+    {
+      "kind": "category.create",
+      "subject": "soins"
+    },
+    {
+      "kind": "product.create",
+      "subject": "CAB-LIN",
+      "detail": "Cabas en lin lavé"
+    },
+    {
+      "kind": "categories.set",
+      "subject": "CAB-LIN",
+      "detail": "maison, textile"
+    },
+    {
+      "kind": "images.set",
+      "subject": "CAB-LIN",
+      "detail": "1 image(s)"
+    },
+    {
+      "kind": "product.create",
+      "subject": "CAR-A5",
+      "detail": "Carnet recyclé A5"
+    },
+    {
+      "kind": "categories.set",
+      "subject": "CAR-A5",
+      "detail": "papeterie"
+    },
+    {
+      "kind": "images.set",
+      "subject": "CAR-A5",
+      "detail": "1 image(s)"
+    },
+    {
+      "kind": "product.create",
+      "subject": "CAR-A6",
+      "detail": "Carnet recyclé A6"
+    },
+    {
+      "kind": "categories.set",
+      "subject": "CAR-A6",
+      "detail": "papeterie"
+    },
+    {
+      "kind": "images.set",
+      "subject": "CAR-A6",
+      "detail": "1 image(s)"
+    },
+    {
+      "kind": "product.create",
+      "subject": "MUG-GRE",
+      "detail": "Mug en grès émaillé"
+    },
+    {
+      "kind": "categories.set",
+      "subject": "MUG-GRE",
+      "detail": "maison"
+    },
+    {
+      "kind": "images.set",
+      "subject": "MUG-GRE",
+      "detail": "1 image(s)"
+    },
+    {
+      "kind": "product.create",
+      "subject": "SAV-MAR",
+      "detail": "Savon de Marseille 300 g"
+    },
+    {
+      "kind": "categories.set",
+      "subject": "SAV-MAR",
+      "detail": "soins"
+    },
+    {
+      "kind": "images.set",
+      "subject": "SAV-MAR",
+      "detail": "1 image(s)"
+    },
+    {
+      "kind": "product.create",
+      "subject": "TEE",
+      "detail": "Tee-shirt en coton bio"
+    },
+    {
+      "kind": "variant.create",
+      "subject": "TEE-S",
+      "detail": "S"
+    },
+    {
+      "kind": "variant.create",
+      "subject": "TEE-M",
+      "detail": "M"
+    },
+    {
+      "kind": "variant.create",
+      "subject": "TEE-L",
+      "detail": "L"
+    },
+    {
+      "kind": "variant.create",
+      "subject": "TEE-XL",
+      "detail": "XL"
+    },
+    {
+      "kind": "categories.set",
+      "subject": "TEE",
+      "detail": "textile"
+    },
+    {
+      "kind": "images.set",
+      "subject": "TEE",
+      "detail": "1 image(s)"
+    },
+    {
+      "kind": "product.create",
+      "subject": "BOU-CIR",
+      "detail": "Bougie de cire d'abeille"
+    },
+    {
+      "kind": "categories.set",
+      "subject": "BOU-CIR",
+      "detail": "maison"
+    },
+    {
+      "kind": "images.set",
+      "subject": "BOU-CIR",
+      "detail": "1 image(s)"
+    },
+    {
+      "kind": "product.create",
+      "subject": "TOR-LIN",
+      "detail": "Torchon en lin"
+    },
+    {
+      "kind": "categories.set",
+      "subject": "TOR-LIN",
+      "detail": "maison, textile"
+    },
+    {
+      "kind": "images.set",
+      "subject": "TOR-LIN",
+      "detail": "1 image(s)"
+    },
+    {
+      "kind": "product.create",
+      "subject": "PLA-HET",
+      "detail": "Planche à découper en hêtre"
+    },
+    {
+      "kind": "categories.set",
+      "subject": "PLA-HET",
+      "detail": "maison"
+    },
+    {
+      "kind": "images.set",
+      "subject": "PLA-HET",
+      "detail": "1 image(s)"
+    },
+    {
+      "kind": "product.create",
+      "subject": "STY-BOI",
+      "detail": "Stylo en bois de frêne"
+    },
+    {
+      "kind": "categories.set",
+      "subject": "STY-BOI",
+      "detail": "papeterie"
+    },
+    {
+      "kind": "product.create",
+      "subject": "CRA-12",
+      "detail": "Boîte de douze crayons"
+    },
+    {
+      "kind": "categories.set",
+      "subject": "CRA-12",
+      "detail": "papeterie"
+    },
+    {
+      "kind": "product.create",
+      "subject": "ENV-KRA",
+      "detail": "Enveloppes kraft, lot de 25"
+    },
+    {
+      "kind": "categories.set",
+      "subject": "ENV-KRA",
+      "detail": "papeterie"
+    },
+    {
+      "kind": "product.create",
+      "subject": "BAU-LEV",
+      "detail": "Baume à lèvres calendula"
+    },
+    {
+      "kind": "categories.set",
+      "subject": "BAU-LEV",
+      "detail": "soins"
+    },
+    {
+      "kind": "product.create",
+      "subject": "HUI-AMA",
+      "detail": "Huile d'amande douce 100 ml"
+    },
+    {
+      "kind": "categories.set",
+      "subject": "HUI-AMA",
+      "detail": "soins"
+    },
+    {
+      "kind": "product.create",
+      "subject": "SHA",
+      "detail": "Shampooing solide"
+    },
+    {
+      "kind": "variant.create",
+      "subject": "SHA-LAV",
+      "detail": "Lavande"
+    },
+    {
+      "kind": "variant.create",
+      "subject": "SHA-VER",
+      "detail": "Verveine"
+    },
+    {
+      "kind": "categories.set",
+      "subject": "SHA",
+      "detail": "soins"
+    },
+    {
+      "kind": "product.create",
+      "subject": "ECH-LAI",
+      "detail": "Écharpe en laine mérinos"
+    },
+    {
+      "kind": "categories.set",
+      "subject": "ECH-LAI",
+      "detail": "textile"
+    },
+    {
+      "kind": "product.create",
+      "subject": "CHA",
+      "detail": "Chaussettes en coton"
+    },
+    {
+      "kind": "variant.create",
+      "subject": "CHA-3638",
+      "detail": "36-38"
+    },
+    {
+      "kind": "variant.create",
+      "subject": "CHA-3941",
+      "detail": "39-41"
+    },
+    {
+      "kind": "variant.create",
+      "subject": "CHA-4244",
+      "detail": "42-44"
+    },
+    {
+      "kind": "categories.set",
+      "subject": "CHA",
+      "detail": "textile"
+    },
+    {
+      "kind": "product.create",
+      "subject": "NAP-LIN",
+      "detail": "Nappe en lin 150 × 250"
+    },
+    {
+      "kind": "categories.set",
+      "subject": "NAP-LIN",
+      "detail": "maison, textile"
+    },
+    {
+      "kind": "images.set",
+      "subject": "NAP-LIN",
+      "detail": "1 image(s)"
+    },
+    {
+      "kind": "product.create",
+      "subject": "POR-CLE",
+      "detail": "Porte-clés en cuir"
+    },
+    {
+      "kind": "categories.set",
+      "subject": "POR-CLE",
+      "detail": "maison"
+    },
+    {
+      "kind": "product.create",
+      "subject": "CAR-VOE",
+      "detail": "Cartes de vœux, lot de 8"
+    },
+    {
+      "kind": "categories.set",
+      "subject": "CAR-VOE",
+      "detail": "papeterie"
+    }
+  ],
+  "refusals": [],
+  "warnings": [],
+  "untouched": [],
+  "statements": 124
+}

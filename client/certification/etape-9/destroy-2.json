@@ -1,0 +1,18 @@
+{
+  "command": "destroy",
+  "ok": true,
+  "dryRun": false,
+  "shop": "pilote-certif",
+  "env": "staging",
+  "account": {
+    "id": "e11ea775b0317980f1f70960d1000d09",
+    "name": "<email>'s Account"
+  },
+  "removed": [
+    "minshop-pilote-certif-staging-images",
+    "minshop-pilote-certif-staging-backups",
+    "minshop-pilote-certif-staging-db"
+  ],
+  "remaining": [],
+  "failures": []
+}

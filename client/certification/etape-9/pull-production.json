@@ -1,0 +1,59 @@
+{
+  "command": "backup pull",
+  "ok": true,
+  "id": "pilote-certif-production-20261021T194618Z",
+  "path": "~/shop-pilote-certif/backups/pilote-certif-production-20261021T194618Z",
+  "bucket": "minshop-pilote-certif-production-backups",
+  "checks": [
+    {
+      "name": "taille du corps",
+      "ok": true,
+      "detail": "7111 octet(s), le manifeste en annonce 7111"
+    },
+    {
+      "name": "empreinte du corps",
+      "ok": true,
+      "detail": "abf386eece582c1aca503328cf0980ed0c3f124bc3221bf4b414a8e0a9477e63"
+    },
+    {
+      "name": "objet media/053b6b97fc5ccaf2b08c.png",
+      "ok": true,
+      "detail": "intact"
+    },
+    {
+      "name": "objet media/57d97735a1aad93e22d6.png",
+      "ok": true,
+      "detail": "intact"
+    },
+    {
+      "name": "objet media/9a337e73d21f749e20e3.png",
+      "ok": true,
+      "detail": "intact"
+    },
+    {
+      "name": "objet media/b630063abd1cec42c79d.png",
+      "ok": true,
+      "detail": "intact"
+    },
+    {
+      "name": "objet media/bde9ce8d5d67b3a6925c.png",
+      "ok": true,
+      "detail": "intact"
+    },
+    {
+      "name": "objet media/c305815dae2ad10c293b.png",
+      "ok": true,
+      "detail": "intact"
+    },
+    {
+      "name": "objet media/c35201cd8b09cc286be4.png",
+      "ok": true,
+      "detail": "intact"
+    },
+    {
+      "name": "objet media/e9df9de207b06c5bf0b8.png",
+      "ok": true,
+      "detail": "intact"
+    }
+  ]
+}
