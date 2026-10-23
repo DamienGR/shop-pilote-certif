@@ -27,7 +27,7 @@ interface Props {
 const { model, purchase } = Astro.props;
 ---
 
-<nav aria-label="Breadcrumb" class="py-3 font-serif text-[11px] text-[color:var(--market-muted)]">
+<nav aria-label={t('shell.nav.breadcrumb')} class="py-3 font-serif text-[11px] text-[color:var(--market-muted)]">
   <a href={model.backHref} class="hover:text-brand">{t('shell.nav.store')}</a>
   {model.categories.map((category) => (
     <>

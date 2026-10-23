@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join, normalize } from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { markup, readableAttributes, textNodes, trackedTemplates, withImports } from './template-scan.mjs';
 
 // Deliberately .mjs: it reads source files, and tsconfig.compilerOptions.types
 // is pinned to the Cloudflare types. Same reason as test/storefront/boundary.test.mjs.
@@ -13,47 +12,15 @@ import { execFileSync } from 'node:child_process';
 // a French `lang`, which is the one outcome ADR 0011 and ADR 0018 both refuse.
 // A source scan is the cheap floor under that.
 
-/** The Admin's entry points: every route under src/pages/admin, and its layout. */
-const ROOTS = execFileSync('git', ['ls-files', 'src/pages/admin', 'src/layouts/AdminLayout.astro'], {
-  encoding: 'utf8',
-})
-  .trim()
-  .split('\n')
-  .filter((path) => path.endsWith('.astro'));
-
 /**
- * The roots plus every `.astro` component they import, transitively.
- *
- * Derived rather than listed, so a form moved into a feature folder is still
- * scanned. Storefront components never come in through this walk: no Admin page
- * imports one, and the theme boundary keeps it that way from the other side.
+ * The Admin's entry points, every route under src/pages/admin and its layout,
+ * plus what they import. Storefront components never come in through this
+ * walk: no Admin page imports one, and the theme boundary keeps it that way
+ * from the other side.
  */
-function adminTemplates() {
-  const seen = new Set();
-  const queue = [...ROOTS];
-  while (queue.length > 0) {
-    const path = queue.shift();
-    if (seen.has(path)) continue;
-    seen.add(path);
-    const text = readFileSync(path, 'utf8');
-    for (const [, spec] of text.matchAll(/^import\s+[^'"]*['"](\.{1,2}\/[^'"]+\.astro)['"]/gm)) {
-      const target = normalize(join(dirname(path), spec));
-      if (existsSync(target)) queue.push(target);
-    }
-  }
-  return [...seen].sort();
-}
-
-const templates = adminTemplates().map((path) => ({ path, text: readFileSync(path, 'utf8') }));
-
-/** Markup only: no frontmatter, no comments, no scripts or styles. */
-function markup(text) {
-  return text
-    .replace(/^---\n[\s\S]*?\n---\n/, '')
-    .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<(script|style)\b[\s\S]*?<\/\1>/g, '');
-}
+const templates = withImports(trackedTemplates(['src/pages/admin', 'src/layouts/AdminLayout.astro'])).map(
+  (path) => ({ path, text: readFileSync(path, 'utf8') }),
+);
 
 /**
  * Words that mark a phrase as English and do not occur as French words.
@@ -75,24 +42,6 @@ const ENGLISH = new RegExp(
     'Log in', 'Log out', 'Sign in', 'View',
   ].join('|')})\\b`,
 );
-
-/**
- * Text between two tags, when it holds no expression. The `>` of an arrow
- * function and the JavaScript between two elements of a `.map()` are not text.
- */
-function textNodes(source) {
-  return [...source.matchAll(/(?<!=)>([^<>{}]+)</g)]
-    .map(([, text]) => text.replace(/\s+/g, ' ').trim())
-    .filter((text) => /[A-Za-z]{2}/.test(text))
-    .filter((text) => !/===|!==|&&|\|\||=>|\?\s*\($|^\)\s*:/.test(text));
-}
-
-/** Static values of the attributes a person reads or a screen reader speaks. */
-function readableAttributes(source) {
-  return [...source.matchAll(/\s(?:placeholder|title|aria-label|alt|label|hint)="([^"{}]+)"/g)].map(
-    ([, value]) => value,
-  );
-}
 
 describe('the Admin speaks French (ADR 0018)', () => {
   it('finds the templates it is meant to be guarding', () => {

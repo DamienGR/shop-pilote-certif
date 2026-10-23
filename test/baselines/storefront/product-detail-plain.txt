@@ -228,7 +228,7 @@ cache-tag: catalog,product:prod_<id>,product:prod_<id>,product:prod_<id>,product
 </div>
 <aside data-cart-panel class="absolute right-0 top-0 flex h-full w-full max-w-md translate-x-full flex-col bg-paper shadow-xl transition-transform duration-300">
 <div class="flex items-center justify-between border-b border-line px-6 py-5">
-<h2 class="font-serif text-2xl tracking-tight">Your cart</h2>
+<h2 class="font-serif text-2xl tracking-tight">Votre panier</h2>
 <button type="button" data-cart-close aria-label="Fermer le panier" class="-mr-2 flex h-11 w-11 items-center justify-center rounded-md text-3xl leading-none text-faint transition-colors hover:bg-surface hover:text-brand">&times;</button>
 </div>
 <div data-cart-body class="flex-1 overflow-y-auto px-6 py-5">

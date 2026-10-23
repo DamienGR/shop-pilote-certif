@@ -11,6 +11,7 @@ import {
   MENU_CAPS,
   MENU_ITEMS_SQL,
   MAX_MENU_LABEL,
+  SINGLETON_LABELS,
   type MenuItemRow,
 } from './db';
 
@@ -70,6 +71,14 @@ describe('label fallback', () => {
     );
     expect(home.text).toBe('Home');
     expect(catalog.text).toBe('Shop');
+  });
+
+  // A blank label is what most merchants leave, so the fallback is the name a
+  // customer reads in the menu: the catalog's words, never an English placeholder.
+  it('names Home and Catalog in French, in the query that renders them', () => {
+    expect(SINGLETON_LABELS).toEqual({ home: 'Accueil', catalog: 'Catalogue' });
+    expect(MENU_ITEMS_SQL).toMatch(/WHEN 'home'\s+THEN 'Accueil'/);
+    expect(MENU_ITEMS_SQL).toMatch(/WHEN 'catalog'\s+THEN 'Catalogue'/);
   });
 });
 
