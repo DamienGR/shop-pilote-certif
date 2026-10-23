@@ -2,7 +2,7 @@
 
 Fiche de passage pour le poste de Damien. Elle suit l'étape 9 du
 [plan](plan.md#étape-9--bascule-sur-le-compte--client-) : le pilote monte en
-`v0.3.17` ; les trois achats manuels qui restaient de l'étape 6 se font sur le
+`v0.3.18` ; les trois achats manuels qui restaient de l'étape 6 se font sur le
 staging pendant qu'il existe ; la production de `pilote-certif` est créée sur
 le compte B, son mot de passe posé avant tout déploiement, déployée par le
 workflow `Deploy`, installée et saisie sur B, contrôlée par la porte distante
@@ -57,7 +57,7 @@ Turnstile, Access.
 
 ## Ce que le passage réel a trouvé
 
-Le passage des 2026-10-21 et 2026-10-22 a fait publier trois versions du
+Le passage des 2026-10-21 et 2026-10-22 a fait publier quatre versions du
 socle, chacune avant la section qu'elle protégeait :
 
 1. **`v0.3.15`** : l'alerte `markdown-it` du `Nightly`, sans laquelle le job
@@ -69,7 +69,13 @@ socle, chacune avant la section qu'elle protégeait :
    section 2. Sur un téléphone, le menu d'`atelier` s'ouvrait hors de l'écran,
    et « Rechercher » et « Panier » en toutes lettres coupaient le nom de la
    boutique ; partout, une quantité tapée dans le panier sans « Mettre à
-   jour » était perdue au paiement.
+   jour » était perdue au paiement ;
+4. **`v0.3.18`** : la vitrine parlait anglais, vu sur l'accueil de la
+   production une fois redéployée en `v0.3.17`. « Shop » et « All products »
+   au-dessus du catalogue, « Your cart » en tête du tiroir, « Home » et
+   « Shop » dans un menu dont le libellé est laissé vide, et « Breadcrumb »
+   pour les lecteurs d'écran de `market`. Aucune porte ne lisait la vitrine :
+   le contrôle de langue ne couvrait que l'administration.
 
 Et trois trous de cette fiche, corrigés ci-dessous : `gh` refusait de choisir
 entre les deux remotes du clone (section 0), `catalog import` attendait une
@@ -82,7 +88,7 @@ lisait un panier vide (section 8).
 |---|---|
 | Cloudflare B | **créé et gardé** : Worker `minshop-pilote-certif-production` sur `certif-minshop.miijot.fr`, sa base, ses trois buckets en juridiction `eu`, le domaine d'images `images-certif-minshop.miijot.fr` attaché au bucket d'images, son namespace KV de sessions, ses secrets internes, un cron ; deux jetons API (déploiement, sauvegarde) ; les archives de `deploy` et du nocturne dans `-backups` |
 | Cloudflare A | **détruit** : le staging du pilote (Worker, base, trois buckets, namespace KV) ; le jeton de staging révoqué ; les applications Access de la preview et leurs jetons de service supprimés |
-| GitHub `shop-pilote-certif` | la pull request `socle/v0.3.17` ; une pull request qui déclare `imagesDomain` ; l'environnement `backup` et ses trois secrets ; le jeton de l'environnement `production` réécrit ; la variable `STAGING_RETIRED` ; l'environnement `staging` supprimé ; une pull request de preuves |
+| GitHub `shop-pilote-certif` | la pull request `socle/v0.3.18` ; une pull request qui déclare `imagesDomain` ; l'environnement `backup` et ses trois secrets ; le jeton de l'environnement `production` réécrit ; la variable `STAGING_RETIRED` ; l'environnement `staging` supprimé ; une pull request de preuves |
 | Stripe test | trois paiements (section 2) ; l'endpoint de webhook de la preview supprimé |
 | Resend | le domaine d'envoi vérifié s'il ne l'est pas ; des e-mails réels vers les adresses de Damien |
 | Stripe live | rien : l'étape 10 |
@@ -93,8 +99,8 @@ paiement, la démonstration coupée).
 
 ## 0. Shell propre, et ce qui doit exister avant
 
-Prérequis : le tag `v0.3.17`, publié par le workflow `Release` du socle. Il
-reprend `v0.3.14` et les trois versions que le passage réel a fait publier
+Prérequis : le tag `v0.3.18`, publié par le workflow `Release` du socle. Il
+reprend `v0.3.14` et les quatre versions que le passage réel a fait publier
 (ci-dessus).
 
 Sur B, dans le tableau de bord, avant de commencer :
@@ -130,18 +136,18 @@ echo "$COMPTE_A $COMPTE_B $PILOTE $PROD"
 npx wrangler whoami                                  # la session voit A et B
 ```
 
-## 1. Monter le pilote en `v0.3.17`
+## 1. Monter le pilote en `v0.3.18`
 
 ```sh
-npm run shopctl -- core upgrade --to v0.3.17 --open-pr
-gh pr checks socle/v0.3.17 --watch
-gh pr merge socle/v0.3.17 --merge
+npm run shopctl -- core upgrade --to v0.3.18 --open-pr
+gh pr checks socle/v0.3.18 --watch
+gh pr merge socle/v0.3.18 --merge
 git switch main && git pull && npm ci && npm ci --prefix mcp
-npm run shopctl -- core status                       # v0.3.17
-npm run -s shopctl -- deploy --env staging --json > "$E/deploy-staging-v0.3.17.json"; echo $?
+npm run shopctl -- core status                       # v0.3.18
+npm run -s shopctl -- deploy --env staging --json > "$E/deploy-staging-v0.3.18.json"; echo $?
 ```
 
-Attendu : la pull request verte, avec les notes de `v0.3.13` à `v0.3.17`
+Attendu : la pull request verte, avec les notes de `v0.3.13` à `v0.3.18`
 pour un pilote resté en `v0.3.12` ; `deploy` en `0`
 sur A. Le staging sert maintenant ses images par le Worker, même une fois
 `imagesDomain` déclaré.
@@ -150,7 +156,7 @@ Le thème `pilote-certif` est une copie d'`atelier`, et il appartient à la
 boutique : la montée ne le touche pas. L'en-tête corrigé d'`atelier` s'y
 reporte dans une pull request de la boutique, avec sa signature
 (`docs/migrations/v0.3.17.md`, « À faire dans la boutique »), avant le
-déploiement du staging.
+déploiement du staging. `v0.3.18` ne demande rien au thème.
 
 ## 2. Avant que le staging ne parte : les trois achats de l'étape 6
 

@@ -95,8 +95,8 @@ cache-tag: catalog,shell
 </header>
 <main class="page-shell">
 <div class="mb-10">
-<p class="text-xs uppercase tracking-[0.25em] text-muted">Shop</p>
-<h1 class="mt-2 font-serif text-4xl tracking-tight sm:text-5xl">All products</h1>
+<p class="text-xs uppercase tracking-[0.25em] text-muted">Boutique</p>
+<h1 class="mt-2 font-serif text-4xl tracking-tight sm:text-5xl">Tous les produits</h1>
 </div>
 <div class="mb-12 flex flex-wrap gap-x-6 gap-y-2 text-xs uppercase tracking-widest text-muted">
 <a href="/categories/apparel" class="border-b border-transparent pb-0.5 hover:border-brand hover:text-brand">Apparel</a>
@@ -342,7 +342,7 @@ cache-tag: catalog,shell
 </div>
 <aside data-cart-panel class="absolute right-0 top-0 flex h-full w-full max-w-md translate-x-full flex-col bg-paper shadow-xl transition-transform duration-300">
 <div class="flex items-center justify-between border-b border-line px-6 py-5">
-<h2 class="font-serif text-2xl tracking-tight">Your cart</h2>
+<h2 class="font-serif text-2xl tracking-tight">Votre panier</h2>
 <button type="button" data-cart-close aria-label="Fermer le panier" class="-mr-2 flex h-11 w-11 items-center justify-center rounded-md text-3xl leading-none text-faint transition-colors hover:bg-surface hover:text-brand">&times;</button>
 </div>
 <div data-cart-body class="flex-1 overflow-y-auto px-6 py-5">

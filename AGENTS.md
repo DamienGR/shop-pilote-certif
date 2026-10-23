@@ -369,7 +369,9 @@ total, never per line.
   back to `standard` at render time, so old rows never break.
 - **A customer-facing string:** add a key to `src/features/i18n/messages.ts` and
   call `t('…')`. Never a literal in a template — the storefront is French, and a
-  literal is the one thing the catalog's type can't catch. Client scripts take
+  literal is the one thing the catalog's type can't catch;
+  `test/i18n/storefront-language.test.mjs` fails on one written into a core
+  storefront template, a prop default included. Client scripts take
   the string through `define:vars`, never by importing `t` (that would ship the
   whole catalog to the browser).
 - **A config setting:** build-time → add to the `SiteConfig` interface AND

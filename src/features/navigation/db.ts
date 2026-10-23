@@ -1,6 +1,7 @@
 import type { D1Database, D1PreparedStatement } from '@cloudflare/workers-types';
 import { catalogPath, resolveHomePath } from '../settings/home.ts';
 import { withPublicId } from '../ids/publicId.ts';
+import { t } from '../i18n/index.ts';
 
 export type MenuLocation = 'header' | 'footer';
 export type MenuTargetType = 'home' | 'catalog' | 'page' | 'product' | 'category';
@@ -32,11 +33,13 @@ export const MENU_CAPS: Record<MenuLocation, number> = { header: 6, footer: 50 }
  *
  * Exported so the resolution query and the admin form read the same values —
  * admin tells the merchant what a blank label will fall back to, and that
- * promise has to match what the storefront actually renders.
+ * promise has to match what the storefront actually renders. Catalog words,
+ * since a customer reads them; the query quotes them as SQL literals, which
+ * holds because the catalog only uses the typographic apostrophe.
  */
 export const SINGLETON_LABELS: Record<'home' | 'catalog', string> = {
-  home: 'Home',
-  catalog: 'Shop',
+  home: t('shell.nav.home'),
+  catalog: t('shell.nav.catalog'),
 };
 
 /** Label overrides are merchant free text; bound it before it reaches the DOM. */

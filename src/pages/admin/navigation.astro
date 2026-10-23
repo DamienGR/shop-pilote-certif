@@ -137,6 +137,8 @@ const locations: { key: MenuLocation; title: string; note: string }[] = [
       data-msg-label-default={t('admin.navigation.add.labelDefault')}
       data-msg-label-default-generic={t('admin.navigation.add.labelDefaultGeneric')}
       data-msg-nothing-matches={t('admin.navigation.add.nothingMatches')}
+      data-singleton-home={SINGLETON_LABELS.home}
+      data-singleton-catalog={SINGLETON_LABELS.catalog}
       class="flex flex-col gap-4"
     >
       {/* Two rows on purpose. The picker and search change width with the
@@ -502,9 +504,12 @@ const locations: { key: MenuLocation; title: string; note: string }[] = [
       });
     }
 
-    // Mirrors SINGLETON_LABELS — Home and Catalog have no <option> to read a
-    // name from, so their fallback is stated here too.
-    const singletonLabels: Record<string, string> = { home: 'Home', catalog: 'Shop' };
+    // SINGLETON_LABELS, carried on the form: Home and Catalog have no <option>
+    // to read a name from.
+    const singletonLabels: Record<string, string> = {
+      home: form.dataset.singletonHome ?? '',
+      catalog: form.dataset.singletonCatalog ?? '',
+    };
 
     const syncPlaceholder = () => {
       if (!labelInput) return;
