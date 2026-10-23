@@ -79,9 +79,10 @@
     { "binding": "FILES", "bucket_name": "minshop-pilote-certif-files", "jurisdiction": "eu" }
   ],
   "vars": {
-    // Placeholders until the first-run wizard writes the real values to D1.
-    // French, like the rest of the core: these are what a fresh clone shows.
-    "STORE_NAME": "Ma boutique",
+    // Defaults until the first-run wizard writes the real values to D1. The
+    // store name is the manifest's client.displayName, which the wizard then
+    // proposes; the time zone is the core's.
+    "STORE_NAME": "Certif Minshop",
     "TIME_ZONE": "Europe/Paris",
     // Serve product images from an R2 custom domain (bypasses the Worker /images
     // route and unlocks on-demand delivery in Admin), from cloudflare.imagesDomain
