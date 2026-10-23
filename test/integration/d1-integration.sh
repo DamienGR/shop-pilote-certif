@@ -77,7 +77,7 @@ report_port_in_use() {
 cleanup() {
   local status=$?
   if worker_running; then
-    kill "$worker_pid" 2>/dev/null || true
+    kill -- "-$worker_pid" 2>/dev/null || true
     wait "$worker_pid" 2>/dev/null || true
   elif [[ -n "$worker_pid" && "$status" != 0 && -z "$startup_failed" ]]; then
     status="$WORKER_DIED_EXIT"
@@ -164,6 +164,12 @@ export X_LOCAL_EXPLORER=false
 # thing a crash leaves behind today is the empty `✘ [ERROR]` it prints. A path
 # ending in .log is used verbatim rather than as a directory.
 export WRANGLER_LOG_PATH="$wrangler_debug_log"
+# `npx` does not pass a signal on: killing it left wrangler and its workerd
+# running under init (certification step 9). Job control gives the server a
+# process group of its own, which cleanup stops whole; stdin from /dev/null,
+# because a background job under job control that reads the terminal
+# (wrangler's hotkeys) is stopped.
+set -m
 npx wrangler dev \
   --config dist/server/wrangler.json \
   --persist-to "$state_dir" \
@@ -171,8 +177,9 @@ npx wrangler dev \
   --var AUTH_SECRET:integration-auth-secret \
   --ip 127.0.0.1 \
   --port "$requested_port" \
-  --inspector-port 0 >"$worker_log" 2>&1 &
+  --inspector-port 0 </dev/null >"$worker_log" 2>&1 &
 worker_pid="$!"
+set +m
 
 # Which port did it actually get? Everything below addresses the Worker by it.
 for _ in {1..80}; do

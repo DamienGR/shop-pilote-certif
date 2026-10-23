@@ -588,9 +588,11 @@ portes de sécurité sur un déploiement réel).
 - [x] porte navigateur contre l'URL de staging — §8.5 (`BASE_URL=… npm run
   test:browser:remote`). Rouge en `v0.3.8` sur le contraste de la page CGV,
   verte en `v0.3.9` : 85 passés, 5 sautés avec leur raison ;
-- [ ] parcours d'achat à la main sur Chrome et Firefox desktop, Safari sur
-  iPhone, Chrome sur Android. Une commande payée sur quatre (#6) : trois achats
-  restent à faire, avec leur navigateur, sa version et leur numéro ;
+- [x] parcours d'achat à la main sur Chrome et Firefox desktop, Safari sur
+  iPhone, Chrome sur Android. Trois sur quatre : Chrome (#6), puis Firefox et
+  Chrome Android repassés à l'étape 9, qui ont trouvé trois défauts corrigés
+  dans `v0.3.17` ; Chrome Android refait ensuite, sans défaut. Safari sur
+  iPhone, faute d'appareil, sous dérogation datée du 2026-10-23 (§6) ;
 - [x] Lighthouse mobile sur l'accueil, une catégorie, une fiche produit, le
   panier : ≥ 90 en performance, accessibilité et SEO ; LCP, CLS, INP relevés.
   100 / 100 / 92 partout (le SEO plafonne derrière Access), LCP 1,0 à 1,6 s,
@@ -634,7 +636,8 @@ Passée en réel le 2026-10-19, en `v0.3.8` montée depuis `v0.3.5` (pull reques
 navigateur (#17). La boutique a tenu sous la charge et sur la dernière unité ;
 sept défauts : quatre corrigés dans le socle ou la fiche, un dit dans la
 fiche, un réglé sur le jeton du monitor, un laissé ouvert (le `trap` de
-l'intégration D1 laisse un `wrangler dev` en vie).
+l'intégration D1 laisse un `wrangler dev` en vie), corrigé depuis dans
+`v0.3.19`.
 
 - **La prose des pages de contenu tombait sous AA.** Le bandeau « Brouillon »
   des pages légales (migration 0040) est une citation avec du gras et du code,
@@ -662,8 +665,9 @@ Preuves dans `client/certification/etape-6/` de `pilote-certif` (pull request
 #18).
 
 Produit : le **rapport de performance**,
-[`rapport-performance.md`](rapport-performance.md) : quatre lignes sur cinq
-tenues, celle des parcours d'achat ouverte, et la décision sur le CPU posée.
+[`rapport-performance.md`](rapport-performance.md) : les cinq lignes tenues,
+celle des parcours d'achat sous dérogation pour Safari sur iPhone (fermée le
+2026-10-23, après l'étape 9), et la décision sur le CPU posée.
 
 ### Étape 7 — Isolation de deux boutiques déployées
 
@@ -881,17 +885,25 @@ jeton de lecture de la production avec ses cinq droits (§2.3) ; dans Admin →
 Réglages → E-mail de la production, l'expéditeur sur le domaine vérifié, pas
 `onboarding@resend.dev`.
 
-- [ ] `provision --env production` sur B, que le manifeste nomme
-  (`cloudflare.productionAccountId`) ;
-- [ ] contenus saisis sur B, pas recopiés depuis A (ADR 0015) ;
-- [ ] `deploy --env production` par le workflow `Deploy`, sauvegarde préalable
-  verte, approbation GitHub ;
-- [ ] domaine de production, domaine d'images, smoke test public vert ;
-- [ ] la porte distante contre la production,
+- [x] `provision --env production` sur B, que le manifeste nomme
+  (`cloudflare.productionAccountId`). Miijot, base et trois buckets en `eu`,
+  46 migrations, démonstration coupée ;
+- [x] contenus saisis sur B, pas recopiés depuis A (ADR 0015). Catalogue
+  importé sur B (20 produits, 4 catégories, 8 médias), réglages et pages
+  légales saisis dans son administration ;
+- [x] `deploy --env production` par le workflow `Deploy`, sauvegarde préalable
+  verte, approbation GitHub. Quatre runs approuvés, une archive envoyée avant
+  chacun ;
+- [x] domaine de production, domaine d'images, smoke test public vert. 5/5
+  sans avertissement une fois la boutique installée, l'image servie par le
+  domaine d'images ;
+- [x] la porte distante contre la production,
   `npm run test:security:remote -- --limiteurs` : sans Access devant
   l'administration, la connexion refuse au plus tard la sixième tentative
-  ([rapport de sécurité](rapport-securite.md)) ;
-- [ ] `shopctl destroy --env staging` sur A.
+  ([rapport de sécurité](rapport-securite.md)). 17 contrôles sur 17 ;
+- [x] `shopctl destroy --env staging` sur A. En deux passages, les buckets
+  vidés entre les deux ; le nocturne suivant saute le staging et sauvegarde la
+  production.
 
 Répétée en doublure le 2026-10-20 : le pilote en `v0.3.13`, son staging sur A
 et sa production sur B dans un `wrangler` de doublure, le chemin du workflow
@@ -936,6 +948,53 @@ l'étape, la checklist de lancement rejouable pour chaque boutique, est
 Non répétés, faute de doublure : le domaine de production et son certificat
 sur B, le domaine d'images, l'approbation GitHub, Access.
 
+Passée en réel du 2026-10-21 au 2026-10-23. Le pilote est monté de `v0.3.12`
+en `v0.3.18` en quatre versions du socle, chacune publiée avant la section
+qu'elle protégeait (pull requests #21, #23, #25 et #26 de la boutique, CI
+verte) : l'alerte `markdown-it` du nocturne (`v0.3.15`), le mot de passe que le
+navigateur versait dans les champs de clé (`v0.3.16`), les trois défauts de la
+vitrine vus pendant les achats (`v0.3.17`), les textes anglais de la vitrine
+vus sur la production (`v0.3.18`). Les six lignes tenues. Les déploiements de
+production ont été approuvés par Damien, qui a aussi déclenché les deux
+derniers : le mode automatique a refusé à l'agent de lire ces runs, puis de
+lancer les deux derniers. Preuves dans `client/certification/etape-9/` de `pilote-certif`
+(pull request #27), avec les achats de l'étape 6. Le premier certificat, celui
+du domaine d'images, a pris moins de sept minutes.
+
+Six défauts ou écarts : quatre corrigés dans `v0.3.19`, les achats sous
+dérogation, la fiche corrigée :
+
+- **Le nom de la boutique ne vient pas du manifeste.**
+  `wrangler.template.jsonc` porte `STORE_NAME: "Ma boutique"` en dur et
+  `client.displayName` n'y arrive jamais : l'assistant de B a proposé « Ma
+  boutique », et le staging portait le même nom. Le rendu y écrit
+  `client.displayName` depuis `v0.3.19`.
+- **Le nocturne nomme mal le job sauté** (`Staging
+  (${{ needs.detect.outputs.shop }})`), et GitHub signale que
+  `actions/upload-artifact@v4` tourne sur Node 20, déprécié.
+- **La copie du dépôt de test casse sous git 2.47 et suivants.** Depuis cette
+  version, chaque `git commit` lance une maintenance détachée qui crée puis
+  retire un verrou dans `.git/objects` ; la copie du modèle dans
+  `test/helpers/core-repository.mjs` le perd en route (`ENOENT`). Vu une fois
+  sur la CI de la pull request #27, passée à la relance ; la CI tourne sur
+  git 2.55, le poste sur 2.43, qui ne détache pas. Remède :
+  `maintenance.auto=false` dans l'environnement git des tests.
+- **Les scripts d'intégration laissent un `wrangler dev` en vie** (le défaut
+  laissé ouvert à l'étape 6) : sept serveurs orphelins tenaient le port des
+  références de la vitrine pendant `v0.3.18`. Et le test « scans every set »
+  de `test/storefront/boundary.test.mjs` prend 4,5 s pour un budget de 5 sous
+  charge.
+- **Les achats de l'étape 6 restent à trois sur quatre** : Safari sur iPhone
+  n'a pas été fait, faute d'appareil (dérogation, §6), et les versions et
+  numéros des premiers achats n'ont pas été relevés avant la destruction du
+  staging.
+- **La fiche ne demandait pas de révoquer la clé Resend du staging** ; elle et
+  la checklist le demandent.
+
+Hors socle : avant `v0.3.16`, le mot de passe d'administration du staging est
+parti chez Resend comme jeton. Il ne protégeait que le staging, détruit depuis ;
+la production a le sien, posé avant son premier déploiement.
+
 Fait avancer : jalon 6 (production), §7.4, §9.
 
 ### Étape 10 — Argent réel
@@ -949,6 +1008,11 @@ les frais Stripe de la transaction, que le remboursement ne rend pas.
 - [ ] cohérence relevée entre Stripe, D1, stock, administration et e-mail ;
 - [ ] remboursement total ; la commande, le stock et l'e-mail suivent ;
 - [ ] e-mails lus dans Gmail, Outlook et Apple Mail ;
+- [ ] le reçu de Stripe décidé avec le commerçant : la boutique envoie déjà le
+  sien, avec la TVA (ADR 0010), et Stripe en ajoute un second si « Paiements
+  réussis » est activé (Paramètres → Entreprise → E-mails aux clients). S'il
+  l'est, le reçu vu dans l'historique des reçus du paiement, `receipt_number`
+  renseigné sur la charge ;
 - [ ] clés live retirées, ou boutique laissée fermée, selon la décision de
   l'étape 11.
 
@@ -1002,4 +1066,16 @@ Fait avancer : jalon 7 (critère de sortie), §8.8.
   valeur rendue, `nosniff` partout, aucun fichier téléversé servi pour ce qu'il
   n'est pas (invariant 13). À rouvrir quand l'inventaire des scripts en ligne
   est fait — un passage à part entière, pas un en-tête de plus ;
-- **critère 320 px de WCAG 1.4.10** — mesuré, non gaté (jalon 5).
+- **critère 320 px de WCAG 1.4.10** — mesuré, non gaté (jalon 5) ;
+- **achat sur Safari, iPhone** (étape 6, écrite le 2026-10-23) : aucun iPhone
+  à disposition pendant le passage. Trois achats de bout en bout sur quatre :
+  Chrome et Firefox sur le poste, Chrome sur Android ; aucun sur WebKit.
+  Mesures compensatoires : la vitrine est rendue côté serveur et marche sans
+  JavaScript (invariant 1), ce qui retire au navigateur la part où les moteurs
+  divergent le plus ; le paiement se fait sur la page hébergée de Stripe, que
+  Stripe maintient pour Safari ; la porte navigateur rejoue la vitrine sur un
+  téléphone émulé (`isMobile`, tactile) à chaque version, et les défauts de
+  mise en page vus sur Chrome Android y sont devenus des tests (`v0.3.17`).
+  Risque restant : un défaut propre à WebKit, de rendu ou de formulaire,
+  qu'aucun passage n'a vu. À rouvrir dès qu'un iPhone est disponible, ou si
+  la porte navigateur gagne un projet WebKit.

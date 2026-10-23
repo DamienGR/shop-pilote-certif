@@ -5,8 +5,10 @@ dernier temps du cycle de l'ADR 0015 : la boutique a été construite sur le
 compte de l'agence (A) et prévisualisée derrière Access ; elle est mise en
 production sur le compte du client (B), ses contenus y sont saisis, puis la
 copie de l'agence est détruite. Écrite d'après l'étape 9 de la certification
-(répétée le 2026-10-20) ; chaque commande se lance depuis l'arbre de la
-boutique, à jour de `main`, sous Node 22.
+(répétée le 2026-10-20, passée en réel du 2026-10-21 au 2026-10-23) ; chaque
+commande se lance depuis l'arbre de la boutique, à jour de `main`, sous
+Node 22. Un clone qui porte aussi le remote `core` fait refuser à `gh` de
+choisir son dépôt : `gh repo set-default <owner>/<boutique>` une fois avant.
 
 La production est **publique dès son premier déploiement** : le domaine
 répond, son certificat est publié dans les journaux de transparence, et les
@@ -112,7 +114,9 @@ défaire.
 ## 5. Installer et saisir sur B
 
 Connexion sur `https://<domaine>/admin/login`, puis l'assistant : nom de la
-boutique, fuseau. Ensuite, dans Admin → Réglages :
+boutique, fuseau. L'assistant propose le `client.displayName` du manifeste
+(« Ma boutique » avant `v0.3.19`) : le corriger si ce n'est pas le nom que
+voient les clients. Ensuite, dans Admin → Réglages :
 
 - [ ] **E-mail** : l'expéditeur sur le domaine vérifié (jamais
   `onboarding@resend.dev`, qui ne livre qu'au titulaire du compte Resend), la
@@ -120,12 +124,16 @@ boutique, fuseau. Ensuite, dans Admin → Réglages :
 - [ ] **Protection anti-robots** : les clés du widget de production ;
 - [ ] **Paiements** : Stripe, quand le commerçant ouvre — l'endpoint de webhook
   sur `https://<domaine>/api/webhook` avec ses cinq événements
-  ([plan, §2.3](../certification/plan.md)) ;
+  ([plan, §2.3](../certification/plan.md)). Et le reçu de Stripe, à décider
+  avec lui : la boutique envoie déjà le sien, et Stripe en ajoute un second si
+  « Paiements réussis » est activé dans ses E-mails aux clients ;
 - [ ] les **pages légales** relues et publiées, le menu du pied de page.
 
 Les contenus sont saisis sur B, jamais recopiés depuis A (ADR 0015) : le
 catalogue par l'administration, ou par `shopctl catalog import --env production`
-depuis le CSV du commerçant, les images avec lui.
+depuis le CSV du commerçant, les images avec lui. L'import lit le
+`wrangler.jsonc` rendu pour la production : si un `git restore` l'a défait,
+`provision --env production` le rend de nouveau, sans rien recréer.
 
 Un second run du workflow `Deploy` : le test de fumée vert, sans
 avertissement.
@@ -168,7 +176,7 @@ arrêtée. Ensuite :
   d'interroger un staging qui n'existe plus, et le dit ;
 - [ ] le jeton de staging révoqué sur A ; les applications Access de la preview
   et leurs jetons de service supprimés ; l'endpoint de webhook Stripe de test
-  qui visait la preview supprimé ;
+  qui visait la preview supprimé ; la clé Resend du staging révoquée ;
 - [ ] les secrets de l'environnement GitHub `staging` supprimés (le jeton de A
   et le reste) : ils ne servent plus.
 
