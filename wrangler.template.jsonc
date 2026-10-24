@@ -97,7 +97,13 @@
     // (src/middleware.ts). Rendered on staging only, and only with a
     // stagingDomain; empty means no Access, which is every other render.
     "CF_ACCESS_TEAM_DOMAIN": "__ACCESS_TEAM_DOMAIN__",
-    "CF_ACCESS_AUD": "__ACCESS_AUD__"
+    "CF_ACCESS_AUD": "__ACCESS_AUD__",
+    // The environment this render is for: "production", "staging", or empty for
+    // a render that reaches no account (a witness build, local development).
+    // Production takes live Stripe payments only and staging test ones only
+    // (src/features/payments/stripeMode.ts): a test key in production would let
+    // a test card place an order.
+    "MINSHOP_ENV": "__ENVIRONMENT__"
     //
     // This store's MCP endpoint, if you deployed the optional mcp/ Worker.
     // llms.txt advertises it to agents only when set — leave it unset and

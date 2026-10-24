@@ -59,10 +59,14 @@ type ShippingDetails = {
  * Stripe adapter for the PaymentProvider port. createFetchHttpClient() is
  * required on Workers (no Node HTTP), and webhook verification must use the
  * async (WebCrypto) path.
+ *
+ * `livemode`, when set, is the only mode whose events this shop acts on
+ * (./stripeMode.ts): a production settles nothing a test card paid.
  */
 export function createStripeProvider(
   secretKey: string,
   webhookSecret: string,
+  options: { livemode?: boolean } = {},
 ): PaymentProvider {
   const stripe = new Stripe(secretKey, {
     httpClient: Stripe.createFetchHttpClient(),
@@ -149,6 +153,14 @@ export function createStripeProvider(
         signature,
         webhookSecret,
       );
+      // Signed is not enough: a test endpoint pointed at a production signs
+      // its events too. Refused before anything is read, so a test-mode
+      // session can neither write an order nor release a live hold.
+      if (options.livemode !== undefined && event.livemode !== options.livemode) {
+        throw new Error(
+          `${event.livemode ? 'Live' : 'Test'}-mode event refused: this shop takes ${options.livemode ? 'live' : 'test'} payments only.`,
+        );
+      }
 
       if (
         event.type === 'checkout.session.expired' ||

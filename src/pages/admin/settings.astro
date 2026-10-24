@@ -31,6 +31,12 @@ import {
   type SecretName,
 } from '../../features/secrets/store';
 import { submittedSecret } from '../../features/secrets/submitted';
+import {
+  environmentStripeMode,
+  isWebhookSecret,
+  stripeKeyMode,
+  stripeKeyRefusal,
+} from '../../features/payments/stripeMode';
 import { adminCredential } from '../../features/auth/admin';
 import {
   featureAvailability,
@@ -284,7 +290,21 @@ if (Astro.request.method === 'POST') {
       );
     }
   } else if (action === 'save_stripe') {
-    await applySecrets(['stripe_secret_key', 'stripe_webhook_secret']);
+    // Checked before anything is written, and as a pair: a refused key leaves
+    // the stored pair as it was, never a new webhook secret beside an old key.
+    // The mode is the environment's (MINSHOP_ENV): a test key in production
+    // would let a test card place an order (certification, étape 10).
+    const kept = (n: SecretName) => String(form.get(`clear:${n}`)) === '1' ? '' : secretValue(n);
+    const key = await kept('stripe_secret_key');
+    const signing = await kept('stripe_webhook_secret');
+    const refusal = key ? stripeKeyRefusal(key, env.MINSHOP_ENV) : null;
+    if (refusal) {
+      validationError = t(`admin.settings.payments.stripe.refused.${refusal}` as const);
+    } else if (signing && !isWebhookSecret(signing)) {
+      validationError = t('admin.settings.payments.stripe.refused.not_a_webhook_secret');
+    } else {
+      await applySecrets(['stripe_secret_key', 'stripe_webhook_secret']);
+    }
   } else if (action === 'save_lightning') {
     const requestedBackend = String(form.get('lightning_backend') ?? '');
     if (requestedBackend !== 'lnbits' && requestedBackend !== 'phoenixd') {
@@ -493,6 +513,14 @@ const pmMap = Object.fromEntries(pmRows.map((r) => [r.m, r])) as Record<
   string,
   (typeof pmRows)[number]
 >;
+// The mode of the stored Stripe key, never the key: the one thing the vault's
+// chip cannot say, and the whole difference between a payment and a test card.
+// A key from the other mode, stored before the save refused it, is out of
+// service (getPaymentProvider fails closed on it), and the card says so.
+const stripeStoredKey = vault && pmMap.stripe.installed ? await getSecret(env.DB, 'stripe_secret_key') : null;
+const stripeMode = stripeStoredKey ? stripeKeyMode(stripeStoredKey) : null;
+const stripeRequiredMode = environmentStripeMode(env.MINSHOP_ENV);
+const stripeModeRefused = !!stripeMode && !!stripeRequiredMode && stripeMode !== stripeRequiredMode;
 
 // Email integration — config lives in D1 (overlaid on the build-time defaults), the
 // Resend API key in the vault. `from` defaults to the build-time config when blank.
@@ -997,8 +1025,14 @@ const sections = [
         <div class="mb-3 flex items-center justify-between gap-3">
           <div>
             <p class="font-medium">{t('admin.settings.payments.method.stripe')}</p>
-            <p class={pmMap.stripe.installed ? 'text-xs text-gray-500' : 'text-xs text-amber-700'}>
-              {pmMap.stripe.installed ? t('admin.settings.payments.live') : t('admin.settings.payments.stripe.notLive')}
+            <p class={pmMap.stripe.installed && !stripeModeRefused ? 'text-xs text-gray-500' : 'text-xs text-amber-700'} data-stripe-mode={stripeMode ?? undefined}>
+              {stripeModeRefused && stripeRequiredMode
+                ? t(`admin.settings.payments.stripe.mode.refused.${stripeRequiredMode}` as const)
+                : pmMap.stripe.installed
+                  ? stripeMode
+                    ? `${t('admin.settings.payments.live')} — ${t(`admin.settings.payments.stripe.mode.${stripeMode}` as const)}`
+                    : t('admin.settings.payments.live')
+                  : t('admin.settings.payments.stripe.notLive')}
             </p>
           </div>
           {pmMap.stripe.installed && <MethodToggle method="stripe" enabled={pmMap.stripe.enabled} label={t('admin.settings.payments.method.stripe')} />}

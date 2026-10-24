@@ -20,7 +20,12 @@ Développeurs → Webhooks → l'endpoint `https://<domaine>/api/webhook`.
 
 - tentatives en **400** : la signature est refusée. Le secret de signature de
   l'endpoint ne correspond plus à `stripe_webhook_secret` (rotation, endpoint
-  recréé, clé test au lieu de live) ;
+  recréé, clé test au lieu de live). Une réponse « Test-mode event refused »
+  (ou « Live-mode event refused ») dit autre chose : la signature est bonne,
+  mais l'endpoint est celui de l'autre mode, qu'un environnement refuse depuis
+  `v0.3.22` (la production ne prend que le mode live) ; « Stripe takes live
+  keys only » : la clé enregistrée est une clé de test, la carte de Réglages
+  le dit aussi ;
 - tentatives en **5xx** ou délai dépassé : le Worker est en cause, voir
   [Worker en erreur](worker-en-erreur.md) ;
 - **aucune tentative** : l'endpoint est désactivé, pointe sur un autre domaine,

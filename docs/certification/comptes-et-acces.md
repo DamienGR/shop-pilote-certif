@@ -60,8 +60,11 @@ Le plus long d'abord ; le reste tient en une soirée.
 | clé de la boutique (coffre) | Checkout Sessions en écriture, Shipping Rates en lecture, Refunds en écriture | `src/features/payments/stripe.ts` crée, relit et liste des sessions, relit le tarif d'expédition choisi, rembourse |
 | clé du nocturne | Checkout Sessions en écriture | `test/remote/stripe-webhook.mjs` expire une session ; une clé live est refusée |
 
-Si un droit manque, l'erreur de Stripe le nomme : la vérification a lieu au
-premier checkout de l'étape 3.
+Si un droit manque, l'erreur de Stripe le nomme, à une exception près : sans
+Shipping Rates en lecture, la commande est écrite quand même, avec un mode de
+livraison inconnu (`delivery_method` à `unknown`), qui bloque l'achat
+d'étiquette. La vérification a lieu au premier checkout de l'étape 3, et de
+l'étape 10 pour la clé live, sur une commande expédiée.
 
 ## 2. Domaines
 

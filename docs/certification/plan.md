@@ -1023,6 +1023,29 @@ les frais Stripe de la transaction, que le remboursement ne rend pas.
 - [ ] clés live retirées, ou boutique laissée fermée, selon la décision de
   l'étape 11.
 
+Répétée en doublure le 2026-10-23 : le Worker construit de `v0.3.21` dans
+l'état de la production de B à la fin de l'étape 9, Stripe en mode live et
+Resend simulés. Les clés saisies dans Réglages, le produit à 1 € créé dans
+l'administration, l'achat par le panier, le webhook signé, la commande et sa
+TVA, le stock, les deux e-mails, le remboursement par le bouton de
+l'administration et son e-mail, les clés supprimées : le chemin tient. Deux
+défauts du socle, corrigés dans `v0.3.22` ; la fiche de passage est
+[etape-10-commandes.md](etape-10-commandes.md).
+
+- **Une clé de test passait commande en production.** Le Worker ne savait pas
+  qu'il était la production : une clé `rk_test_…` collée dans son coffre
+  ouvrait des sessions que la carte de test payait, et le webhook signé
+  écrivait la commande, prévenait le commerçant et sortait le stock. Le rendu
+  écrit `MINSHOP_ENV` ; la production refuse une clé et un événement du mode
+  test, le staging ceux du mode live, et Réglages dit le mode de la clé.
+- **L'alerte du commerçant numérotait la commande autrement** que le client,
+  l'administration et l'export : « n°1 », l'identifiant de ligne, pour la
+  commande « n°2vgje1r0cb ». Elle prend le numéro du client.
+
+Non répétés, faute de doublure : l'activation du mode live, la page de Stripe
+et 3-D Secure, les frais et le solde réels, le reçu de Stripe, le rendu dans
+les messageries.
+
 Fait avancer : jalon 7 (critère de sortie), §8.8.
 
 ### Étape 11 — Validations humaines et décision

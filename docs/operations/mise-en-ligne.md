@@ -122,9 +122,12 @@ voient les clients. Ensuite, dans Admin → Réglages :
   `onboarding@resend.dev`, qui ne livre qu'au titulaire du compte Resend), la
   clé Resend, un e-mail de test reçu ;
 - [ ] **Protection anti-robots** : les clés du widget de production ;
-- [ ] **Paiements** : Stripe, quand le commerçant ouvre — l'endpoint de webhook
-  sur `https://<domaine>/api/webhook` avec ses cinq événements
-  ([plan, §2.3](../certification/plan.md)). Et le reçu de Stripe, à décider
+- [ ] **Paiements** : Stripe, quand le commerçant ouvre — une clé **live**
+  restreinte (droits : [guide des comptes, §1](../certification/comptes-et-acces.md#1-stripe)),
+  l'endpoint de webhook du mode live sur `https://<domaine>/api/webhook` avec
+  ses cinq événements ([plan, §2.3](../certification/plan.md)), et la carte
+  de Réglages qui dit « mode live ». La production refuse une clé de test
+  depuis `v0.3.22` : avec elle, une carte de test passait commande. Et le reçu de Stripe, à décider
   avec lui : la boutique envoie déjà le sien, et Stripe en ajoute un second si
   « Paiements réussis » est activé dans ses E-mails aux clients ;
 - [ ] les **pages légales** relues et publiées, le menu du pied de page.

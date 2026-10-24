@@ -58,6 +58,7 @@ sed \
   -e 's/__ACCESS_TEAM_DOMAIN__//g' \
   -e 's/__ACCESS_AUD__//g' \
   -e 's/__STORE_NAME__/Ma boutique/g' \
+  -e 's/__ENVIRONMENT__//g' \
   -e 's/__DB_NAME__/minshop-clean-clone-db/g' \
   -e 's/__DB_ID__/00000000-0000-0000-0000-000000000000/g' \
   -e 's/__BUCKET__/minshop-clean-clone-images/g' \
