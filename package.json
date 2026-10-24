@@ -1,7 +1,7 @@
 {
   "name": "minshop",
   "type": "module",
-  "version": "0.3.20",
+  "version": "0.3.22",
   "private": true,
   "repository": {
     "type": "git",
@@ -24,7 +24,7 @@
     "check": "npm run theme:sync && astro check",
     "test": "npm run theme:sync && vitest run",
     "test:watch": "vitest",
-    "test:integration": "npm run test:security && node --experimental-strip-types test/integration/remote-gates.mjs && node --experimental-strip-types --import ./test/helpers/register-workers-loader.mjs test/integration/settlement.mjs && node --experimental-strip-types test/integration/reservations.mjs && node --experimental-strip-types test/integration/refunds.mjs && node --experimental-strip-types test/integration/media.mjs && node --experimental-strip-types test/integration/menus.mjs && node --experimental-strip-types test/integration/guest-access.mjs && node --experimental-strip-types test/integration/history-reads.mjs && node --experimental-strip-types test/integration/terms.mjs && node --experimental-strip-types test/integration/shipping.mjs && bash test/integration/run-d1-integration.sh",
+    "test:integration": "npm run test:security && node --experimental-strip-types test/integration/remote-gates.mjs && node --experimental-strip-types test/integration/stripe-mode.mjs && node --experimental-strip-types --import ./test/helpers/register-workers-loader.mjs test/integration/settlement.mjs && node --experimental-strip-types test/integration/reservations.mjs && node --experimental-strip-types test/integration/refunds.mjs && node --experimental-strip-types test/integration/media.mjs && node --experimental-strip-types test/integration/menus.mjs && node --experimental-strip-types test/integration/guest-access.mjs && node --experimental-strip-types test/integration/history-reads.mjs && node --experimental-strip-types test/integration/terms.mjs && node --experimental-strip-types test/integration/shipping.mjs && bash test/integration/run-d1-integration.sh",
     "test:d1": "astro build && npm run test:integration",
     "test:storefront-equivalence": "astro build && bash test/integration/storefront-baselines.sh",
     "test:storefront-contract": "vitest run test/storefront",

@@ -47,7 +47,11 @@ selection for one shop; `--env <staging|production>` renders that environment's
 names, `--list` names the shops in the tree, `--out` writes elsewhere. The
 render also carries `client.displayName` as `STORE_NAME`, the name the setup
 wizard proposes; the renders that have no manifest (CI checks, the clean clone,
-`provision-cf.sh`) write the core's "Ma boutique". The witness shops live in `test/fixtures/clients/` and CI builds
+`provision-cf.sh`) write the core's "Ma boutique". It carries the environment
+as `MINSHOP_ENV` too — `production`, `staging`, or empty for a render that
+reaches no account — and the Worker takes live Stripe payments only in
+production, test ones only in staging (`src/features/payments/stripeMode.ts`).
+The witness shops live in `test/fixtures/clients/` and CI builds
 both. The core must not name any of them: `config:validate` scans core-owned
 files for a shop's slug, display name, worker name, domain or sender, because a
 core that knows one customer is a condition the third one discovers in

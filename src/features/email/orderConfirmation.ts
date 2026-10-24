@@ -162,10 +162,12 @@ export function orderNotificationEmail(
   imageDelivery: ImageDelivery = 'original',
 ): EmailMessage {
   const publicId = order.public_id ?? '—';
-  // ASCII hyphen on purpose: a non-ASCII char anywhere in a header forces RFC
-  // 2047 encoded-words, which read as "=?utf-8?b?...?=" in raw logs. The em
-  // dashes in the BODY are fine — bodies declare their charset.
-  const subjectPublicId = order.public_id ? ` - ${order.public_id}` : '';
+  // The number the customer was given, the admin titles the order with and the
+  // CSV export carries — never the row id, which read "n°1" beside a customer's
+  // "n°2vgje1r0cb" (certification, étape 10). The public id stays in the body,
+  // where the admin link uses it, and leaves the subject, where it repeated the
+  // number.
+  const num = orderReference(order.public_id, order.id, getConfig().orderNumber);
   const money = (cents: number) => formatPrice(cents, order.currency);
   const shipText = formatShipAddress(order);
   const adminUrl = `${baseUrl}/admin/orders/${order.public_id ?? order.id}`;
@@ -175,7 +177,7 @@ export function orderNotificationEmail(
   );
 
   const text = [
-    t('email.notification.newOrder', { numero: order.id }),
+    t('email.notification.newOrder', { numero: num }),
     t('email.notification.publicId', { id: publicId }),
     ``,
     t('email.notification.customer', { email: order.email ?? '-' }),
@@ -191,7 +193,7 @@ export function orderNotificationEmail(
 
   const html = emailShell({
     storeName,
-    heading: t('email.notification.heading', { numero: order.id }),
+    heading: t('email.notification.heading', { numero: num }),
     subheading: t('email.notification.subheading', {
       montant: money(order.amount_total_cents),
       email: escapeHtml(order.email ?? t('email.notification.unknownEmail')),
@@ -199,7 +201,7 @@ export function orderNotificationEmail(
     body:
       emailLabel(t('email.notification.identifiers')) +
       `<p style="margin:0;font-size:14px;line-height:1.6;">${escapeHtml(
-        t('email.order.reference', { numero: order.id, boutique: storeName }),
+        t('email.order.reference', { numero: num, boutique: storeName }),
       )}<br><span style="font-family:monospace;">${escapeHtml(publicId)}</span></p>` +
       emailLabel(t('email.notification.shipTo')) +
       `<p style="margin:0;font-size:14px;line-height:1.6;">${escapeHtml(shipText).replace(/\n/g, '<br>')}</p>` +
@@ -217,10 +219,7 @@ export function orderNotificationEmail(
 
   return {
     to,
-    subject: `${t('email.notification.subject', {
-      boutique: storeName,
-      numero: order.id,
-    })}${subjectPublicId}`,
+    subject: t('email.notification.subject', { boutique: storeName, numero: num }),
     html,
     text,
   };

@@ -290,6 +290,9 @@ export function wranglerSubstitutions(manifest, { databaseId = '00000000-0000-00
     // The name the setup wizard proposes, and the sender name until Settings
     // names one. Inside a JSON string in the template, so escaped as one.
     __STORE_NAME__: JSON.stringify(manifest.client.displayName).slice(1, -1),
+    // Which Stripe mode the Worker accepts: live in production, test in
+    // staging, either in a render that reaches no account.
+    __ENVIRONMENT__: env ?? '',
   };
 }
 

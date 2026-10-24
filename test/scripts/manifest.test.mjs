@@ -295,7 +295,21 @@ describe('fleet identifiers', () => {
       __ACCESS_TEAM_DOMAIN__: '',
       __ACCESS_AUD__: '',
       __STORE_NAME__: 'Boutique Pilote',
+      // Neither environment, so the Worker takes either Stripe mode.
+      __ENVIRONMENT__: '',
     });
+  });
+
+  // A production holding a Stripe test key let a test card place an order in
+  // the rehearsal of certification step 10: the Worker had no way to tell it
+  // was the production. The render now says so, and only a deployed render does.
+  it('tells the Worker which environment it is, and the Stripe mode with it', () => {
+    for (const env of ['production', 'staging']) {
+      const rendered = renderWrangler(read('wrangler.template.jsonc'), wranglerSubstitutions(base(), { env }));
+      expect(rendered).toContain(`"MINSHOP_ENV": "${env}"`);
+    }
+    const local = renderWrangler(read('wrangler.template.jsonc'), wranglerSubstitutions(base()));
+    expect(local).toContain('"MINSHOP_ENV": ""');
   });
 
   // The setup wizard proposes STORE_NAME, and it read "Ma boutique" on the

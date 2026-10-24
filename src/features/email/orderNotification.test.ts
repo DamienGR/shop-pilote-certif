@@ -40,7 +40,7 @@ const order = (overrides: Partial<Order> = {}): Order =>
   });
 
 describe('orderNotificationEmail', () => {
-  it('shows the sequential order number and public ID in the owner subject and message', () => {
+  it('numbers the order as the customer, the admin and the export do', () => {
     const message = orderNotificationEmail(
       order(),
       [],
@@ -49,13 +49,18 @@ describe('orderNotificationEmail', () => {
       'Minshop',
     );
 
-    // ASCII hyphen: keeps the header out of RFC 2047 encoded-words in raw logs.
-    expect(message.subject).toBe('Nouvelle commande Minshop n°105 - ord_zdpyy315je');
+    // The row id read "n°1" beside the customer's "n°2vgje1r0cb" on the first
+    // real order (certification, étape 10): one order, two numbers.
+    expect(message.subject).toBe('Nouvelle commande Minshop n°zdpyy315je');
     for (const body of [message.text, message.html]) {
-      expect(body.toLowerCase()).toContain('commande n°105');
+      expect(body.toLowerCase()).toContain('commande n°zdpyy315je');
+      expect(body).not.toContain('n°105');
       expect(body).toContain('ord_zdpyy315je');
     }
     expect(message.html).toContain('/admin/orders/ord_zdpyy315je');
+
+    const customer = orderConfirmationEmail(order(), [], 'https://demo.minshop.dev', 'Minshop');
+    expect(customer.subject).toContain('n°zdpyy315je');
   });
 
   it('does not render null when a legacy order has no public ID', () => {
@@ -67,7 +72,8 @@ describe('orderNotificationEmail', () => {
       'Minshop',
     );
 
-    expect(message.subject).toBe('Nouvelle commande Minshop n°105');
+    // A legacy order keeps the calculated number it was given: offset 1000.
+    expect(message.subject).toBe('Nouvelle commande Minshop n°1104');
     expect(message.text).toContain('Identifiant public\u202f: \u2014');
     expect(message.html).not.toContain('null');
   });

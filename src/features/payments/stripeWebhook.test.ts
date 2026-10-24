@@ -359,3 +359,41 @@ describe('any other event', () => {
     expect(result).toEqual({ type: 'payment_intent.created' });
   });
 });
+
+describe('the mode a shop takes payments in', () => {
+  // MINSHOP_ENV makes a production take live payments only (./stripeMode.ts).
+  // A test endpoint pointed at it signs its events like any other, so the
+  // signature alone would let a test card write an order.
+  const only = (livemode: boolean) => createStripeProvider(SECRET_KEY, WEBHOOK_SECRET, { livemode });
+  async function verifyAs(livemode: boolean, payload: unknown) {
+    const body = JSON.stringify(payload);
+    return only(livemode).verifyWebhook(body, await signed(body));
+  }
+
+  it('settles a live payment in a live-only shop', async () => {
+    const result = await verifyAs(true, { ...event('checkout.session.completed', session()), livemode: true });
+    expect(result.order?.providerSessionId).toBe('cs_test_1');
+  });
+
+  it('refuses a test payment in a live-only shop, before reading it', async () => {
+    await expect(
+      verifyAs(true, { ...event('checkout.session.completed', session()), livemode: false }),
+    ).rejects.toThrow(/test-mode event refused/i);
+    await expect(
+      verifyAs(true, { ...event('checkout.session.expired', session()), livemode: false }),
+    ).rejects.toThrow(/test-mode event refused/i);
+  });
+
+  it('refuses a live event in a test-only shop', async () => {
+    await expect(
+      verifyAs(false, { ...event('charge.refunded', { id: 'ch_1', payment_intent: 'pi_1', amount_refunded: 1 }), livemode: true }),
+    ).rejects.toThrow(/live-mode event refused/i);
+  });
+
+  it('acts on either mode when the shop names none', async () => {
+    for (const livemode of [true, false]) {
+      const result = await verify({ ...event('checkout.session.expired', session()), livemode });
+      expect(result.releaseReservationId).toBe('ord_abc');
+    }
+  });
+});

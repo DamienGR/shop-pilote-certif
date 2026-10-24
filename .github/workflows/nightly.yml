@@ -241,9 +241,19 @@ jobs:
           BASE_URL: ${{ steps.origin.outputs.url }}
         run: npm run test:security:remote
 
+      # Without --with-deps, as in verify.yml (whose comment says why): the
+      # system packages only when a launch says one is missing.
       - name: Install Chromium
         if: ${{ !cancelled() && steps.origin.outcome == 'success' }}
-        run: npx playwright install --with-deps chromium
+        run: |
+          npx playwright install chromium
+          node --input-type=module -e "
+            import { chromium } from '@playwright/test';
+            await (await chromium.launch()).close();
+          " || {
+            echo '::warning title=Install Chromium::Chromium ne démarre pas sans ses dépendances système : installation par apt.'
+            npx playwright install-deps chromium
+          }
 
       - name: Browser gate against staging
         if: ${{ !cancelled() && steps.origin.outcome == 'success' }}

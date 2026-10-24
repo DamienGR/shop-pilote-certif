@@ -71,6 +71,10 @@ declare namespace Cloudflare {
     IMAGE_BASE_URL?: string;
     /** This store's MCP endpoint, advertised in llms.txt. Unset = not advertised. */
     MCP_URL?: string;
+    // The environment this Worker was rendered for — 'production', 'staging', or
+    // empty for a render that reaches no account. It decides which Stripe mode
+    // the shop takes payments in (features/payments/stripeMode.ts).
+    MINSHOP_ENV?: string;
     // Stable HTTPS origin for absolute URLs embedded in public cached responses.
     // Set when a custom domain is the sole ingress; fresh workers.dev instances
     // omit it and use their request origin until a custom domain is attached.

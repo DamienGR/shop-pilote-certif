@@ -356,11 +356,30 @@ jobs:
       - name: Install storefront dependencies
         run: npm ci
 
-      # The revision pinned by the @playwright/test version in package-lock,
-      # with its system libraries. test/browser/chromium.mjs only ever falls
-      # back to another build when this step has not run.
+      # The revision pinned by the @playwright/test version in package-lock.
+      # test/browser/chromium.mjs only ever falls back to another build when
+      # this step has not run.
+      #
+      # Without --with-deps. The runner image ships Google Chrome, so every
+      # library Chromium links against is already there; what --with-deps added
+      # was apt: CJK, Thai and X bitmap fonts no French storefront renders, and
+      # upgrades of packages already installed, 25.9 MB from
+      # azure.archive.ubuntu.com. That mirror sometimes serves at 45 kB/s, and
+      # the step then took ten minutes instead of twenty seconds, on three of
+      # five Browser jobs of one run. Chromium itself comes from Playwright's
+      # CDN in five seconds. Playwright checks the libraries before it starts a
+      # browser, so a launch says whether one is missing, and only then does
+      # apt run.
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: |
+          npx playwright install chromium
+          node --input-type=module -e "
+            import { chromium } from '@playwright/test';
+            await (await chromium.launch()).close();
+          " || {
+            echo '::warning title=Install Chromium::Chromium ne démarre pas sans ses dépendances système : installation par apt.'
+            npx playwright install-deps chromium
+          }
 
       - name: Create isolated Wrangler configuration
         run: |
@@ -373,6 +392,7 @@ jobs:
             -e 's/__ACCESS_TEAM_DOMAIN__//g' \
             -e 's/__ACCESS_AUD__//g' \
             -e 's/__STORE_NAME__/Ma boutique/g' \
+            -e 's/__ENVIRONMENT__//g' \
             -e 's/__DB_NAME__/minshop-check-db/g' \
             -e 's/__DB_ID__/00000000-0000-0000-0000-000000000000/g' \
             -e 's/__BUCKET__/minshop-check-images/g' \
@@ -461,6 +481,7 @@ jobs:
             -e 's/__ACCESS_TEAM_DOMAIN__//g' \
             -e 's/__ACCESS_AUD__//g' \
             -e 's/__STORE_NAME__/Ma boutique/g' \
+            -e 's/__ENVIRONMENT__//g' \
             -e 's/__DB_NAME__/minshop-check-db/g' \
             -e 's/__DB_ID__/00000000-0000-0000-0000-000000000000/g' \
             -e 's/__BUCKET__/minshop-check-images/g' \

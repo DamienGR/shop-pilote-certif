@@ -42,4 +42,25 @@ describe('the workflows', () => {
     const behind = used.filter(({ action, major }) => !(major >= NODE_24[action]));
     expect(behind.map(({ file, action, major }) => `${file}: actions/${action}@v${major}`)).toEqual([]);
   });
+
+  // `--with-deps` made Install Chromium an apt-get install from
+  // azure.archive.ubuntu.com, which sometimes serves at 45 kB/s: ten minutes
+  // instead of twenty seconds, on several Browser jobs of one run. The runner
+  // image already has every library Chromium needs (verify.yml says why), so
+  // apt runs only when a launch says one is missing.
+  it('installs Chromium without apt, unless a launch says a library is missing', () => {
+    const code = (text) => text.replace(/^\s*#.*\n/gm, '');
+    expect(workflows.filter(({ text }) => code(text).includes('--with-deps')).map(({ file }) => file)).toEqual([]);
+
+    const steps = workflows.flatMap(({ file, text }) =>
+      [...code(text).matchAll(/- name: Install Chromium\n((?: {8}.*\n)+)/g)].map((match) => ({ file, step: match[1] })),
+    );
+    expect(steps.map(({ file }) => file).sort()).toEqual(['nightly.yml', 'verify.yml']);
+    for (const { step } of steps) {
+      expect(step).toMatch(/^ +npx playwright install chromium$/m);
+      expect(step).toMatch(/chromium\.launch\(\)[\s\S]*\|\| \{[\s\S]*npx playwright install-deps chromium/);
+    }
+    // One step in two files: the nightly's copy is the one that would drift.
+    expect(new Set(steps.map(({ step }) => step.slice(step.indexOf('run: |')))).size).toBe(1);
+  });
 });

@@ -58,3 +58,10 @@ What it asserts, and why each one is here rather than in vitest:
 Chromium comes from `npx playwright install chromium`. On a machine that already
 has one and cannot download another, `test/browser/chromium.mjs` falls back to
 whatever is under `PLAYWRIGHT_BROWSERS_PATH` and says so.
+
+CI installs it without `--with-deps`: the runner image already carries every
+library Chromium needs, and the fonts apt added came from a mirror that
+sometimes turned a twenty-second step into ten minutes. The step launches
+Chromium once and runs `npx playwright install-deps chromium` only if that
+launch fails (`verify.yml` has the numbers; `test/scripts/workflows.test.mjs`
+keeps `--with-deps` out).

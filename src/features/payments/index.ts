@@ -3,6 +3,7 @@ import type { PaymentProvider } from './provider';
 import type { StoreSettings } from '../settings/db';
 import { getStoreSettings } from '../settings/db';
 import { createStripeProvider } from './stripe';
+import { environmentStripeMode, stripeKeyMode } from './stripeMode';
 import { createLightningProvider } from './lightning-provider';
 import { getLightningBackend } from './lightning';
 import { createOpenNodeProvider } from './opennode';
@@ -156,7 +157,15 @@ export async function getPaymentProvider(method?: PaymentMethod): Promise<Paymen
       const secretKey = await getSecret(env.DB, 'stripe_secret_key');
       const webhookSecret = await getSecret(env.DB, 'stripe_webhook_secret');
       if (!secretKey || !webhookSecret) throw new Error('Stripe is not fully configured.');
-      return createStripeProvider(secretKey, webhookSecret);
+      // Settings refuse a key from the other mode; one stored before they did
+      // fails closed here, because a test key in production sells to test cards.
+      const mode = environmentStripeMode(env.MINSHOP_ENV);
+      if (mode && stripeKeyMode(secretKey) !== mode) {
+        throw new Error(`Stripe takes ${mode} keys only in ${env.MINSHOP_ENV}.`);
+      }
+      return createStripeProvider(secretKey, webhookSecret, {
+        livemode: mode ? mode === 'live' : undefined,
+      });
     }
   }
 }
