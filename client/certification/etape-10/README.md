@@ -33,6 +33,7 @@ remboursement, la lecture des e-mails. Les heures sont celles de Paris
 |---|---|---|---|---|
 | 40133545202 | 2026-10-24 21:17 → 21:26 | `v0.3.22` | `pilote-certif-production-20261024T212535Z` (10 fichiers) | 5/5 au premier essai, aucun avertissement ; aucun secret créé |
 | 40178641326 | 2026-10-25 08:56 → 09:05 | `v0.3.23` | `pilote-certif-production-20261025T090442Z` (10 fichiers) | 5/5 au premier essai ; aucun secret créé |
+| 40191714351 | 2026-10-25 12:07 → 12:19 | `v0.3.24` | `pilote-certif-production-20261025T121844Z` (10 fichiers) | 5/5 au premier essai ; aucun secret créé |
 
 `provision.json` : le `provision --env production` du poste, qui rend la
 configuration de production sans rien créer, `MINSHOP_ENV` à `production`.
@@ -41,8 +42,9 @@ Le second run vient après l'étape : il déploie la montée en `v0.3.23` (pull
 request #33, CI 20/20), qui corrige les défauts 1 et 2. Cette montée est
 partie de la bonne version (« v0.3.22 → v0.3.23 »), parce que les tags du
 socle avaient été récupérés avant : le `shopctl` de la boutique était encore
-celui de `v0.3.22`. Les rapports des deux runs sont dans `deploy-v0.3.22/` et
-`deploy-v0.3.23/`.
+celui de `v0.3.22`. Le troisième déploie la montée en `v0.3.24` (pull request
+#35, CI 20/20), qui corrige les défauts 3 à 5. Les rapports des trois runs
+sont dans `deploy-v0.3.22/`, `deploy-v0.3.23/` et `deploy-v0.3.24/`.
 
 ## Ce qui ne laisse pas de fichier
 
@@ -103,24 +105,29 @@ celui de `v0.3.22`. Les rapports des deux runs sont dans `deploy-v0.3.22/` et
    l'étape 9 ne demandait de remplir Réglages → E-mail → « Destinataire des
    alertes de commande », et le socle n'a pas d'adresse par défaut :
    l'alerte de `tspzkyxggc` est `skipped`, et aucun moyen ne la renvoie.
-   L'adresse Outlook est posée depuis 0 h 15. À reprendre dans la checklist
-   de lancement, et à signaler dans l'administration.
+   L'adresse Outlook est posée depuis 0 h 15. La checklist de lancement la
+   demande depuis `v0.3.23` ; depuis `v0.3.24`, l'administration signale son
+   absence dès qu'un vrai moyen de paiement est ouvert.
 4. **Le bandeau « Aucun moyen de paiement réel n'est configuré »** dit que la
    commande de démonstration permet de commander. En production, la
    démonstration est coupée : personne ne peut commander. Le bandeau ne lit
-   que l'absence d'un moyen réel.
+   que l'absence d'un moyen réel. Corrigé dans `v0.3.24` : après le
+   déploiement, l'administration de la production affiche « La boutique ne
+   prend aucune commande. Aucun moyen de paiement n'est actif, et le paiement
+   de démonstration est coupé… », relevé par Damien.
 5. **La fiche d'un produit désactivé reste servie** en 200 par son URL directe,
-   « Épuisé » ; le panier, lui, le refuse. À décider dans le socle : une page
-   qui reste, ou un 404.
+   « Épuisé » ; le panier, lui, le refuse. Décision de Damien : un 404,
+   depuis `v0.3.24`. `fiche-desactivee-404.txt` : la fiche et l'API JSON en
+   404, l'ancienne adresse au singulier en 301 vers la fiche.
 6. **Une lecture D1 a échoué en 7403** (« The given account is not valid… »),
    comme à l'étape 9 ; relancée, elle est passée.
 
 ## Ce qui reste
 
 - Défauts 1 et 2 : fermés, `v0.3.23` en production depuis le 25 octobre.
-- Défaut 3 : la checklist de lancement demande le destinataire des alertes
-  depuis `v0.3.23` ; l'administration ne signale toujours pas son absence.
-- Défauts 4 et 5 : ouverts dans le socle.
+- Défauts 3 à 5 : fermés, `v0.3.24` en production depuis le 25 octobre. Le
+  bandeau d'alerte sans destinataire n'a pas été vu en production : l'adresse
+  y est posée et les clés retirées. Il est tenu par les tests du socle.
 - Les clés : retirées jusqu'à l'étape 11, qui décide de l'ouverture. Les
   remettre prend une nouvelle clé restreinte et le même secret de webhook ;
   l'endpoint « pilote-certif production » est gardé.

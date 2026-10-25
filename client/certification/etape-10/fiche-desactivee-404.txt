@@ -1,0 +1,4 @@
+# 2026-10-25, après le déploiement de v0.3.24 (run 40191714351)
+404 /products/article-de-certification
+301 /product/article-de-certification
+404 /api/products/article-de-certification
