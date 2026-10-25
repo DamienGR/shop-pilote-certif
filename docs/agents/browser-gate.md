@@ -40,6 +40,12 @@ What it asserts, and why each one is here rather than in vitest:
 - **states** (`states.spec.mjs`) — empty catalogue, sold out, low stock, and six
   hostile search queries. FTS5 `MATCH` throws on raw input, so the sanitizer is
   one refactor away from a 500 on an apostrophe.
+- **admin saves** (`admin-settings.spec.mjs`) — Admin → Réglages with its
+  script running: a refused save shows the server's reason and keeps it on
+  screen, any other failure keeps the generic line. The integration suites post
+  the form without the script, and the script used to throw the reason away
+  (certification, step 10). `serve.mjs` gives the fixture store an admin
+  password (`admin.mjs`) and a vault for it; skipped against `BASE_URL`.
 - **design signature** (`design-signature.spec.mjs`) — visual regression as the
   COMPUTED style of ten probes, committed per theme under
   `test/browser/__signatures__/` for the shipped themes and under the shop's

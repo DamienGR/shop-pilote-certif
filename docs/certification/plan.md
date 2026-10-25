@@ -1009,19 +1009,31 @@ Fait avancer : jalon 6 (production), §7.4, §9.
 Crée : une commande payée avec une vraie carte, puis son remboursement. Coût :
 les frais Stripe de la transaction, que le remboursement ne rend pas.
 
-- [ ] clés Stripe live et secret du webhook live dans le coffre de la
-  production ;
-- [ ] un produit à 1 € ; commande réelle ;
-- [ ] cohérence relevée entre Stripe, D1, stock, administration et e-mail ;
-- [ ] remboursement total ; la commande, le stock et l'e-mail suivent ;
-- [ ] e-mails lus dans Gmail, Outlook et Apple Mail ;
-- [ ] le reçu de Stripe décidé avec le commerçant : la boutique envoie déjà le
+- [x] clés Stripe live et secret du webhook live dans le coffre de la
+  production. Une clé `rk_test_…` refusée d'abord, rien d'enregistré ; puis
+  « En service — mode live », et la porte distante 14/14 avec Stripe
+  configuré ;
+- [x] un produit à 1 € ; commande réelle. `tspzkyxggc`, 6,90 € avec Colissimo,
+  une carte Visa standard de l'EEE ;
+- [x] cohérence relevée entre Stripe, D1, stock, administration et e-mail. Le
+  même `pi_…` partout, 115 centimes de TVA à 20 %, le stock à 0 et la fiche
+  « Épuisé », la confirmation envoyée. L'alerte du commerçant sautée, faute
+  de destinataire (défaut ci-dessous) ;
+- [x] remboursement total ; la commande, le stock et l'e-mail suivent. Par le
+  bouton de l'administration : `refunded`, un `charge.refunded` traité, le
+  stock laissé à 0 comme voulu, un e-mail de remboursement ;
+- [x] e-mails lus dans Gmail, Outlook et Apple Mail. Gmail seul : la
+  confirmation et le remboursement, relevés sans capture. Outlook et Apple
+  Mail sous dérogation datée du 2026-10-25 (§6) ;
+- [x] le reçu de Stripe décidé avec le commerçant : la boutique envoie déjà le
   sien, avec la TVA (ADR 0010), et Stripe en ajoute un second si « Paiements
   réussis » est activé (Paramètres → Entreprise → E-mails aux clients). S'il
   l'est, le reçu vu dans l'historique des reçus du paiement, `receipt_number`
-  renseigné sur la charge ;
-- [ ] clés live retirées, ou boutique laissée fermée, selon la décision de
-  l'étape 11.
+  renseigné sur la charge. Coupé : le client ne reçoit que celui de la
+  boutique ;
+- [x] clés live retirées, ou boutique laissée fermée, selon la décision de
+  l'étape 11. Retirées après 24 minutes de fenêtre, le produit désactivé : le
+  panier dit la commande « momentanément indisponible ».
 
 Répétée en doublure le 2026-10-23 : le Worker construit de `v0.3.21` dans
 l'état de la production de B à la fin de l'étape 9, Stripe en mode live et
@@ -1045,6 +1057,50 @@ défauts du socle, corrigés dans `v0.3.22` ; la fiche de passage est
 Non répétés, faute de doublure : l'activation du mode live, la page de Stripe
 et 3-D Secure, les frais et le solde réels, le reçu de Stripe, le rendu dans
 les messageries.
+
+Passée en réel dans la nuit du 24 au 25 octobre 2026. Le pilote est monté de
+`v0.3.20` en `v0.3.22` (pull request #30 de la boutique, CI verte) et la
+production de B redéployée par le workflow `Deploy`, archive préalable et
+fumée 5/5. Les clés ont été enregistrées à 23 h 56, l'achat payé à 0 h 02, le
+remboursement fait par l'administration, les clés retirées à 0 h 20 : aucune
+autre commande pendant la fenêtre. 0,27 € de frais, que le remboursement ne
+rend pas. Stripe a appliqué l'exemption d'authentification forte au petit
+montant : 3-D Secure n'a pas été exercé. Damien a fusionné la montée,
+déclenché et approuvé le déploiement, et fait ce qui passe par un tableau de
+bord ou un navigateur ; le mode automatique a refusé à l'agent la fusion et
+le lancement du déploiement. Preuves dans `client/certification/etape-10/` de
+`pilote-certif` (pull request #32).
+
+Six défauts ou écarts : deux corrigés dans `v0.3.23`, un dans la checklist de
+lancement, deux ouverts, un d'infrastructure :
+
+- **`core upgrade` lisait la version de la boutique avant d'en récupérer les
+  tags.** Le clone du pilote s'était arrêté aux tags de `v0.3.5` : la pull
+  request annonçait « v0.3.5 → v0.3.22 », 283 fichiers divergents et une
+  migration déjà appliquée. La fusion était juste, le compte rendu faux, et
+  son corps a été réécrit à la main. Les tags sont récupérés d'abord depuis
+  `v0.3.23`, et `core status` nomme le tag qui manque au clone.
+- **Réglages cachait la raison d'un refus.** Avec JavaScript, la clé de test
+  refusée affichait « Échec de l'enregistrement — réessayez » ; la répétition
+  n'avait regardé que sans. Vrai de tous les refus de Réglages depuis la
+  première version. La raison s'affiche et reste depuis `v0.3.23`.
+- **La production n'avait pas de destinataire d'alertes.** Ni la fiche de
+  l'étape 9 ni la checklist ne le demandaient, et le socle n'a pas d'adresse
+  par défaut : l'alerte de la commande réelle est sautée, et rien ne la
+  renvoie. La checklist le demande ; l'administration ne signale toujours pas
+  son absence.
+- **Le bandeau « Aucun moyen de paiement réel n'est configuré »** dit que la
+  commande de démonstration permet de commander, alors que la production l'a
+  coupée. Il ne lit que l'absence d'un moyen réel. Ouvert.
+- **La fiche d'un produit désactivé reste servie** en 200 par son URL directe,
+  « Épuisé », quand le panier le refuse. Une page qui reste ou un 404 : à
+  décider. Ouvert.
+- **Une lecture D1 distante a échoué une fois en 7403** (« The given account
+  is not valid »), comme à l'étape 9 ; relancée, elle est passée.
+
+Hors du passage : pendant `v0.3.23`, le test d'intégration des étiquettes
+d'expédition (`test/integration/shipping.mjs`) a échoué une fois sur l'ordre
+de deux tentatives réglées dans la même seconde, et passé à la relance.
 
 Fait avancer : jalon 7 (critère de sortie), §8.8.
 
@@ -1109,3 +1165,13 @@ Fait avancer : jalon 7 (critère de sortie), §8.8.
   Risque restant : un défaut propre à WebKit, de rendu ou de formulaire,
   qu'aucun passage n'a vu. À rouvrir dès qu'un iPhone est disponible, ou si
   la porte navigateur gagne un projet WebKit.
+- **e-mails dans Outlook et Apple Mail** (étape 10, écrite le 2026-10-25) :
+  aucun appareil Apple, et aucun e-mail de la boutique arrivé dans Outlook,
+  l'alerte du commerçant ayant été sautée. Un second achat aurait fermé la
+  ligne Outlook pour quelques centimes de frais ; Damien a préféré ne pas le
+  faire. Mesures compensatoires : la confirmation et le remboursement lus
+  dans Gmail, accents et liens corrects ; le numéro que porte l'alerte
+  depuis `v0.3.22` est vérifié par la répétition et les tests du socle.
+  Risque restant : un rendu propre à Outlook ou à Apple Mail. À rouvrir à la
+  première commande réelle d'une boutique dont le commerçant lit ses alertes
+  dans Outlook.

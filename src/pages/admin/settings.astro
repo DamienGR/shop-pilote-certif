@@ -66,6 +66,9 @@ const capabilities: RuntimeCapabilities = {
   vectorize: !!env.VECTORIZE,
 };
 
+// Marks a background save's 400 as a refusal written for the merchant.
+const SETTINGS_REFUSAL_HEADER = 'x-minshop-refusal';
+
 // Runtime mutations (POST). On success set a one-time flash cookie and redirect to a
 // CLEAN url (no ?msg lingering) — the GET below reads + clears it (Post/Redirect/Get).
 let validationError = '';
@@ -347,9 +350,17 @@ if (Astro.request.method === 'POST') {
   // silently missing its invalidation edge.
   await purgeCacheTags([CACHE_TAG.shell, CACHE_TAG.catalog]);
   // Background (JS) submit → no redirect; the client re-fetches + swaps the section.
+  // A refusal is marked as one: the client shows its text to the merchant, and
+  // the generic failure for any other non-2xx (Astro's CSRF 403 is English, a
+  // 500 is not written for a merchant). Unmarked, the script threw the reason
+  // away and said « réessayez » to a production refusing a test key, which
+  // retrying cannot fix (certification, step 10).
   if (Astro.request.headers.get('x-requested-with') === 'fetch') {
     return validationError
-      ? new Response(validationError, { status: 400 })
+      ? new Response(validationError, {
+          status: 400,
+          headers: { 'content-type': 'text/plain; charset=utf-8', [SETTINGS_REFUSAL_HEADER]: '1' },
+        })
       : new Response(null, { status: 204 });
   }
   // Invalid timezone: render the form with the error and retain the saved zone.
@@ -1577,6 +1588,7 @@ const sections = [
     define:vars={{
       savedText: t('admin.settings.inlineSave.saved'),
       saveFailedText: t('admin.settings.inlineSave.failed'),
+      refusalHeader: SETTINGS_REFUSAL_HEADER,
     }}
   >
     // Inline saves (progressive enhancement). Without JS each section form POSTs
@@ -1586,6 +1598,28 @@ const sections = [
     (function () {
       if (!window.fetch || !window.DOMParser) return;
       var path = location.pathname;
+
+      // A refusal stays until its form is saved again: it is a sentence to read
+      // (« Clé de test refusée : … »), not a confirmation to glance at. A toggle
+      // sits in a flex row, so its refusal goes under the row, not inside it.
+      function refuse(form, text) {
+        clearRefusal(form);
+        var row = form.querySelector('[role="switch"]') ? form.parentNode : null;
+        var inList = row && /^(UL|OL)$/.test(row.parentNode.nodeName);
+        var n = document.createElement(inList ? 'li' : 'p');
+        n.setAttribute('data-refusal', '');
+        n.setAttribute('role', 'alert');
+        n.textContent = text;
+        n.className = 'mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700';
+        if (row) row.parentNode.insertBefore(n, row.nextSibling);
+        else form.appendChild(n);
+        form._refusal = n;
+      }
+
+      function clearRefusal(form) {
+        if (form._refusal) form._refusal.remove();
+        form._refusal = null;
+      }
 
       function toast(scope, text, isErr) {
         var prev = scope.querySelector('[data-toast]');
@@ -1620,14 +1654,20 @@ const sections = [
             var isToggle = !!form.querySelector('[role="switch"]');
             var btn = form.querySelector('button[type="submit"]');
             if (btn) btn.disabled = true;
+            clearRefusal(form);
             fetch(path, {
               method: 'POST',
               body: new FormData(form),
               headers: { 'X-Requested-With': 'fetch' },
             })
               .then(function (r) {
-                if (!r.ok) throw new Error('save');
-                return fetch(path, { headers: { 'X-Requested-With': 'fetch' } });
+                if (r.ok) return fetch(path, { headers: { 'X-Requested-With': 'fetch' } });
+                // Only the page's own refusals are shown as sent; any other
+                // failure keeps the generic line.
+                if (r.status === 400 && r.headers.get(refusalHeader) === '1') {
+                  return r.text().then(function (text) { throw { refusal: text }; });
+                }
+                throw new Error('save');
               })
               .then(function (r) { return r.text(); })
               .then(function (html) {
@@ -1639,9 +1679,10 @@ const sections = [
                 bind(fresh);
                 if (!isToggle) toast(fresh, savedText, false);
               })
-              .catch(function () {
+              .catch(function (err) {
                 if (btn) btn.disabled = false;
-                toast(form, saveFailedText, true);
+                if (err && err.refusal) refuse(form, err.refusal);
+                else toast(form, saveFailedText, true);
               });
           });
         });

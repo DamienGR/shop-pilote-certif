@@ -167,11 +167,15 @@ and [backup.md](backup.md) is the whole story.
 
 `core` and `fleet` are the upgrade path (jalon 9, ADR 0016). A shop's version is
 read from its GIT HISTORY — the newest `v<semver>` tag merged into HEAD — never
-from `coreVersion`, which is a claim `core status` exists to check. An upgrade
-fetches the tag, branches `socle/<tag>`, merges, bumps the manifest, re-renders
-the generated files, runs the gates the shop now carries, and with `--open-pr`
-opens the pull request. It never deploys and never merges a pull request:
-production stays behind the GitHub Environment. It refuses a dirty tree, a
+from `coreVersion`, which is a claim `core status` exists to check. A clone only
+sees the tags it has fetched, and an upgrade merged on the forge then pulled
+from the shop's origin brings none: `core status` names a declared tag the
+clone lacks instead of blaming the manifest, and an upgrade fetches the core's
+tags BEFORE it reads where the shop is. It then branches `socle/<tag>`,
+merges, bumps the manifest, re-renders the generated files, runs the gates the
+shop now carries, and with `--open-pr` opens the pull request. It never deploys
+and never merges a pull request: production stays behind the GitHub
+Environment. It refuses a dirty tree, a
 downgrade, and a version that rewrites a published migration (ADR 0006); a
 conflict is named file by file WITH its ownership and left in the tree, because
 resolving it is git work there. The fleet is DECLARED in `fleet.json` next to

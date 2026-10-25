@@ -24,6 +24,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { adminPasswordHash } from './admin.mjs';
 
 const port = process.argv[2] ?? '8788';
 
@@ -45,6 +46,12 @@ wrangler([
   'd1', 'execute', 'DB', '--local', '--persist-to', state,
   '--file', './test/fixtures/storefront-states.sql',
 ]);
+// An admin password, for the specs that save in Admin → Réglages. Here and not
+// in the shared fixtures: the baselines gate has no admin to log into.
+wrangler([
+  'd1', 'execute', 'DB', '--local', '--persist-to', state,
+  '--command', `INSERT OR REPLACE INTO settings (key, value) VALUES ('admin_password_hash', '${adminPasswordHash()}')`,
+]);
 
 // The gallery rows point at object keys. Without the objects the product page
 // renders broken images, and "does this image actually load" is one of the
@@ -65,6 +72,8 @@ const child = spawn(
     '--persist-to', state,
     '--var', 'CANONICAL_ORIGIN:https://canonical.example',
     '--var', 'AUTH_SECRET:browser-suite-auth-secret',
+    // Without a vault, Réglages shows no key field to save.
+    '--var', 'SECRETS_KEK:browser-suite-key-encryption-key',
     '--ip', '127.0.0.1',
     '--port', port,
   ],

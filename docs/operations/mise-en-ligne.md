@@ -120,7 +120,10 @@ voient les clients. Ensuite, dans Admin → Réglages :
 
 - [ ] **E-mail** : l'expéditeur sur le domaine vérifié (jamais
   `onboarding@resend.dev`, qui ne livre qu'au titulaire du compte Resend), la
-  clé Resend, un e-mail de test reçu ;
+  clé Resend, un e-mail de test reçu, et le **destinataire des alertes de
+  commande**. Le socle n'en a pas par défaut : sans lui, l'alerte de chaque
+  commande est sautée, et rien ne la renvoie (la première commande réelle du
+  pilote, étape 10 de la certification) ;
 - [ ] **Protection anti-robots** : les clés du widget de production ;
 - [ ] **Paiements** : Stripe, quand le commerçant ouvre — une clé **live**
   restreinte (droits : [guide des comptes, §1](../certification/comptes-et-acces.md#1-stripe)),
