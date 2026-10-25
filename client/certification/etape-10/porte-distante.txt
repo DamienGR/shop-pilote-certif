@@ -1,0 +1,33 @@
+Porte de sécurité distante — https://certif-minshop.miijot.fr
+
+▸ La porte d'administration
+  ✓ l'admin refuse l'anonyme (mode password)
+  ✓ 37 routes d'administration dérivées des fichiers, refusées sur chaque verbe
+  ✓ le magicien d'installation est fermé
+  ✓ une assertion Access forgée n'ouvre rien
+  ✓ une API d'administration ne dit rien de ce qu'elle protège
+
+▸ L'origine des formulaires
+  ✓ un POST d'une autre origine, ou sans origine, est refusé
+  ✓ un POST de même origine passe la garde d'origine
+
+▸ Traversée de chemin
+  ✓ huit formes de traversée refusées sans rien laisser voir
+
+▸ Les webhooks de paiement
+  ✓ un événement non signé ou mal signé est refusé par le Worker, sans jeton Access
+
+▸ Aucune donnée de carte
+  ✓ aucun champ de carte sur les pages de la boutique, du catalogue au paiement
+
+▸ En-têtes de durcissement
+  ✓ chaque classe de réponse du Worker porte le durcissement complet
+  ✓ les actifs statiques, servis avant le Worker, aussi
+
+▸ URL à capacité
+  ✓ un jeton de commande inconnu n'ouvre rien et ne fuit ni en référent ni en cache
+
+▸ Une erreur non rattrapée reste une réponse
+  ✓ un 500 est durci, non mis en cache, et ne montre pas sa pile
+
+14 contrôle(s) passé(s), 0 en échec.
