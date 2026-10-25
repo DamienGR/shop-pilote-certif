@@ -508,6 +508,12 @@ Le dépôt est en phase de cadrage :
 ## Documentation
 
 - [Plan détaillé d'implémentation](docs/implementation-plan.md)
+- [Plan de certification](docs/certification/plan.md) et
+  [dossier de décision](docs/certification/dossier-de-decision.md)
+- [Exploitation d'une boutique](docs/operations/README.md) : runbooks, mise en
+  ligne, recette, remboursement, départ d'un client, responsabilités,
+  sous-traitants
+- [Notes de migration du socle](docs/migrations/README.md)
 - [Décisions d'architecture (ADR)](docs/architecture/decisions/README.md)
 - [Inventaire de la baseline](docs/architecture/baseline-inventory.md)
 - [Documentation Minshop](https://github.com/ddyy/minshop)

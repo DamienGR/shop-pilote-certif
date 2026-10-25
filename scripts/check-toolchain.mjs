@@ -131,7 +131,9 @@ if (!Number.isFinite(nvmrcResolved[0]) || !satisfies(nvmrcResolved, nodeRange)) 
 const running = parseVersion(process.version);
 if (!satisfies(running, nodeRange)) {
   failures.push(
-    `running node ${process.version} is outside "${nodeRange}" — run \`nvm use\` (.nvmrc: ${nvmrc})`,
+    // `nvm install`, not `nvm use`: with a major in .nvmrc, `use` settles for
+    // the newest 22.x already installed, which is the one just refused.
+    `running node ${process.version} is outside "${nodeRange}" — run \`nvm install\` (.nvmrc: ${nvmrc})`,
   );
 }
 

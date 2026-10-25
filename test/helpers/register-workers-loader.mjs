@@ -1,6 +1,6 @@
 import { register } from 'node:module';
 
 // `node --import ./test/helpers/register-workers-loader.mjs`. register() rather
-// than module.registerHooks(): the latter landed in Node 22.15, and
-// package.json supports the whole 22 line from 22.12.
+// than module.registerHooks(), which landed in Node 22.15: the loader predates
+// the 22.23.4 floor, and register() still works on the whole 22 line.
 register(new URL('./workers-loader.mjs', import.meta.url));

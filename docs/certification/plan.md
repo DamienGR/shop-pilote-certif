@@ -1118,18 +1118,54 @@ Fait avancer : jalon 7 (critère de sortie), §8.8.
 - [ ] rapports assemblés, dérogations signées ;
 - [ ] décision go/no-go (point de décision F, §11).
 
+Préparée le 2026-10-25, sans compte réel. La fiche de passage est
+[etape-11-commandes.md](etape-11-commandes.md) : ce qu'il faut remettre au
+conseil qui relit les pages légales, à l'expert-comptable et à la personne de
+la recette, ce qu'il faut obtenir d'eux, et où la preuve se range, jamais un
+document signé dans un dépôt public. Le
+[dossier de décision](dossier-de-decision.md) assemble les livrables, l'état
+de chaque critère du §8 avec sa preuve, les dérogations à signer et la fiche
+de décision. Quatre documents du §12 manquaient, écrits dans
+`docs/operations/` : le modèle de [recette](../operations/recette.md) et de
+procès-verbal, le [remboursement](../operations/remboursement.md), la
+[matrice des responsabilités](../operations/responsabilites.md) et les
+[sous-traitants](../operations/sous-traitants.md).
+
+Trois écarts, corrigés dans `v0.3.25` :
+
+- **Les pages légales de la production sont publiées en squelette.** Les
+  quatre pages de la migration 0040, « [À COMPLÉTER] » et bandeau
+  « Brouillon » compris : la commande réelle de l'étape 10 a accepté des CGV
+  qui ne nomment pas le vendeur. La production refuse désormais de publier
+  une page qui porte un marqueur, et le dit pour celle qui est déjà en ligne.
+- **Le nocturne du pilote est rouge depuis le 2026-10-24** sur l'audit des
+  dépendances, deux alertes élevées publiées après `v0.3.24` (`undici`,
+  `zod`) : le §8.4 ne tient plus sans la montée.
+- **Les traces étaient gardées à 100 %**, et Cloudflare les compte avec les
+  journaux dans une même allocation à partir du 2026-12-01 : une requête sur
+  dix.
+
+Trois questions hors des lignes, posées dans le dossier : le CPU, que
+l'étape 6 a laissé à décider ; le RPO, tenu « une archive par nuit » mais
+dépassé de 18 à 54 minutes selon l'heure à laquelle GitHub lance le
+cron ; la ligne « échec réseau temporaire » du §8.7, qu'aucune étape
+n'a rejouée.
+
+Fait avancer : jalon 10 (critère de sortie, livrables), §8.8, §11 (point F),
+§12.
+
 ## 5. Livrables du jalon 10
 
 | Livrable | Produit par |
 |---|---|
-| rapport de tests | étapes 3, 4, 6, 7 |
+| rapport de tests | étapes 3, 4, 6, 7 ; assemblé dans le [dossier de décision](dossier-de-decision.md), section 2 |
 | [rapport de sécurité](rapport-securite.md) | étape 5 |
 | [rapport de performance](rapport-performance.md) | étape 6 |
 | preuve de restauration | étape 8 |
 | validation TVA/facturation | étape 11 |
 | checklist de lancement | étape 9, rejouable pour chaque boutique |
-| documentation de support | étapes 0 et 8 (runbooks), §12 |
-| décision go/no-go | étape 11 |
+| documentation de support | étapes 0 et 8 (runbooks), étape 11 (§12) |
+| décision go/no-go | étape 11, [dossier de décision](dossier-de-decision.md), section 6 |
 
 ## 6. Dérogations prévisibles
 

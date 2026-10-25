@@ -95,6 +95,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
+          check-latest: true
 
       - name: Classify the tree and gate the change
         env:
@@ -125,6 +126,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
+          check-latest: true
 
       - name: Install, build and dry-run deploy from a scratch clone
         run: npm run check:clean-clone
@@ -165,6 +167,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
+          check-latest: true
           cache: npm
           cache-dependency-path: package-lock.json
 
@@ -276,6 +279,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
+          check-latest: true
           cache: npm
           cache-dependency-path: package-lock.json
 
@@ -350,6 +354,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
+          check-latest: true
           cache: npm
           cache-dependency-path: package-lock.json
 
@@ -464,6 +469,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
+          check-latest: true
           cache: npm
           cache-dependency-path: package-lock.json
 

@@ -7,10 +7,10 @@ it before editing anything non-trivial.
 
 ## Setup
 
-Node ≥ 22.12 and Git. Then:
+Node ≥ 22.23.4 and Git. Then:
 
 ```sh
-nvm use 22
+nvm install 22
 npm install
 npm run provision:local -- --seed
 npm run dev

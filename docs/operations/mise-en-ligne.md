@@ -133,7 +133,13 @@ voient les clients. Ensuite, dans Admin → Réglages :
   depuis `v0.3.22` : avec elle, une carte de test passait commande. Et le reçu de Stripe, à décider
   avec lui : la boutique envoie déjà le sien, et Stripe en ajoute un second si
   « Paiements réussis » est activé dans ses E-mails aux clients ;
-- [ ] les **pages légales** relues et publiées, le menu du pied de page.
+- [ ] les **pages légales** écrites par le commerçant, relues par un conseil
+  et publiées, le menu du pied de page. Aucune ne garde un « [À COMPLÉTER] » :
+  depuis `v0.3.25`, la production refuse d'en publier une, mais elle laisse en
+  ligne celle qui l'était déjà (la production du pilote a vendu sous des CGV
+  en squelette, étape 11 de la certification). Avant la première commande,
+  `legal.termsVersion` dans `src/store.config.ts` nomme le texte publié ;
+  il monte à chaque changement que l'acheteur devrait réaccepter.
 
 Les contenus sont saisis sur B, jamais recopiés depuis A (ADR 0015) : le
 catalogue par l'administration, ou par `shopctl catalog import --env production`

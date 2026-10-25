@@ -78,6 +78,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
+          check-latest: true
 
       # The typed version is a confirmation, not a source: the version lives in
       # package.json and in the witness manifests, and a dispatch input that
@@ -160,6 +161,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
+          check-latest: true
           cache: npm
           cache-dependency-path: package-lock.json
 

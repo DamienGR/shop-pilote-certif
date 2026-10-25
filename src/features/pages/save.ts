@@ -1,14 +1,17 @@
 import type { D1Database } from '@cloudflare/workers-types';
-import { tn } from '../i18n/index.ts';
+import { t, tn } from '../i18n/index.ts';
 import { findMediaByKeys, pageMediaClaimStatements } from '../media/db.ts';
+import { isIncomplete } from './completeness.ts';
 import { extractMediaKeys } from './markdown.ts';
 import { type Page } from './db.ts';
 
 export interface SaveResult {
   /** Keys the body references that are not in the media library. */
   unresolved: string[];
-  /** True when a requested publish was refused because media was missing. */
+  /** True when a requested publish was refused: media missing, or markers left. */
   publishRefused: boolean;
+  /** The body still holds `[À COMPLÉTER]` markers, in an environment that refuses them live. */
+  incomplete: boolean;
   /** The publication state actually stored. */
   published: number;
 }
@@ -28,6 +31,11 @@ export interface SaveResult {
  * had already been published by then. Here the UPDATE decides `published` from
  * a COUNT of the rows the same transaction just claimed, so a claim that lost
  * to a concurrent delete refuses the draft-to-live transition instead.
+ *
+ * `refuseIncomplete` (a production, ./completeness.ts) treats a body that still
+ * holds the skeleton's `[À COMPLÉTER]` markers the same way: saved, kept a
+ * draft, and a live page left live. Demoting a published terms page would
+ * reopen the checkout without consent, which is worse than a marker.
  */
 export async function savePageBody(
   db: D1Database,
@@ -39,18 +47,20 @@ export async function savePageBody(
     published: number;
     layout: string;
   },
-  options: { baseUrl?: string } = {},
+  options: { baseUrl?: string; refuseIncomplete?: boolean } = {},
 ): Promise<SaveResult> {
   const referenced = extractMediaKeys(fields.body_markdown, { baseUrl: options.baseUrl });
   const resolved = await findMediaByKeys(db, referenced);
   const resolvedKeys = new Set(resolved.map((m) => m.image_key));
   const unresolved = referenced.filter((key) => !resolvedKeys.has(key));
 
-  // Publishing is refused when media is missing, but an explicit unpublish is
-  // always honoured and a live page is never demoted.
+  const incomplete = options.refuseIncomplete === true && isIncomplete(fields.body_markdown);
+
+  // Publishing is refused when media is missing or markers are left, but an
+  // explicit unpublish is always honoured and a live page is never demoted.
   const wantsPublish = fields.published === 1;
   const blockedValue = wantsPublish ? existing.published : 0;
-  const okValue = unresolved.length === 0 ? fields.published : blockedValue;
+  const okValue = unresolved.length === 0 && !incomplete ? fields.published : blockedValue;
 
   await db.batch([
     ...pageMediaClaimStatements(
@@ -93,15 +103,31 @@ export async function savePageBody(
   return {
     unresolved,
     publishRefused: wantsPublish && published !== 1,
+    incomplete,
     published,
   };
 }
 
 /** Admin-facing summary of what happened, or '' when everything resolved. */
 export function saveWarning(result: SaveResult): string {
-  if (result.unresolved.length === 0 && !result.publishRefused) return '';
+  const warnings: string[] = [];
+  if (result.incomplete && result.published === 1) {
+    warnings.push(t('admin.pages.save.incompleteLive'));
+  } else if (result.incomplete && result.publishRefused) {
+    warnings.push(t('admin.pages.save.incompleteRefused'));
+  }
+  const media = mediaWarning(result);
+  if (media) warnings.push(media);
+  return warnings.join(' ');
+}
+
+function mediaWarning(result: SaveResult): string {
+  // A refusal the markers alone explain is not a media problem.
+  const refusedForMedia =
+    result.publishRefused && !(result.incomplete && result.unresolved.length === 0);
+  if (result.unresolved.length === 0 && !refusedForMedia) return '';
   const count = Math.max(result.unresolved.length, 1);
-  if (result.publishRefused) {
+  if (refusedForMedia) {
     return tn('admin.pages.save.publishRefused.one', 'admin.pages.save.publishRefused.other', count);
   }
   if (result.published === 1) {

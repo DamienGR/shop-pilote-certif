@@ -10,6 +10,13 @@ const workflows = readdirSync(dir)
   .filter((file) => file.endsWith('.yml'))
   .map((file) => ({ file, text: readFileSync(new URL(file, dir), 'utf8') }));
 
+/** The composite actions the workflows call: their steps run in the same jobs. */
+const actionsDir = new URL('../../.github/actions/', import.meta.url);
+const actions = readdirSync(actionsDir).map((name) => ({
+  file: `actions/${name}/action.yml`,
+  text: readFileSync(new URL(`${name}/action.yml`, actionsDir), 'utf8'),
+}));
+
 /**
  * The first major of each action that runs on Node 24. GitHub forces Node 20
  * actions onto 24 and warns on every run until they move (the nightly of
@@ -62,5 +69,23 @@ describe('the workflows', () => {
     }
     // One step in two files: the nightly's copy is the one that would drift.
     expect(new Set(steps.map(({ step }) => step.slice(step.indexOf('run: |')))).size).toBe(1);
+  });
+
+  // `.nvmrc` names a major, and setup-node resolves a major to the newest
+  // version cached on the runner image, which trails Node's releases by weeks.
+  // Astro 7.4 requires 22.23.4, the security release of 2026-10-20; the image
+  // still had 22.23.3, and engine-strict refused every install of that
+  // Dependabot pull request. check-latest asks Node's own list instead.
+  it('installs the newest Node of the .nvmrc line, not the one the image cached', () => {
+    // One chunk per step: a step starts at a `- ` list item.
+    const steps = [...workflows, ...actions].flatMap(({ file, text }) =>
+      text
+        .split(/^ *- /m)
+        .filter((step) => step.includes('uses: actions/setup-node@') && step.includes('node-version-file: .nvmrc'))
+        .map((step) => ({ file, step })),
+    );
+    expect(steps.map(({ file }) => file)).toContain('actions/run-verify/action.yml');
+    expect(steps.length).toBeGreaterThan(10);
+    expect(steps.filter(({ step }) => !/^ +check-latest: true$/m.test(step)).map(({ file }) => file)).toEqual([]);
   });
 });

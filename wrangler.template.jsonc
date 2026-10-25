@@ -28,7 +28,13 @@
   // Recurring jobs (handler: src/worker.ts) — retries queued notifications and
   // releases expired inventory holds without waiting for the next shopper.
   "triggers": { "crons": ["*/5 * * * *"] },
-  "observability": { "enabled": true, "traces": { "enabled": true, "head_sampling_rate": 1 } },
+  // Logs keep every request: the runbooks read them. Traces keep one in ten:
+  // from 2026-12-01 both draw on one ingestion allowance, which the Free plan
+  // caps at 0.5 GB a day and then stops ingesting until 00:00 UTC, logs
+  // included; past Paid's 50 GB a month it bills by the GB. A tenth still shows
+  // where a slow route spends its time, and the logs keep each request's CPU and
+  // outcome (certification, étape 11).
+  "observability": { "enabled": true, "traces": { "enabled": true, "head_sampling_rate": 0.1 } },
   // The custom production domain, from cloudflare.productionDomain in the client
   // manifest. `shopctl provision --env production` renders it as a route and
   // turns workers.dev OFF at the same time: two doors into the same shop means

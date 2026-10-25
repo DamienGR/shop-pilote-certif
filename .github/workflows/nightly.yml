@@ -115,6 +115,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
+          check-latest: true
 
       # What ships is the gate: the storefront Worker and the MCP Worker's
       # runtime dependencies, at `high` and above. Build tooling (astro's
@@ -194,6 +195,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
+          check-latest: true
           cache: npm
           cache-dependency-path: package-lock.json
 
@@ -333,6 +335,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
+          check-latest: true
           cache: npm
           cache-dependency-path: package-lock.json
 
@@ -395,6 +398,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
+          check-latest: true
           cache: npm
           cache-dependency-path: package-lock.json
 

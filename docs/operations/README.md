@@ -18,9 +18,18 @@ certification).
 | Des données personnelles ont été exposées | [violation-de-donnees](runbooks/violation-de-donnees.md) |
 | Le mot de passe d'administration est perdu | [mot-de-passe-admin](runbooks/mot-de-passe-admin.md) |
 
-Et deux procédures qui ne sont pas des incidents : la
-[mise en ligne](mise-en-ligne.md), checklist de lancement de chaque boutique,
-et le [départ d'un client](sortie-client.md).
+Et les procédures qui ne sont pas des incidents :
+
+| Moment | Document |
+|---|---|
+| Lancer une boutique (checklist rejouable) | [mise-en-ligne](mise-en-ligne.md) |
+| La faire recevoir et livrer | [recette](recette.md), modèle de recette et procès-verbal |
+| Rembourser une commande | [remboursement](remboursement.md) |
+| Rendre une boutique à un client qui part | [sortie-client](sortie-client.md) |
+
+Deux références à remettre au commerçant avec le procès-verbal : la
+[matrice des responsabilités](responsabilites.md) de l'agence et du
+commerçant, et la liste des [sous-traitants techniques](sous-traitants.md).
 
 Quatre règles valent pour tous :
 
