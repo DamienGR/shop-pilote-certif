@@ -88,7 +88,10 @@ export async function loadProductDetail(
   options: ProductDetailOptions,
 ): Promise<LoadedProductDetail> {
   const product = options.slug ? await getProductBySlug(db, options.slug) : null;
-  if (!product) return { status: 'not_found' };
+  // A deactivated product is gone from the shop, as the JSON catalogue and the
+  // cart already said: its old URL served a page nobody could buy from
+  // (certification, step 10).
+  if (!product || !product.active) return { status: 'not_found' };
 
   // Independent once the product is known: one D1 batch (reads.ts says why),
   // beside the stored neighbours, which only a semantic-search shop has. The

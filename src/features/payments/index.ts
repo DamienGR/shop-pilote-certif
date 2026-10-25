@@ -65,11 +65,6 @@ export function hasRealMethod(settings: StoreSettings, vault = vaultReady()): bo
   return ALL_METHODS.some((m) => isMethodAvailable(m, settings, vault));
 }
 
-/** No real rail configured: only the demo method can take a payment. */
-export function paymentsInDemoMode(settings: StoreSettings, vault = vaultReady()): boolean {
-  return !hasRealMethod(settings, vault);
-}
-
 /** The store's default rail (Réglages → Paiements; default 'stripe'). */
 export function defaultMethod(settings: StoreSettings): PaymentMethod {
   return settings.paymentProvider;

@@ -84,6 +84,15 @@ async function shop(environment) {
 
 let s = await shop('production');
 try {
+  // As `provision` leaves a production nobody has installed: the demo switched
+  // off, so with no key the shop takes no order at all. Step 10's banner said
+  // the demo took them.
+  await s.setting('payment_methods_disabled', 'demo');
+  let shell = await s.settingsPage();
+  assert.match(shell, /La boutique ne prend aucune commande/);
+  assert.doesNotMatch(shell, /Aucun moyen de paiement réel n’est configuré/);
+  console.log('✓ production: with the demo off and no key, the admin says the shop takes no order');
+
   const testKey = await s.saveStripe({ 'secret:stripe_secret_key': 'rk_test_suite', 'secret:stripe_webhook_secret': WHSEC });
   assert.equal(testKey.status, 200, 'a refused key re-renders the page with its reason');
   assert.match(testKey.html, /Clé de test refusée/);
@@ -119,6 +128,14 @@ try {
   assert.ok(!page.includes('rk_live_suite'), 'the settings page must never show the key');
   console.log('✓ production: a live key is stored, and the card says "mode live" without showing it');
 
+  // Open for real orders, with nobody to tell: step 10's order went unannounced.
+  assert.doesNotMatch(page, /La boutique ne prend aucune commande/);
+  assert.match(page, /Les nouvelles commandes ne préviennent personne/);
+  await s.setting('email_notify_to', 'owner@store.test');
+  shell = await s.settingsPage();
+  assert.doesNotMatch(shell, /Les nouvelles commandes ne préviennent personne/);
+  console.log('✓ production: open with no alert recipient, the admin says so until one is set');
+
   const testEvent = await s.deliver(false);
   assert.equal(testEvent.status, 400, `a test-mode event reached a production: ${testEvent.status} ${testEvent.body}`);
   assert.match(testEvent.body, /Test-mode event refused/);
@@ -138,7 +155,8 @@ try {
   assert.equal(cleared.status, 204);
   assert.equal(cleared.refusal, null, 'a save that went through is not a refusal');
   assert.deepEqual(await s.stored(), []);
-  console.log('✓ production: the keys are removed with "Supprimer", the end of step 10');
+  assert.match(await s.settingsPage(), /La boutique ne prend aucune commande/);
+  console.log('✓ production: the keys are removed with "Supprimer", the end of step 10, and the shop says it is closed');
 } finally {
   await s.worker.dispose();
 }

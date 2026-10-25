@@ -1071,8 +1071,8 @@ bord ou un navigateur ; le mode automatique a refusé à l'agent la fusion et
 le lancement du déploiement. Preuves dans `client/certification/etape-10/` de
 `pilote-certif` (pull request #32).
 
-Six défauts ou écarts : deux corrigés dans `v0.3.23`, un dans la checklist de
-lancement, deux ouverts, un d'infrastructure :
+Six défauts ou écarts : deux corrigés dans `v0.3.23`, trois dans `v0.3.24`
+(l'un aussi dans la checklist de lancement), un d'infrastructure :
 
 - **`core upgrade` lisait la version de la boutique avant d'en récupérer les
   tags.** Le clone du pilote s'était arrêté aux tags de `v0.3.5` : la pull
@@ -1087,14 +1087,17 @@ lancement, deux ouverts, un d'infrastructure :
 - **La production n'avait pas de destinataire d'alertes.** Ni la fiche de
   l'étape 9 ni la checklist ne le demandaient, et le socle n'a pas d'adresse
   par défaut : l'alerte de la commande réelle est sautée, et rien ne la
-  renvoie. La checklist le demande ; l'administration ne signale toujours pas
-  son absence.
-- **Le bandeau « Aucun moyen de paiement réel n'est configuré »** dit que la
-  commande de démonstration permet de commander, alors que la production l'a
-  coupée. Il ne lit que l'absence d'un moyen réel. Ouvert.
-- **La fiche d'un produit désactivé reste servie** en 200 par son URL directe,
-  « Épuisé », quand le panier le refuse. Une page qui reste ou un 404 : à
-  décider. Ouvert.
+  renvoie. La checklist le demande depuis `v0.3.23` ; depuis `v0.3.24`,
+  l'administration le signale sur toutes ses pages dès qu'un vrai moyen de
+  paiement est ouvert.
+- **Le bandeau « Aucun moyen de paiement réel n'est configuré »** disait que la
+  commande de démonstration permettait de commander, alors que la production
+  l'avait coupée : il ne lisait que l'absence d'un moyen réel. Depuis
+  `v0.3.24`, il lit les moyens ouverts, et une boutique qui n'en a aucun dit
+  qu'elle ne prend aucune commande.
+- **La fiche d'un produit désactivé restait servie** en 200 par son URL
+  directe, « Épuisé », quand le panier le refusait. Décision de Damien : un
+  404, depuis `v0.3.24`.
 - **Une lecture D1 distante a échoué une fois en 7403** (« The given account
   is not valid »), comme à l'étape 9 ; relancée, elle est passée.
 

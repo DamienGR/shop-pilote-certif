@@ -102,7 +102,7 @@ const galleryRow = (overrides: Record<string, unknown> = {}) => ({
 });
 
 beforeEach(() => {
-  rows.product = { ...rows.product, public_id: 'prod_k7m2qx8vn6' };
+  rows.product = { ...rows.product, public_id: 'prod_k7m2qx8vn6', active: 1 };
   rows.variants = [];
   rows.extras = [];
   rows.images = [];
@@ -160,6 +160,12 @@ describe('loadProductDetail public-ID policy', () => {
   it('reports not_found rather than throwing for a missing slug', async () => {
     const db = await import('../../src/features/products/db');
     vi.mocked(db.getProductBySlug).mockResolvedValueOnce(null);
+
+    await expect(load()).resolves.toEqual({ status: 'not_found' });
+  });
+
+  it('reports not_found for a deactivated product, like the cart and the JSON catalogue', async () => {
+    rows.product = { ...rows.product, active: 0 };
 
     await expect(load()).resolves.toEqual({ status: 'not_found' });
   });
