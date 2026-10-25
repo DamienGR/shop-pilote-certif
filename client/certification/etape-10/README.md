@@ -37,11 +37,12 @@ remboursement, la lecture des e-mails. Les heures sont celles de Paris
 `provision.json` : le `provision --env production` du poste, qui rend la
 configuration de production sans rien créer, `MINSHOP_ENV` à `production`.
 
-Le second, après l'étape : la montée en `v0.3.23` (pull request #33, CI 20/20),
-qui corrige les défauts 1 et 2, partie cette fois de la bonne version
-(« v0.3.22 → v0.3.23 ») : les tags du socle avaient été récupérés avant, le
-`shopctl` de la boutique étant encore celui de `v0.3.22`. Les rapports des
-deux runs sont dans `deploy-v0.3.22/` et `deploy-v0.3.23/`.
+Le second run vient après l'étape : il déploie la montée en `v0.3.23` (pull
+request #33, CI 20/20), qui corrige les défauts 1 et 2. Cette montée est
+partie de la bonne version (« v0.3.22 → v0.3.23 »), parce que les tags du
+socle avaient été récupérés avant : le `shopctl` de la boutique était encore
+celui de `v0.3.22`. Les rapports des deux runs sont dans `deploy-v0.3.22/` et
+`deploy-v0.3.23/`.
 
 ## Ce qui ne laisse pas de fichier
 
