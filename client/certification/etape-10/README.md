@@ -32,9 +32,16 @@ remboursement, la lecture des e-mails. Les heures sont celles de Paris
 | Run | Date (UTC) | Socle | Archive préalable | Fumée |
 |---|---|---|---|---|
 | 40133545202 | 2026-10-24 21:17 → 21:26 | `v0.3.22` | `pilote-certif-production-20261024T212535Z` (10 fichiers) | 5/5 au premier essai, aucun avertissement ; aucun secret créé |
+| 40178641326 | 2026-10-25 08:56 → 09:05 | `v0.3.23` | `pilote-certif-production-20261025T090442Z` (10 fichiers) | 5/5 au premier essai ; aucun secret créé |
 
 `provision.json` : le `provision --env production` du poste, qui rend la
 configuration de production sans rien créer, `MINSHOP_ENV` à `production`.
+
+Le second, après l'étape : la montée en `v0.3.23` (pull request #33, CI 20/20),
+qui corrige les défauts 1 et 2, partie cette fois de la bonne version
+(« v0.3.22 → v0.3.23 ») : les tags du socle avaient été récupérés avant, le
+`shopctl` de la boutique étant encore celui de `v0.3.22`. Les rapports des
+deux runs sont dans `deploy-v0.3.22/` et `deploy-v0.3.23/`.
 
 ## Ce qui ne laisse pas de fichier
 
@@ -83,14 +90,14 @@ configuration de production sans rien créer, `MINSHOP_ENV` à `production`.
    « v0.3.5 → v0.3.22 », 283 fichiers divergents et la migration 0045, déjà
    appliquée. La fusion était juste, puisque git suit le graphe et pas les
    tags. Le corps de la pull request #30 a été réécrit à la main depuis
-   `v0.3.20`. Corrigé dans le socle, `v0.3.23`.
+   `v0.3.20`. Corrigé dans le socle, `v0.3.23`, déployé le 25 octobre.
 2. **Réglages cache la raison d'un refus.** Avec JavaScript, l'enregistrement
    part en arrière-plan ; le serveur répond 400 avec « Clé de test
    refusée : … », et la page affiche « Échec de l'enregistrement —
    réessayez ». C'est vrai pour tous les refus de Réglages, depuis la
    première version ; la répétition ne l'avait vu que sans JavaScript. La
    capture `cle-test-refusee.png` a été prise JavaScript coupé pour le site.
-   Corrigé dans le socle, `v0.3.23`.
+   Corrigé dans le socle, `v0.3.23`, déployé le 25 octobre.
 3. **La production n'avait pas de destinataire d'alertes.** Aucune fiche de
    l'étape 9 ne demandait de remplir Réglages → E-mail → « Destinataire des
    alertes de commande », et le socle n'a pas d'adresse par défaut :
@@ -109,8 +116,10 @@ configuration de production sans rien créer, `MINSHOP_ENV` à `production`.
 
 ## Ce qui reste
 
-- Défauts 1 et 2 : publier `v0.3.23` et monter le pilote.
-- Défauts 3 à 5 : à corriger dans le socle ou dans la checklist de lancement.
+- Défauts 1 et 2 : fermés, `v0.3.23` en production depuis le 25 octobre.
+- Défaut 3 : la checklist de lancement demande le destinataire des alertes
+  depuis `v0.3.23` ; l'administration ne signale toujours pas son absence.
+- Défauts 4 et 5 : ouverts dans le socle.
 - Les clés : retirées jusqu'à l'étape 11, qui décide de l'ouverture. Les
   remettre prend une nouvelle clé restreinte et le même secret de webhook ;
   l'endpoint « pilote-certif production » est gardé.
