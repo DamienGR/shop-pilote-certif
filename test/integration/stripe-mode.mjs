@@ -41,14 +41,20 @@ async function shop(environment) {
   assert.equal(login.status, 303, 'the suite could not log in');
   const cookie = login.headers.getSetCookie().map((line) => line.split(';')[0]).join('; ');
 
-  /** Réglages → Paiements → Carte (Stripe) → Enregistrer, as the form posts it. */
-  async function saveStripe(fields) {
+  /** Réglages → Paiements → Carte (Stripe) → Enregistrer, as the form posts it
+   *  — or, `background`, as the page's script posts it when JavaScript runs. */
+  async function saveStripe(fields, { background = false } = {}) {
     const response = await worker.fetch('/admin/settings', {
       method: 'POST',
-      headers: { origin: ORIGIN, 'content-type': 'application/x-www-form-urlencoded', cookie },
+      headers: {
+        origin: ORIGIN,
+        'content-type': 'application/x-www-form-urlencoded',
+        cookie,
+        ...(background ? { 'x-requested-with': 'fetch' } : {}),
+      },
       body: new URLSearchParams({ _action: 'save_stripe', ...fields }).toString(),
     });
-    return { status: response.status, html: await response.text() };
+    return { status: response.status, refusal: response.headers.get('x-minshop-refusal'), html: await response.text() };
   }
   const stored = async () =>
     (await worker.db.prepare("SELECT key FROM settings WHERE key LIKE 'enc:stripe_%' ORDER BY key").all()).results.map((row) => row.key);
@@ -84,6 +90,19 @@ try {
   assert.deepEqual(await s.stored(), [], 'a refused key must store nothing, the webhook secret beside it included');
   console.log('✓ production: a test key is refused at the save, and nothing is stored');
 
+  // With JavaScript the page saves in the background, and a refusal is only
+  // shown if it is marked as one: step 10's merchant read « Échec de
+  // l'enregistrement — réessayez » for this exact key (test/browser/admin-settings.spec.mjs).
+  const inBackground = await s.saveStripe(
+    { 'secret:stripe_secret_key': 'rk_test_suite', 'secret:stripe_webhook_secret': WHSEC },
+    { background: true },
+  );
+  assert.equal(inBackground.status, 400);
+  assert.equal(inBackground.refusal, '1', 'a background refusal must be marked as one, or the page hides its reason');
+  assert.match(inBackground.html, /^Clé de test refusée : cette boutique est la production/);
+  assert.deepEqual(await s.stored(), []);
+  console.log('✓ production: in the background, the refusal comes back marked, with its reason as the body');
+
   const publishable = await s.saveStripe({ 'secret:stripe_secret_key': 'pk_live_suite', 'secret:stripe_webhook_secret': WHSEC });
   assert.match(publishable.html, /Ce n’est pas une clé secrète Stripe/);
   const swapped = await s.saveStripe({ 'secret:stripe_secret_key': 'rk_live_suite', 'secret:stripe_webhook_secret': 'rk_live_suite' });
@@ -115,8 +134,9 @@ try {
   assert.match(legacy.body, /live keys only in production/);
   console.log('✓ production: a test key stored before the upgrade fails closed, and the card says why');
 
-  const cleared = await s.saveStripe({ 'clear:stripe_secret_key': '1', 'clear:stripe_webhook_secret': '1' });
-  assert.equal(cleared.status, 303);
+  const cleared = await s.saveStripe({ 'clear:stripe_secret_key': '1', 'clear:stripe_webhook_secret': '1' }, { background: true });
+  assert.equal(cleared.status, 204);
+  assert.equal(cleared.refusal, null, 'a save that went through is not a refusal');
   assert.deepEqual(await s.stored(), []);
   console.log('✓ production: the keys are removed with "Supprimer", the end of step 10');
 } finally {

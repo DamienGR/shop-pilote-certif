@@ -206,6 +206,31 @@ function migrate(shopRoot) {
 
 const read = (root, file) => readFileSync(join(root, file), 'utf8');
 
+/** The version after TO, which a stale clone is upgraded to. */
+const NEXT = nextMinor(TO);
+const NEXT_TAG = `v${NEXT}`;
+
+/**
+ * A shop on TO whose clone never had TO's tag — certification, step 10.
+ *
+ * The pilot's clone had last fetched the core's tags at v0.3.5. Every upgrade
+ * since was merged on the forge and pulled from the shop's own origin, which
+ * brings the merge commits and none of the core's tags, so the newest tag its
+ * history could show was v0.3.5 for a shop on v0.3.20. Upgraded here, merged
+ * into main, and the tag deleted: the same history, missing the same tag.
+ */
+function staleClone() {
+  const agency = workspace();
+  const shop = agency.shop();
+  agency.publish();
+  const upgraded = agency.run(['core', 'upgrade', '--to', TO_TAG], { cwd: shop });
+  if (upgraded.status !== 0) throw new Error(`core upgrade ${TO_TAG}: ${upgraded.stderr}`);
+  git(['switch', '--quiet', 'main'], shop);
+  git(['merge', '--quiet', '--ff-only', UPGRADE_BRANCH], shop);
+  git(['tag', '--delete', TO_TAG], shop);
+  return { agency, shop };
+}
+
 // ---------------------------------------------------------------------------
 // The ordering. Pure, and load-bearing: everything else decides what to merge
 // by comparing three integers.
@@ -265,6 +290,23 @@ describe('shopctl core status', () => {
     expect(report.findings.some((finding) => finding.status === 'fail')).toBe(true);
   });
 
+  // The same disagreement with the opposite cause: the manifest is right and
+  // the clone is short of a tag. Saying only "the manifest declares X" invites
+  // the operator to write the stale version back into it.
+  it('names the missing tag, not the manifest, in a clone that never fetched it', () => {
+    const { agency, shop } = staleClone();
+    const { report } = agency.json(['core', 'status', '--offline'], { cwd: shop });
+    expect(report.core).toMatchObject({ declared: TO, merged: FROM, declaresMerged: false, declaredUnfetched: true });
+    const failure = report.findings.find((finding) => finding.status === 'fail');
+    expect(failure.message).toContain(`ce clone n'a pas le tag ${TO_TAG}`);
+    expect(failure.message).toContain('git fetch --tags core');
+
+    // Fetched, the history reads what the manifest says.
+    git(['fetch', '--quiet', '--tags', 'core'], shop);
+    const fetched = agency.json(['core', 'status', '--offline'], { cwd: shop }).report;
+    expect(fetched.core).toMatchObject({ merged: TO, declaresMerged: true, declaredUnfetched: false });
+  });
+
   it('counts how many versions the shop is behind', () => {
     const agency = workspace();
     agency.publish();
@@ -317,6 +359,27 @@ describe('shopctl core upgrade', () => {
     // And the shop still passes its own gates, with the NEW core's copy of them.
     const gates = agency.run(['config', 'validate'], { cwd: shop });
     expect(gates.status, gates.stdout).toBe(EXIT_CODES.ok);
+  });
+
+  // Read before the fetch, the stale clone's starting point was the last tag
+  // it happened to have: the report, and the pull request built from it,
+  // carried every note and migration since, and every file changed since as
+  // drift.
+  it('starts from the version the shop is on, in a clone that never fetched its tag', () => {
+    const { agency, shop } = staleClone();
+    publishVersion(agency.core, {
+      version: NEXT,
+      notes: `# Socle ${NEXT_TAG}\n\n## Migrations\n\n- \`migrations/0046_gift_wrap.sql\`, additive.\n`,
+      files: { 'migrations/0046_gift_wrap.sql': 'ALTER TABLE orders ADD COLUMN gift_wrap INTEGER;\n' },
+    });
+
+    const { status, report, stderr } = agency.json(['core', 'upgrade', '--to', NEXT_TAG], { cwd: shop });
+    expect(status, stderr).toBe(EXIT_CODES.ok);
+    expect(report).toMatchObject({ from: TO, to: NEXT, changed: true });
+    expect(report.notes.map((note) => note.version)).toEqual([NEXT]);
+    expect(report.migrations).toEqual(['migrations/0046_gift_wrap.sql']);
+    expect(report.drift).toEqual([]);
+    expect(stderr).toContain(`socle ${TO_TAG} → ${NEXT_TAG}`);
   });
 
   // "L'ancien Worker reste compatible avec le nouveau schéma" (jalon 9, ADR

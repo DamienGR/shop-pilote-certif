@@ -60,7 +60,7 @@ import {
   upgradeBranch,
   worktreeState,
 } from '../upgrade.mjs';
-import { compareVersions, isBreakingStep, latestVersion, tagForVersion, versionFromTag } from '../version.mjs';
+import { compareVersions, isBreakingStep, isCoreTag, latestVersion, tagForVersion, versionFromTag } from '../version.mjs';
 
 export const CORE_OPTIONS = {
   '--to': 'tag',
@@ -152,6 +152,21 @@ export function coreState(shop, { offline = false, published = null } = {}) {
 
   const behind = available && merged ? available.filter((tag) => compareVersions(tag, merged) > 0) : [];
 
+  // A manifest ahead of the history is either edited by hand or sitting in a
+  // clone that never fetched the tag it names: an upgrade merged on the forge
+  // and pulled from the shop's origin brings its commits, not the core's tags.
+  // Only the second is fixed by fetching, and telling the operator to "correct"
+  // the manifest instead would put the wrong version in it (certification,
+  // step 10). Offline, a tag missing here is all there is to go on; online, the
+  // core must also publish it.
+  const local = localCoreTags(root);
+  const declaredTag = tagForVersion(declared);
+  const declaredUnfetched =
+    isCoreTag(declaredTag) &&
+    !local.includes(declaredTag) &&
+    (merged === null || compareVersions(declared, merged) > 0) &&
+    (available ? available.includes(declaredTag) : true);
+
   // Two kinds of difference, and conflating them would make the report useless.
   // A GENERATED file always differs — `wrangler.jsonc` is rendered from this
   // shop's manifest, so every shop in the fleet differs there from the day it
@@ -175,11 +190,12 @@ export function coreState(shop, { offline = false, published = null } = {}) {
       // `core status` to catch: a manifest edited by hand, or a merge that took
       // the core without the manifest bump that goes with it.
       declaresMerged: merged !== null && compareVersions(declared, merged) === 0,
+      declaredUnfetched,
     },
     drift,
     generated,
     worktree: { branch: worktree.branch, clean: worktree.clean, dirty: worktree.dirty },
-    tags: { local: localCoreTags(root), published: available },
+    tags: { local, published: available },
   };
 }
 
@@ -193,15 +209,18 @@ export function stateFindings(state) {
   if (!state.core.remote) {
     findings.push({ status: 'fail', message: `pas de remote « ${CORE_REMOTE} » : cette boutique ne peut recevoir aucune version du socle.` });
   }
+  const fetchHint = state.core.declaredUnfetched
+    ? `, mais ce clone n'a pas le tag v${state.core.declared} : récupérez les tags du socle (git fetch --tags ${CORE_REMOTE}) et relancez avant de toucher au manifeste`
+    : '';
   if (state.core.merged === null) {
     findings.push({
       status: 'fail',
-      message: 'aucun tag du socle n\'est fusionné dans HEAD : la version réellement embarquée est inconnue.',
+      message: `aucun tag du socle n'est fusionné dans HEAD : la version réellement embarquée est inconnue${fetchHint}.`,
     });
   } else if (!state.core.declaresMerged) {
     findings.push({
       status: 'fail',
-      message: `le manifeste déclare ${state.core.declared} et l'historique porte ${state.core.mergedTag}.`,
+      message: `le manifeste déclare ${state.core.declared} et l'historique porte ${state.core.mergedTag}${fetchHint}.`,
     });
   } else {
     findings.push({ status: 'ok', message: `socle ${state.core.mergedTag}, déclaré et fusionné.` });
@@ -247,15 +266,14 @@ function statusCommand(args, reporter) {
   return 0;
 }
 
-/** The version an upgrade targets, from `--to`. */
-export function resolveTarget(value, state) {
+/** The version an upgrade targets, from `--to`. A missing one gets no
+ *  suggestion: before the fetch, the clone's tags may be stale (certification,
+ *  step 10). */
+export function resolveTarget(value) {
   if (value === undefined) {
-    const suggestion = state.core.behind.at(-1) ?? state.core.latest;
     throw usageError(
       '--to est obligatoire.',
-      suggestion
-        ? `Une mise à niveau nomme la version qu'elle prend : --to v${suggestion}. \`shopctl core status\` liste les versions publiées.`
-        : 'Une mise à niveau nomme la version qu\'elle prend : --to v1.1.0. Rien n\'est deviné ici.',
+      'Une mise à niveau nomme la version qu\'elle prend : --to v1.1.0. `shopctl core status` liste les versions publiées ; rien n\'est deviné ici.',
     );
   }
   const tag = tagForVersion(String(value));
@@ -312,16 +330,25 @@ export function upgradeShop({
 
   // ------------------------------------------------------------- 1. le socle
   requireCoreRemote(root);
-  const state = coreState(shop, { offline: true });
-  const target = resolveTarget(to, state);
+  // A forgotten `--to` is a usage error, and must not cost a fetch first.
+  const target = resolveTarget(to);
 
   // The forge is asked BEFORE anything is merged, like `new` does: a missing or
   // unauthenticated `gh` must cost a message, not a merged branch nobody can
   // push.
   if (openPr) assertForgeReady({ cwd: root });
 
-  reporter.section(`Boutique ${slug} — socle ${state.core.mergedTag ?? 'inconnu'} → ${target.tag}`);
+  // The tags BEFORE the state. The version a shop is on is the newest core tag
+  // merged into HEAD, and a clone only knows the tags it has fetched: `git pull`
+  // from the shop's own origin brings the merged upgrades, not the core's tags.
+  // Read first, a clone last fetched at v0.3.5 announced « v0.3.5 → v0.3.22 »
+  // for a shop on v0.3.20, with 283 « diverged » files and a migration its
+  // database already had — and wrote all three into the pull request
+  // (certification, step 10).
   fetchCoreTags(root);
+  const state = coreState(shop, { offline: true });
+
+  reporter.section(`Boutique ${slug} — socle ${state.core.mergedTag ?? 'inconnu'} → ${target.tag}`);
   if (!hasTag(root, target.tag)) {
     const known = localCoreTags(root);
     throw inputError(
