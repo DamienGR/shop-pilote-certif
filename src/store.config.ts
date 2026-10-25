@@ -15,4 +15,8 @@ import type { DeepPartial, SiteConfig } from './config';
  *
  * Operational switches and integrations belong in Admin → Settings.
  */
-export const storeOverrides: DeepPartial<SiteConfig> = {};
+export const storeOverrides: DeepPartial<SiteConfig> = {
+  // 1 : le squelette de la migration 0040, accepté par la commande de l'étape 10.
+  // 2 : le texte complet de l'étape 11.
+  legal: { termsVersion: '2' },
+};
