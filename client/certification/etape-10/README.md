@@ -23,7 +23,7 @@ remboursement, la lecture des e-mails. Les heures sont celles de Paris
 | un produit à 1 € ; commande réelle | `produit.json`, `commande.json`, `stripe-paiement.png` | 100 centimes, stock 1, expédié, 50 g ; la commande `tspzkyxggc` payée 6,90 € sur `pi_3UUD0xPDgQeHL5O710WjEFP1` |
 | cohérence relevée entre Stripe, D1, stock, administration et e-mail | `commande.json`, `lignes.json`, `notifications.json`, `stock-apres-commande.json`, `fiche-epuisee.txt`, `admin-commande.png`, `stripe-paiement.png` | 690, dont 590 de Colissimo et 115 de TVA à 20 %, `tax_cents` et remise à 0, conditions version 1 ; le même `pi_…` dans Stripe et en base ; le stock à 0, la fiche « Épuisé » ; la confirmation envoyée. **L'alerte du commerçant a été sautée** (défaut 3) |
 | remboursement total ; la commande, le stock et l'e-mail suivent | `commande-remboursee.json`, `remboursements.json`, `evenements-remboursement.json`, `stock-apres-remboursement.json` | `refunded`, 690 par le prestataire, 0 en externe, aucune revue ; un remboursement `provider_sync` de 690 ; un `charge.refunded` traité, livré en 200 ; le stock reste à 0, voulu ; un seul e-mail de remboursement |
-| e-mails lus dans Gmail, Outlook et Apple Mail | `emails/` | Gmail : la confirmation et le remboursement. Outlook et Apple Mail : **dérogation** (ci-dessous) |
+| e-mails lus dans Gmail, Outlook et Apple Mail | ce README, `notifications.json` | Gmail : la confirmation et le remboursement, relevés par Damien, sans capture. Outlook et Apple Mail : **dérogation** (ci-dessous) |
 | le reçu de Stripe décidé avec le commerçant | ce README | « Paiements réussis » coupé : l'acheteur ne reçoit que la confirmation de la boutique, qui porte la TVA |
 | clés live retirées, ou boutique laissée fermée | `cles-apres.json`, `panier-ferme.txt`, `commandes-apres.json`, `produit-apres.json` | aucune clé Stripe en base ; le panier dit la commande « momentanément indisponible » ; une seule commande, la nôtre ; le produit inactif |
 
@@ -63,6 +63,8 @@ configuration de production sans rien créer, `MINSHOP_ENV` à `production`.
   6,90 € ») sont arrivés en boîte de réception, expédiés par
   `commandes@certif-minshop.miijot.fr`, accents et liens corrects. L'e-mail
   d'abord pris pour l'alerte dans Outlook était un e-mail de Stripe.
+  Aucune capture : le relevé est celui de Damien, et `notifications.json`
+  donne l'envoi de la confirmation côté boutique.
 
 ## Dérogations
 
