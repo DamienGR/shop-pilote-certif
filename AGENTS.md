@@ -9,7 +9,7 @@ recipes, and the traps. Each subsystem has its own page under `docs/agents/`
 ## The loop (run this constantly)
 
 ```sh
-nvm use 22         # REQUIRED — the supported toolchain runs on Node 22 (≥ 22.12)
+nvm install 22     # REQUIRED — the supported toolchain runs on Node 22 (≥ 22.23.4)
 npm run verify     # complete storefront + D1 + MCP green/red gate
 ```
 

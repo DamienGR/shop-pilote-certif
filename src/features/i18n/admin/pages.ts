@@ -98,4 +98,8 @@ export const pages = {
     'Brouillon enregistré, mais {count} image est introuvable dans la médiathèque.',
   'admin.pages.save.draftMissing.other':
     'Brouillon enregistré, mais {count} images sont introuvables dans la médiathèque.',
+  'admin.pages.save.incompleteRefused':
+    'Modifications enregistrées, mais la page n’a pas été publiée : elle contient encore « [À COMPLÉTER] ». Remplacez chaque marqueur par le texte définitif, puis publiez-la.',
+  'admin.pages.save.incompleteLive':
+    'Modifications enregistrées. La page est en ligne et contient encore « [À COMPLÉTER] » : remplacez chaque marqueur par le texte définitif.',
 } satisfies Catalog;

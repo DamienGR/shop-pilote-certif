@@ -14,7 +14,7 @@ import {
 } from '../../src/features/media/db.ts';
 import { mediaUsage, mediaUsageForIds, isUnused } from '../../src/features/media/usage.ts';
 import { uploadMedia } from '../../src/features/media/upload.ts';
-import { savePageBody } from '../../src/features/pages/save.ts';
+import { savePageBody, saveWarning } from '../../src/features/pages/save.ts';
 import { resolveHomePath, homeTargetIsValid } from '../../src/features/settings/home.ts';
 
 // Media lifecycle against a real D1. The properties under test are the ones a
@@ -457,6 +457,59 @@ try {
     const page = await seedPage(23, 'atomic-unpublish', 1);
     const result = await savePageBody(db, page, fieldsFor(page, 'no images', 0));
     assert.equal(result.published, 0, 'unpublish was ignored');
+  });
+
+  // A production refuses to put a page with `[À COMPLÉTER]` markers live
+  // (features/pages/completeness.ts): the pilot published its legal skeletons
+  // as they stood, and its first real order accepted terms naming no seller.
+  const SKELETON = 'Dénomination sociale : [À COMPLÉTER]';
+  const PRODUCTION = { refuseIncomplete: true };
+
+  await check('a production keeps a draft with markers a draft, text saved', async () => {
+    const page = await seedPage(24, 'cgv-draft');
+    const result = await savePageBody(db, page, fieldsFor(page, SKELETON, 1), PRODUCTION);
+    assert.equal(result.published, 0, 'a skeleton went live in production');
+    assert.equal(result.publishRefused, true, 'the refusal was not reported');
+    assert.equal(result.incomplete, true);
+    const saved = await db.prepare('SELECT published, body_markdown FROM pages WHERE id = 24').first();
+    assert.equal(saved.published, 0, 'stored state disagrees with the result');
+    assert.equal(saved.body_markdown, SKELETON, 'the author lost their text');
+    assert.match(saveWarning(result), /n’a pas été publiée/);
+    assert.doesNotMatch(saveWarning(result), /image/, 'the markers were blamed on media');
+  });
+
+  await check('a live page with markers stays live, and says so', async () => {
+    // Demoting a published terms page would reopen the checkout without consent.
+    const page = await seedPage(25, 'cgv-live', 1);
+    const result = await savePageBody(db, page, fieldsFor(page, SKELETON, 1), PRODUCTION);
+    assert.equal(result.published, 1, 'a live page was demoted');
+    assert.match(saveWarning(result), /en ligne et contient encore/);
+  });
+
+  await check('a production publishes a page once its markers are gone', async () => {
+    const page = await seedPage(26, 'cgv-done');
+    const body = 'Dénomination sociale : Atelier Exemple SAS';
+    const result = await savePageBody(db, page, fieldsFor(page, body, 1), PRODUCTION);
+    assert.equal(result.published, 1, 'a finished page was refused');
+    assert.equal(saveWarning(result), '');
+  });
+
+  await check('staging still publishes the skeleton', async () => {
+    // The certification publishes it there to exercise the consent gate (étape 4).
+    const page = await seedPage(27, 'cgv-staging');
+    const result = await savePageBody(db, page, fieldsFor(page, SKELETON, 1));
+    assert.equal(result.published, 1, 'staging refused the skeleton');
+    assert.equal(result.incomplete, false);
+  });
+
+  await check('markers and missing media are both reported', async () => {
+    const page = await seedPage(28, 'cgv-both');
+    const body = `${SKELETON}\n\n![x](/images/media/never-uploaded.png)`;
+    const result = await savePageBody(db, page, fieldsFor(page, body, 1), PRODUCTION);
+    assert.equal(result.published, 0);
+    const warning = saveWarning(result);
+    assert.match(warning, /\[À COMPLÉTER\]/);
+    assert.match(warning, /1 image est introuvable/);
   });
 
   await check('an image-heavy save stays inside D1’s free-plan query budget', async () => {

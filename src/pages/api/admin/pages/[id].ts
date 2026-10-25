@@ -5,6 +5,7 @@ import { getPageByPublicId, deletePage } from '../../../../features/pages/db';
 import { parsePageForm } from '../../../../features/pages/form';
 import { uniquePageSlug } from '../../../../features/pages/slug';
 import { savePageBody, saveWarning } from '../../../../features/pages/save';
+import { refusesIncompletePages } from '../../../../features/pages/completeness';
 import { parsePublicId } from '../../../../features/ids/publicId';
 import { CACHE_TAG } from '../../../../features/cache/tags';
 import { purgeCacheTags } from '../../../../features/cache/purge';
@@ -38,11 +39,15 @@ export const POST: APIRoute = async ({ request, params, redirect }) => {
   const slugBase = parsed.data.slug || existing.slug || parsed.data.title;
   const slug = await uniquePageSlug(env.DB, slugBase, id);
 
+  // A production refuses to put a page still carrying `[À COMPLÉTER]` markers live.
   const result = await savePageBody(
     env.DB,
     existing,
     { ...parsed.data, slug },
-    { baseUrl: getConfig().images.baseUrl },
+    {
+      baseUrl: getConfig().images.baseUrl,
+      refuseIncomplete: refusesIncompletePages(env.MINSHOP_ENV),
+    },
   );
 
   await purgeCacheTags([CACHE_TAG.shell]);

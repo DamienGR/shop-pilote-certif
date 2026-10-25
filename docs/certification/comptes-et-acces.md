@@ -251,7 +251,7 @@ bucket `-backups` de l'environnement, jamais en artefact.
 ## 8. Poste de l'opérateur
 
 ```sh
-nvm use 22
+nvm install 22
 npm ci
 npx wrangler login       # une session qui voit A et B
 npx wrangler whoami      # les deux comptes listés, avec leur identifiant

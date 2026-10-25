@@ -13,6 +13,8 @@ runs:
         # The supported line is declared once, in .nvmrc; `engines` and
         # scripts/check-toolchain.mjs hold CI and every workstation to it.
         node-version-file: .nvmrc
+        # The newest release of that line, not the older one the image cached.
+        check-latest: true
         cache: npm
         cache-dependency-path: |
           package-lock.json
