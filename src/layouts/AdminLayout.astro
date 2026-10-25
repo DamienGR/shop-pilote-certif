@@ -1,6 +1,7 @@
 ---
 import { getConfig } from '../config';
-import { paymentsInDemoMode } from '../features/payments';
+import { enabledMethods } from '../features/payments';
+import { ownerAlertRecipient } from '../features/email/orderPolicy';
 import { shippingFor } from '../features/shipping/effective';
 import { env } from 'cloudflare:workers';
 import { countUnresolvedInventoryExceptions } from '../features/orders/db';
@@ -45,6 +46,18 @@ const pageTitle = title
 // out that they cannot take orders. Resolution is already loaded for this request,
 // so this costs no query.
 const shippingIssue = shippingFor(Astro.locals.settings).issue;
+// Payments as a buyer meets them, not as configured. With no real rail, the
+// demo either takes the orders or, switched off as `provision` leaves a
+// production, nothing does — and the demo banner told that closed shop that
+// demo orders were open (certification, step 10).
+const openMethods = Astro.locals.settings ? enabledMethods(Astro.locals.settings) : null;
+const paymentBanner =
+  openMethods === null ? null : openMethods.length === 0 ? 'closed' : openMethods.every((m) => m === 'demo') ? 'demo' : null;
+// Real orders with nobody to tell: the outbox skips the owner's alert and never
+// sends it later. The pilot's first real order went unannounced this way.
+const alertRecipientMissing =
+  !!openMethods?.some((m) => m !== 'demo') &&
+  !ownerAlertRecipient(Astro.locals.settings?.emailNotifyTo, config.email.notifyTo);
 const inventoryExceptionCount = await countUnresolvedInventoryExceptions(env.DB);
 
 const nav: { key: Section; label: string; href: string }[] = [
@@ -165,7 +178,35 @@ const currentLabel = nav.find((n) => n.key === active)?.label ?? t('admin.shell.
           )
         }
         {
-          Astro.locals.settings && paymentsInDemoMode(Astro.locals.settings) && (
+          paymentBanner === 'closed' && (
+            <a
+              href="/admin/settings#payments"
+              class="mb-6 flex items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 transition hover:border-amber-500"
+            >
+              <span>
+                <strong class="font-semibold">{t('admin.shell.closedBanner.title')}</strong>{' '}
+                {t('admin.shell.closedBanner.detail')}
+              </span>
+              <span aria-hidden="true">&rarr;</span>
+            </a>
+          )
+        }
+        {
+          alertRecipientMissing && (
+            <a
+              href="/admin/settings#email"
+              class="mb-6 flex items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 transition hover:border-amber-500"
+            >
+              <span>
+                <strong class="font-semibold">{t('admin.shell.alertRecipient.title')}</strong>{' '}
+                {t('admin.shell.alertRecipient.detail')}
+              </span>
+              <span aria-hidden="true">&rarr;</span>
+            </a>
+          )
+        }
+        {
+          paymentBanner === 'demo' && (
             <div class="mb-6 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
               <strong class="font-semibold">{t('admin.shell.demoBanner.title')}</strong>{' '}
               {t('admin.shell.demoBanner.before')} <strong>{t('payment.demo.label')}</strong>{' '}

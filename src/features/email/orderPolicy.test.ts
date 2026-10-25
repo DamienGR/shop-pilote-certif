@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveRequiredOrderEmail, shouldSendCustomerOrderEmail } from './orderPolicy';
+import { ownerAlertRecipient, resolveRequiredOrderEmail, shouldSendCustomerOrderEmail } from './orderPolicy';
 
 describe('shouldSendCustomerOrderEmail', () => {
   it('suppresses customer email for demo orders', () => {
@@ -12,6 +12,21 @@ describe('shouldSendCustomerOrderEmail', () => {
       expect(shouldSendCustomerOrderEmail(paymentMethod)).toBe(true);
     },
   );
+});
+
+describe('ownerAlertRecipient', () => {
+  it('prefers the address saved in Réglages', () => {
+    expect(ownerAlertRecipient('owner@example.com', 'config@example.com')).toBe('owner@example.com');
+  });
+
+  it('falls back to store.config.ts', () => {
+    expect(ownerAlertRecipient(undefined, 'config@example.com')).toBe('config@example.com');
+    expect(ownerAlertRecipient('', 'config@example.com')).toBe('config@example.com');
+  });
+
+  it('is empty when neither names anyone, as in a production nobody filled in', () => {
+    expect(ownerAlertRecipient(null, '')).toBe('');
+  });
 });
 
 describe('resolveRequiredOrderEmail', () => {
