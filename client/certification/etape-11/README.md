@@ -3,8 +3,8 @@
 Passée du 25 au 27 octobre 2026 selon la fiche
 `docs/certification/etape-11-commandes.md` du socle, et le dossier de décision
 `docs/certification/dossier-de-decision.md` qu'elle remplit. Le pilote est
-monté en `v0.3.26` (pull request #37), puis en `v0.3.27` (#40), chaque fois
-redéployé sur B ; les CGV sont passées en version 2 (#39) ; les quatre pages
+monté en `v0.3.26` (pull request #37), en `v0.3.27` (#40), puis en `v0.3.28`
+(#42), chaque fois redéployé sur B ; les CGV sont passées en version 2 (#39) ; les quatre pages
 légales ont été écrites en entier et saisies dans l'administration.
 
 Le pilote est une **boutique de démonstration** : il sert à éprouver le
@@ -36,9 +36,14 @@ déploiements, et saisi les pages. Les heures sont en UTC.
 |---|---|---|---|
 | 40236611288 | `v0.3.26` | `pilote-certif-production-20261025T214858Z` | au premier essai ; aucun secret créé |
 | 40352733778 | `v0.3.27` | `pilote-certif-production-20261026T161114Z` | au premier essai ; aucun secret créé |
+| 40365454643 | `v0.3.28` | `pilote-certif-production-20261026T173810Z` | au premier essai ; aucun secret créé |
 
-Les rapports sont dans `deploy-v0.3.26/` et `deploy-v0.3.27/`. Le second
-déploiement porte aussi les CGV en version 2, fusionnées avant lui.
+Les rapports sont dans `deploy-v0.3.26/`, `deploy-v0.3.27/` et
+`deploy-v0.3.28/`. Le deuxième déploiement porte aussi les CGV en version 2,
+fusionnées avant lui. Le troisième applique la migration 0046, qui ne
+réécrit qu'un squelette encore marqué : relu avant lui, aucune page de la
+production ne l'était, et les quatre textes sont restés tels quels, date de
+modification comprise.
 
 ## Le nocturne
 
@@ -78,11 +83,13 @@ ce jour-là.
    `v0.3.27`.
 2. La montée reprise annonçait « v0.3.26 → v0.3.26 » : elle lisait son point
    de départ dans le dernier tag local ; corrigé en `v0.3.27`.
-3. La meta description d'une page colle les mots de part et d'autre d'un
+3. La meta description d'une page collait les mots de part et d'autre d'un
    saut de ligne (« parcours decertification ») ; les descriptions de produit
-   aussi. Pour `v0.3.28`.
-4. Les squelettes des pages légales répètent le titre de la page. Pour
-   `v0.3.28`.
+   aussi. Corrigé en `v0.3.28` : les quatre pages de la production disent
+   « parcours de certification » depuis son déploiement.
+4. Les squelettes des pages légales répétaient le titre de la page. Corrigé
+   en `v0.3.28` (migration 0046) pour les boutiques à venir ; le pilote
+   l'avait déjà retiré de ses textes.
 
 ## Les décisions
 
