@@ -158,8 +158,15 @@ export function markdownExcerpt(markdown: string, maxLength = 160): string {
     .filter((token) => token.type === 'inline')
     .map((token) =>
       (token.children ?? [])
-        .filter((child) => child.type === 'text' || child.type === 'code_inline')
-        .map((child) => child.content)
+        // A wrapped line is a softbreak token with no content: it stands for a
+        // space, or the words on either side of it run together.
+        .map((child) =>
+          child.type === 'softbreak' || child.type === 'hardbreak'
+            ? ' '
+            : child.type === 'text' || child.type === 'code_inline'
+              ? child.content
+              : '',
+        )
         .join(''),
     )
     .join(' ')
