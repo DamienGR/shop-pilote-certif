@@ -54,6 +54,7 @@ import {
   mergedCoreTags,
   migrationNotes,
   pendingMigrations,
+  previousCoreTag,
   publishedCoreTags,
   requireCoreRemote,
   rewrittenMigrations,
@@ -348,23 +349,11 @@ export function upgradeShop({
   fetchCoreTags(root);
   const state = coreState(shop, { offline: true });
 
-  reporter.section(`Boutique ${slug} — socle ${state.core.mergedTag ?? 'inconnu'} → ${target.tag}`);
-  if (!hasTag(root, target.tag)) {
-    const known = localCoreTags(root);
-    throw inputError(
-      `le socle ne publie pas de tag « ${target.tag} ».`,
-      known.length > 0
-        ? `Versions connues de ce clone : ${known.join(', ')}.`
-        : 'Ce dépôt ne publie aucun tag de version ; une boutique ne se met à niveau que vers un tag immuable (ADR 0003).',
-    );
-  }
-  reporter.ok(`tag ${target.tag} récupéré depuis « ${CORE_REMOTE} »`);
-
   // ------------------------------------------------ 2. le sens de la marche
   //
   // The branch is decided here rather than further down, because whether this
   // run is a FRESH upgrade or the RESUMPTION of one is decided by which branch
-  // is checked out.
+  // is checked out — and the heading already says where the step starts.
   const branch = branchName ? String(branchName) : upgradeBranch(target.tag);
   const onUpgradeBranch = currentBranch(root) === branch;
   // The base of the pull request: the branch the operator started from. On a
@@ -381,6 +370,24 @@ export function upgradeShop({
   // shop merged, unbumped and unproposed, which is the worst of the three
   // states.
   const resuming = alreadyMerged && onUpgradeBranch;
+  // On a resumption the tag is already merged, so `mergedTag` IS the target:
+  // where the step started is read from the merge that brought it, whose first
+  // parent is the shop before the step. The heading said « v0.3.26 → v0.3.26 »
+  // on the pilot's resumed upgrade (certification, step 11).
+  const fromTag = resuming ? previousCoreTag(root, target.tag) : state.core.mergedTag;
+
+  reporter.section(`Boutique ${slug} — socle ${fromTag ?? 'inconnu'} → ${target.tag}`);
+  if (!hasTag(root, target.tag)) {
+    const known = localCoreTags(root);
+    throw inputError(
+      `le socle ne publie pas de tag « ${target.tag} ».`,
+      known.length > 0
+        ? `Versions connues de ce clone : ${known.join(', ')}.`
+        : 'Ce dépôt ne publie aucun tag de version ; une boutique ne se met à niveau que vers un tag immuable (ADR 0003).',
+    );
+  }
+  reporter.ok(`tag ${target.tag} récupéré depuis « ${CORE_REMOTE} »`);
+
   if (alreadyMerged && !resuming) {
     reporter.ok(`déjà sur ${target.tag} ; rien à fusionner.`);
     return { shop: state.shop, from: state.core.merged, to: target.version, changed: false, upToDate: true };
@@ -393,9 +400,6 @@ export function upgradeShop({
   }
 
   // ---------------------------------------------------- 3. ce que le pas fait
-  // On a resumption the tag is already merged, so `mergedTag` IS the target and
-  // the step's content has to be read from the version before it.
-  const fromTag = resuming ? (state.tags.local.filter((tag) => compareVersions(tag, target.version) < 0).at(-1) ?? null) : state.core.mergedTag;
   const fromVersion = fromTag ? versionFromTag(fromTag) : null;
   const notes = migrationNotes(root, target.tag, { from: fromVersion });
   const migrations = fromTag ? pendingMigrations(root, fromTag, target.tag) : [];
@@ -453,14 +457,18 @@ export function upgradeShop({
   }
 
   const merge = resuming
-    ? { ok: true, conflicts: [], output: '' }
+    ? { ok: true, conflicts: [], resolved: [], output: '' }
     : mergeCoreTag(root, target.tag, { message: `Fusionner le socle ${target.tag}` });
+  const generatedResolved = merge.resolved.length > 0
+    ? `conflit sur ${merge.resolved.length} fichier${merge.resolved.length > 1 ? 's' : ''} généré${merge.resolved.length > 1 ? 's' : ''}, repris du socle : ${merge.resolved.join(', ')}`
+    : null;
   if (!merge.ok) {
     const aborted = abortOnConflict ? abortMerge(root) : false;
     throw verificationError(
       `la fusion de ${target.tag} entre en conflit sur ${merge.conflicts.length} fichier${merge.conflicts.length > 1 ? 's' : ''}.`,
       [
         merge.conflicts.map((entry) => `  ${entry.path} (${entry.owner})`).join('\n'),
+        ...(generatedResolved && !aborted ? [`Déjà résolu : ${generatedResolved} ; la reprise le rend à nouveau.`] : []),
         aborted
           ? `Fusion défaite ; la branche ${branch} est revenue à son état d'avant.`
           : `Résolvez dans ${root}, puis \`git commit\` et relancez la commande — elle reprend la branche ${branch}. \`git merge --abort\` défait tout.`,
@@ -468,6 +476,7 @@ export function upgradeShop({
       { branch, conflicts: merge.conflicts, aborted },
     );
   }
+  if (generatedResolved) reporter.ok(generatedResolved);
   if (!resuming) reporter.ok(`socle ${target.tag} fusionné`);
 
   // ------------------------------------- 5. le manifeste et les fichiers générés

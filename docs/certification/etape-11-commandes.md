@@ -56,11 +56,11 @@ de la campagne n'a rejouée.
 
 | Où | Ce qui est créé, modifié ou détruit |
 |---|---|
-| Cloudflare B | la production redéployée en `v0.3.25`, puis avec `termsVersion` à 2 ; les quatre pages légales réécrites dans sa base ; pour la recette, un produit de recette, et une commande avec son remboursement si elle paie en réel |
+| Cloudflare B | la production redéployée en `v0.3.26`, puis avec `termsVersion` à 2 ; les quatre pages légales réécrites dans sa base ; pour la recette, un produit de recette, et une commande avec son remboursement si elle paie en réel |
 | Stripe live | seulement si la recette paie en réel : une clé restreinte créée puis supprimée, un code promotionnel, un paiement de quelques euros remboursé, ses frais (de l'ordre de 0,30 €) |
 | Resend | les e-mails de la recette |
-| GitHub `minshop-platform` | la pull request de `v0.3.25`, un run `Release` |
-| GitHub `shop-pilote-certif` | la pull request `socle/v0.3.25`, celle de `termsVersion`, deux runs `Deploy` approuvés, la pull request des preuves |
+| GitHub `minshop-platform` | les pull requests de `v0.3.25` et `v0.3.26`, un run `Release` |
+| GitHub `shop-pilote-certif` | la pull request `socle/v0.3.26`, celle de `termsVersion`, deux runs `Deploy` approuvés, la pull request des preuves |
 | Hors des comptes | les textes relus par un conseil, l'avis écrit d'un expert-comptable, le procès-verbal de recette signé, le dossier de décision signé |
 | Cloudflare A, `canari-certif`, Stripe test | rien |
 
@@ -73,7 +73,7 @@ les conclusions.
 
 ## 0. Shell propre
 
-Prérequis : la pull request de `v0.3.25` fusionnée sur le socle.
+Prérequis : les pull requests de `v0.3.25` et `v0.3.26` fusionnées sur le socle.
 
 ```sh
 P=<chemin>/shop-pilote-certif
@@ -97,17 +97,22 @@ marqueurs() {
 marqueurs | tee "$E/pages-avant.txt"     # 200 partout ; 14, 9, 5, 4 : l'état relevé le 2026-10-25
 ```
 
-## 1. Publier `v0.3.25` et monter le pilote
+## 1. Publier `v0.3.26` et monter le pilote
+
+`v0.3.25` n'a pas de tag : `v0.3.26` (Node 22.23.4, Astro 7.4) a été fusionnée
+avant sa publication. Elle porte donc les corrections de `v0.3.25`, et la pull
+request de montée reprend les deux notes de migration. Le poste a besoin de
+Node 22.23.4 : c'est le `nvm install 22` de la section 0.
 
 Sur le socle : GitHub → Actions → **Release** → Run workflow, version
-`0.3.25`. Puis dans le pilote, comme à l'étape 10 :
+`0.3.26`. Puis dans le pilote, comme à l'étape 10 :
 
 ```sh
-npm run shopctl -- core upgrade --to v0.3.25 --open-pr
-gh pr checks socle/v0.3.25 --watch
-gh pr merge socle/v0.3.25 --merge
+npm run shopctl -- core upgrade --to v0.3.26 --open-pr
+gh pr checks socle/v0.3.26 --watch
+gh pr merge socle/v0.3.26 --merge
 git switch main && git pull && npm ci && npm ci --prefix mcp
-npm run shopctl -- core status                       # v0.3.25
+npm run shopctl -- core status                       # v0.3.26
 gh workflow run deploy.yml -f shop=pilote-certif -f environment=production
 sleep 10 && R=$(gh run list --workflow deploy.yml --limit 1 --json databaseId -q '.[0].databaseId') && echo "$R"
 ```
@@ -117,7 +122,7 @@ GitHub → Actions → ce run → **Review deployments** → `production` →
 
 ```sh
 gh run watch "$R"; echo $?
-gh run download "$R" -D "$E/deploy-v0.3.25"
+gh run download "$R" -D "$E/deploy-v0.3.26"
 gh workflow run nightly.yml && sleep 10
 N=$(gh run list --workflow nightly.yml --limit 1 --json databaseId -q '.[0].databaseId')
 gh run watch "$N"; echo $?

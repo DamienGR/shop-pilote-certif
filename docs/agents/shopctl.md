@@ -178,7 +178,13 @@ and never merges a pull request: production stays behind the GitHub
 Environment. It refuses a dirty tree, a
 downgrade, and a version that rewrites a published migration (ADR 0006); a
 conflict is named file by file WITH its ownership and left in the tree, because
-resolving it is git work there. The fleet is DECLARED in `fleet.json` next to
+resolving it is git work there. Except on a GENERATED file: nobody chooses
+between two outputs of a generator, so the new core's copy is taken and the
+upgrade re-renders `wrangler.jsonc` right after — the shop's rendering differs
+from the core's own copy from its first line, and conflicts with every version
+that edits it. Re-run after a hand resolution, the command resumes on the
+upgrade branch, and reads where the step started from the merge's first
+parent, never from the newest local tag below the target. The fleet is DECLARED in `fleet.json` next to
 the shops — never discovered by scanning, because the command writes — and one
 failing shop does not stop the others.
 

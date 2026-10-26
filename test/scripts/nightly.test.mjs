@@ -15,6 +15,24 @@ describe('the nightly workflow', () => {
     expect(workflow).toMatch(/workflow_dispatch:/);
   });
 
+  // ADR 0005's 24-hour RPO, held by two backups a day: GitHub started the
+  // 03:17 run five hours late during the certification, and one run a day left
+  // two archives more than 24 hours apart (step 11). The second schedule runs
+  // the production backup and nothing else.
+  it('backs production up a second time, twelve hours later, and only that', () => {
+    const crons = [...workflow.matchAll(/^\s+- cron: '([^']+)'$/gm)].map((match) => match[1]);
+    expect(crons).toEqual(['17 3 * * *', '17 15 * * *']);
+    const section = workflow.slice(workflow.indexOf('\njobs:\n'));
+    const jobs = [...section.matchAll(/^ {2}([a-z-]+):\n((?: {4}.*\n|\s*\n)+)/gm)].map(([, name, body]) => ({ name, body }));
+    expect(jobs.map((job) => job.name)).toEqual(['suite', 'audit', 'detect', 'staging', 'production-backup', 'production-watch']);
+    const backupOnly = "github.event.schedule != '17 15 * * *'";
+    for (const job of jobs) {
+      const runsAtMidday = ['detect', 'production-backup'].includes(job.name);
+      const condition = job.body.match(/^ {4}if: (.*)$/m)?.[1] ?? '';
+      expect(condition.includes(backupOnly), job.name).toBe(!runsAtMidday);
+    }
+  });
+
   // The night's questions are asked of staging. A production that answered
   // them would be a production that took a test session and a test e-mail.
   // Its two exceptions read: analytics, with a token that can do nothing else,
@@ -48,7 +66,7 @@ describe('the nightly workflow', () => {
   // night. A repository variable retires it, and the run says so.
   it('retires the staging checks once staging is destroyed, and says so', () => {
     const staging = workflow.slice(workflow.indexOf('  staging:'), workflow.indexOf('production-backup:'));
-    expect(staging).toMatch(/if: \$\{\{ needs\.detect\.outputs\.shop != '' && vars\.STAGING_RETIRED == '' \}\}/);
+    expect(staging).toMatch(/if: \$\{\{ needs\.detect\.outputs\.shop != '' && vars\.STAGING_RETIRED == '' && /);
     const detect = workflow.slice(workflow.indexOf('  detect:'), workflow.indexOf('  staging:'));
     expect(detect).toMatch(/STAGING_RETIRED: \$\{\{ vars\.STAGING_RETIRED \}\}/);
     expect(detect).toMatch(/::notice::Staging détruit/);

@@ -100,8 +100,11 @@ défaut et pose sans relecteur, avec son propre jeton (`CLOUDFLARE_API_TOKEN_BAC
 D1 en lecture, Workers R2 Storage en écriture, Account Settings, Memberships et
 User Details en lecture). L'archive part dans le bucket `-backups` de la
 production et `backup verify` l'ouvre avec la clé ; elle n'est jamais restaurée
-sur le runner. Une fois le staging détruit (étape 9), la variable de dépôt
-`STAGING_RETIRED` éteint ses contrôles, ce que le run annonce.
+sur le runner. Un second déclenchement, à 15:17 UTC, ne lance que cette
+sauvegarde : GitHub démarre le run de 03:17 avec plusieurs heures de retard, et
+une seule archive par jour en a déjà laissé deux à plus de 24 h d'écart. Une
+fois le staging détruit (étape 9), la variable de dépôt `STAGING_RETIRED`
+éteint ses contrôles, ce que le run annonce.
 
 Le run nocturne qui échoue est une notification que GitHub envoie déjà ; il n'y
 a pas de second canal à entretenir.

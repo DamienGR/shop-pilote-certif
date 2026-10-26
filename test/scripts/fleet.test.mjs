@@ -508,6 +508,63 @@ describe('shopctl core upgrade', () => {
     expect(agency.github().repos['agence/shop-boutique-un'].pulls).toHaveLength(1);
   });
 
+  // The shop's `wrangler.jsonc` is rendered from its manifest and differs from
+  // the core's own from the first line, so every core version that edits the
+  // core's copy conflicts there. v0.3.26 stopped the pilot's upgrade on it, for
+  // a file the next step re-renders anyway (certification, step 11).
+  it('resolves a conflict on a generated file by itself, and renders it again', () => {
+    const agency = workspace();
+    const shop = agency.shop();
+    const rendered = read(shop, 'wrangler.jsonc');
+    // The Worker's name: the one line every rendering rewrites, whatever the
+    // core's copy is — the committed default here, a template rendering in CI,
+    // whose `run-verify` renders it before the suite.
+    const coreConfig = read(agency.core, 'wrangler.jsonc');
+    const edited = coreConfig.replace(/^(\s*)"name": "[^"]+",$/m, '$1"name": "minshop-next-core",');
+    expect(edited).not.toBe(coreConfig);
+    agency.publish({ files: { 'wrangler.jsonc': edited } });
+
+    const { status, report, stderr } = agency.json(['core', 'upgrade', '--to', TO_TAG], { cwd: shop });
+    expect(status, stderr).toBe(EXIT_CODES.ok);
+    expect(report).toMatchObject({ from: FROM, to: TO, changed: true });
+    expect(stderr).toContain('repris du socle : wrangler.jsonc');
+    // Rendered from the shop's manifest again, not the core's copy, and no marker.
+    expect(read(shop, 'wrangler.jsonc')).toBe(rendered);
+    expect(git(['log', '-2', '--format=%s'], shop).split('\n')).toEqual([
+      `Passer la boutique boutique-un au socle ${TO_TAG}`,
+      `Fusionner le socle ${TO_TAG}`,
+    ]);
+  });
+
+  // Resumed, the step used to start from the newest LOCAL tag below the target.
+  // A shop that skips a version the clone has fetched would then lose that
+  // version's notes and migrations from its pull request.
+  it('resumes a step that skips a version from where the shop was', () => {
+    const agency = workspace();
+    const shop = agency.shop();
+    writeFileSync(join(shop, 'scripts/check-toolchain.mjs'), '// correctif urgent de la boutique\n');
+    git(['add', '-A'], shop);
+    git(['commit', '--quiet', '-m', 'Corriger un fichier du cœur en urgence'], shop);
+    agency.publish();
+    publishVersion(agency.core, {
+      version: NEXT,
+      notes: `# Socle ${NEXT_TAG}\n\n## Migrations\n\n- aucune.\n`,
+      files: { 'scripts/check-toolchain.mjs': '// correctif du socle\n' },
+    });
+    expect(agency.run(['core', 'upgrade', '--to', NEXT_TAG], { cwd: shop }).status).toBe(EXIT_CODES.verification);
+
+    writeFileSync(join(shop, 'scripts/check-toolchain.mjs'), '// correctif urgent de la boutique\n// correctif du socle\n');
+    git(['add', '-A'], shop);
+    git(['commit', '--quiet', '--no-edit'], shop);
+
+    const { status, report, stderr } = agency.json(['core', 'upgrade', '--to', NEXT_TAG], { cwd: shop });
+    expect(status, stderr).toBe(EXIT_CODES.ok);
+    expect(report).toMatchObject({ from: FROM, to: NEXT, changed: true });
+    expect(report.notes.map((note) => note.version)).toEqual([TO, NEXT]);
+    expect(report.migrations).toEqual(['migrations/0044_gift_message.sql']);
+    expect(stderr).toContain(`socle ${FROM_TAG} → ${NEXT_TAG}`);
+  });
+
   it('backs the merge out when asked, leaving the branch clean', () => {
     const agency = workspace();
     const shop = agency.shop();

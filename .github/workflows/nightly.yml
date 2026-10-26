@@ -26,8 +26,9 @@
 #   - production's error rate and quotas (`shopctl monitor`,
 #     docs/operations/README.md), read with a token that can read analytics
 #     and nothing else;
-#   - production's backup (ADR 0005: RPO 24 h), taken in the `backup`
-#     environment `shopctl repo` limits to the default branch, with a token
+#   - production's backup (ADR 0005: RPO 24 h), twice a day — in the night's
+#     run, and alone in a second one at 15:17 UTC (see `schedule`) — taken in
+#     the `backup` environment `shopctl repo` limits to the default branch, with a token
 #     that reads D1 and writes R2 and cannot deploy. The archive goes to
 #     production's own `-backups` bucket and is verified with the key on the
 #     runner; it is never restored there (`restore` refuses a production
@@ -82,6 +83,14 @@ on:
     # reads land in a fresh day, and off the top of the hour, when GitHub's
     # scheduler is busiest and runs late.
     - cron: '17 3 * * *'
+    # 15:17 UTC: production's backup ALONE, every job but `detect` and
+    # `production-backup` skipped. GitHub started the 03:17 run between 08:00
+    # and 09:00 UTC during the certification, and two archives ended up 24 h 54
+    # and 24 h 18 apart: one run a day cannot hold ADR 0005's 24-hour RPO.
+    # Twelve hours apart, a delay of several hours on either run still leaves
+    # every gap far below it (certification, step 11). The second backup reads
+    # every row of the database a second time, which a shop's D1 quota counts.
+    - cron: '17 15 * * *'
   workflow_dispatch:
 
 permissions:
@@ -94,6 +103,7 @@ concurrency:
 jobs:
   suite:
     name: Clean D1 and full suite
+    if: ${{ github.event.schedule != '17 15 * * *' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -105,6 +115,7 @@ jobs:
 
   audit:
     name: Dependency audit
+    if: ${{ github.event.schedule != '17 15 * * *' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -175,7 +186,7 @@ jobs:
     # skipped one showed its expression verbatim. The shop is the repository.
     name: Staging
     needs: detect
-    if: ${{ needs.detect.outputs.shop != '' && vars.STAGING_RETIRED == '' }}
+    if: ${{ needs.detect.outputs.shop != '' && vars.STAGING_RETIRED == '' && github.event.schedule != '17 15 * * *' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: staging
@@ -382,7 +393,7 @@ jobs:
   production-watch:
     name: Production error rate and quotas
     needs: detect
-    if: ${{ needs.detect.outputs.shop != '' }}
+    if: ${{ needs.detect.outputs.shop != '' && github.event.schedule != '17 15 * * *' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
 

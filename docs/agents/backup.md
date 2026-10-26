@@ -83,7 +83,11 @@ production too, in the `backup` GitHub environment (default branch only, a
 token that reads D1 and writes R2, never the deploy token), and `verify`s it
 with the key instead of restoring it: until the launch the staging half carries
 the RPO, and from certification step 9 on, with staging destroyed, a production
-deployed once a month would otherwise be backed up once a month. The bucket's lifecycle rule is
+deployed once a month would otherwise be backed up once a month. It runs TWICE a
+day: a second schedule, twelve hours after the night's, runs that job and
+nothing else, because GitHub started the 03:17 run up to five hours late and one
+run a day left two archives more than 24 hours apart (certification, step 11).
+The bucket's lifecycle rule is
 `--keep-days`' 90, and it is an AGE rule only: R2 cannot count, so the "never
 lose the last one" half of `prune` does not hold there. What holds it instead is
 the nightly run failing loudly — a nightly that stopped is an incident, not a

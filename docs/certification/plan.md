@@ -1154,6 +1154,18 @@ n'a rejouée.
 Fait avancer : jalon 10 (critère de sortie, livrables), §8.8, §11 (point F),
 §12.
 
+Passage commencé le 2026-10-25 au soir. La production du pilote est en
+`v0.3.26` (montée #37, `Deploy` 40236611288) et son nocturne est vert, audit
+des dépendances compris (40237706569). Damien a tranché les trois questions
+du dossier comme il les recommandait : le CPU au plan gratuit sous dérogation
+(§6), le RPO par une seconde sauvegarde quotidienne de la production
+(`v0.3.27`), l'échec réseau temporaire tenu par les preuves. Le pilote est
+une boutique de démonstration : ses pages légales portent une identité
+fictive, signalée en tête de chacune. La montée a trouvé deux défauts de
+`core upgrade`, corrigés en `v0.3.27` : un conflit sur `wrangler.jsonc`,
+fichier généré, arrêtait la fusion, et une montée reprise lisait son point
+de départ dans le dernier tag local plutôt que dans la boutique.
+
 ## 5. Livrables du jalon 10
 
 | Livrable | Produit par |
@@ -1214,3 +1226,17 @@ Fait avancer : jalon 10 (critère de sortie, livrables), §8.8, §11 (point F),
   Risque restant : un rendu propre à Outlook ou à Apple Mail. À rouvrir à la
   première commande réelle d'une boutique dont le commerçant lit ses alertes
   dans Outlook.
+- **CPU au plan gratuit de Workers** (étape 6, décidée et écrite le
+  2026-10-25, étape 11) : la vitrine tient ses 10 ms de CPU à chaud (p50 de 3
+  à 6 ms, p90 de 5 à 11 ms), mais un démarrage à froid ou un rare pic les
+  dépasse, jusqu'à 53 ms sur `GET /` ([rapport de
+  performance](rapport-performance.md)). Damien a choisi de rester au plan
+  gratuit plutôt que de passer au plan Workers Paid ou d'activer le cache.
+  Mesures compensatoires : Cloudflare tolère un dépassement occasionnel ; la
+  surveillance nocturne de la production (`shopctl monitor`) échoue dès
+  qu'une invocation est arrêtée (erreur 1102), et elle est verte chaque nuit
+  depuis l'étape 9 ; le remède est écrit, le passage au plan payant dans le
+  runbook [worker-en-erreur](../operations/runbooks/worker-en-erreur.md).
+  Risque restant : une boutique dont le trafic rend les dépassements
+  réguliers, ce que la charge de vingt acheteurs n'a pas produit. À rouvrir
+  à la première nuit où la surveillance relève une invocation arrêtée.
