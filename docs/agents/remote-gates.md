@@ -82,7 +82,8 @@ through the `production` environment, whose reviewers would hold every night:
 token (`MONITOR_CLOUDFLARE_API_TOKEN`), and `shopctl backup --env production
 --upload` then `backup verify` in the `backup` environment, limited to the
 default branch, with a token that reads D1 and writes R2 (ADR 0005's RPO once
-staging is gone). Once staging is destroyed at the launch, the repository
+staging is gone) — twice a day, the second schedule running that job alone.
+Once staging is destroyed at the launch, the repository
 variable `STAGING_RETIRED` turns the staging half off, with a notice. A check
 whose credential is absent is skipped with a warning, never passed silently.
 `test/scripts/nightly.test.mjs` pins what makes it safe: staging only but for

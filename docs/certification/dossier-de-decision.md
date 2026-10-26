@@ -13,6 +13,11 @@ Assemblé le 2026-10-25, à la fin de l'étape 10, d'après le
 Stripe live ; `v0.3.25` ferme les écarts trouvés en préparant l'étape 11
 ([fiche](etape-11-commandes.md)).
 
+Mis à jour le 2026-10-25 au soir, pendant l'étape 11 : la production est en
+`v0.3.26` (montée #37, run `Deploy` 40236611288), le nocturne 40237706569 est
+vert, audit des dépendances compris, et les décisions de la section 5 sont
+prises.
+
 Les sections 3 et 6 se signent sur un exemplaire gardé hors du dépôt : celui-ci
 est public par ses boutiques.
 
@@ -21,8 +26,8 @@ est public par ses boutiques.
 | Livrable | Où | État au 2026-10-25 |
 |---|---|---|
 | rapport de tests | section 2 de ce dossier, d'après les étapes 3, 4, 6 et 7 | assemblé |
-| rapport de sécurité | [rapport-securite.md](rapport-securite.md) | neuf lignes tenues sur le staging, la porte distante 17/17 sur la production ; l'audit des dépendances rouge depuis le 2026-10-24, fermé par `v0.3.25` |
-| rapport de performance | [rapport-performance.md](rapport-performance.md) | cinq lignes tenues ; la décision sur le CPU reste à prendre (section 5) |
+| rapport de sécurité | [rapport-securite.md](rapport-securite.md) | neuf lignes tenues sur le staging, la porte distante 17/17 sur la production ; l'audit des dépendances, rouge les 24 et 25 octobre, vert de nouveau en `v0.3.26` |
+| rapport de performance | [rapport-performance.md](rapport-performance.md) | cinq lignes tenues ; le CPU au plan gratuit, sous dérogation (section 3) |
 | preuve de restauration | étape 8, pull request #20 du pilote | restauration sur B en 29 min 21 s, 26 tables identiques à l'archive |
 | validation TVA/facturation | étape 11, section 3 de la fiche | à obtenir |
 | checklist de lancement | [mise-en-ligne.md](../operations/mise-en-ligne.md) | écrite à l'étape 9, complétée aux étapes 10 et 11 |
@@ -60,7 +65,7 @@ pull request renvoient au dépôt du pilote, sauf mention.
 
 | Ligne | État | Preuve |
 |---|---|---|
-| aucune vulnérabilité critique ou élevée non justifiée | **rouge depuis le 2026-10-24**, fermée par `v0.3.25` | aucune à l'étape 5 (#11) ; deux alertes élevées publiées depuis (`undici`, `zod`), le nocturne du pilote rouge les 24 et 25 octobre ; à refermer par la montée et un nocturne vert (fiche, section 1) |
+| aucune vulnérabilité critique ou élevée non justifiée | tenue | aucune à l'étape 5 (#11) ; deux alertes élevées publiées depuis (`undici`, `zod`), le nocturne du pilote rouge les 24 et 25 octobre ; montées en `v0.3.25`, le pilote en `v0.3.26` (#37) et son nocturne 40237706569 vert, « Dependency audit » compris (étape 11) |
 | aucune clé dans Git, les journaux ou les artefacts | tenue | étape 5 : l'arbre, tout l'historique et les artefacts du build (#11) |
 | webhooks signés, routes admin protégées, limiteurs actifs, uploads contrôlés, aucune donnée de carte | tenues | porte distante 18/18 sur le staging (#13), 17/17 sur la production (étape 9, #27) |
 | aucune PII inutile dans les journaux | tenue | étape 5 : 531 événements de `wrangler tail` et la trace du webhook relus (#11) |
@@ -83,8 +88,8 @@ pull request renvoient au dépôt du pilote, sauf mention.
 | cinq checkouts concurrents sans survente | tenue | une session, quatre `409` (#18) |
 
 Le CPU n'est pas une ligne du §8, mais le §8.6 demande le plan Workers Paid
-si le plan gratuit dépasse régulièrement sa limite : la décision est à la
-section 5.
+si le plan gratuit dépasse régulièrement sa limite : Damien a choisi le plan
+gratuit sous dérogation (section 5, décision 1).
 
 ### 8.7 Résilience
 
@@ -93,12 +98,12 @@ section 5.
 | Resend indisponible | tenue | étape 4 : clé révoquée, commande écrite, e-mails partis au balayage suivant (#9) |
 | webhook Stripe répété | tenue | étape 4 : aucune seconde commande, aucun remboursement compté deux fois (#9) |
 | média R2 manquant | tenue | étape 8 : la fiche en 200, l'image en 404 sans exception (#20) |
-| échec réseau temporaire | **sans ligne de campagne** | aucune étape ne le rejoue ; tenue par les tests du socle (file d'e-mails relâchée puis retentée, étiquette d'expédition à l'issue ambiguë) et vue en réel trois fois : une lecture D1 distante en échec puis passée (étapes 9 et 10), la propagation de Cloudflare attendue par le test de fumée (étape 7). Section 5 |
+| échec réseau temporaire | tenue par les preuves (section 5, décision 3) | aucune étape ne le rejoue ; tenue par les tests du socle (file d'e-mails relâchée puis retentée, étiquette d'expédition à l'issue ambiguë) et vue en réel trois fois : une lecture D1 distante en échec puis passée (étapes 9 et 10), la propagation de Cloudflare attendue par le test de fumée (étape 7) |
 | rotation des secrets | tenue | étape 8 : `AUTH_SECRET`, les sessions tombent et rien d'autre (#20) ; la clé Resend remplacée à l'étape 4 |
 | mot de passe admin perdu | tenue | étape 8, le runbook suivi tel quel (#20) |
 | rollback Worker | tenue | étape 8 : la version précédente à 100 %, puis retour (#20) |
 | restauration complète, RTO ≤ 60 min | tenues | étape 8 : 29 min 21 s vers le compte B (#20) |
-| RPO ≤ 24 h | **tenue au sens « une archive par nuit »** | cinq nuits de suite à l'étape 8, la production chaque nuit depuis l'étape 9 ; mais GitHub lance le cron de 03:17 entre 8 et 9 h UTC, et deux archives ont été séparées de 24 h 54 sur le staging (18 → 19 octobre), 24 h 18 sur la production (24 → 25 octobre). Section 5 |
+| RPO ≤ 24 h | **à tenir par `v0.3.27`** (section 5, décision 2) | cinq nuits de suite à l'étape 8, la production chaque nuit depuis l'étape 9 ; mais GitHub lance le cron de 03:17 entre 8 et 9 h UTC, et deux archives ont été séparées de 24 h 54 sur le staging (18 → 19 octobre), 24 h 18 sur la production (24 → 25 octobre). `v0.3.27` sauvegarde la production une seconde fois, à 15:17 UTC : la ligne est tenue quand le pilote l'a prise et qu'un run de l'après-midi est vert |
 
 ### 8.8 Conformité et validation humaine
 
@@ -132,9 +137,10 @@ Hors du §8, prévues au même §6 sans date : à dater en les signant.
 | test de fumée avant promotion (§5.5, jalon 6) | une version cassée sert jusqu'au retour arrière que le test de fumée public nomme | Cloudflare ouvre les déploiements graduels à ce plan | |
 | approbation de production opposable (§9) | sans objet pour le pilote, dont les dépôts sont publics ; une boutique privée demande GitHub Pro, ou repose sur `--yes` et un seul ayant droit | une boutique en dépôt privé | |
 | critère 320 px de WCAG 1.4.10 (jalon 5) | un débordement horizontal sur un très petit écran, mesuré et non gaté ; le §8.5 demande le zoom à 200 %, tenu | une boutique annonce la conformité WCAG, ou la porte navigateur le gate | |
+| CPU au plan gratuit de Workers (§8.6, rapport de performance ; écrite le 2026-10-25) | une boutique dont le trafic rend réguliers les dépassements de 10 ms, que la charge de vingt acheteurs n'a pas produits | la surveillance nocturne relève une invocation arrêtée (erreur 1102) | |
 
-S'y ajoutent, selon les décisions de la section 5, une dérogation sur le CPU,
-sur le RPO, ou sur l'échec réseau temporaire.
+Les décisions de la section 5 n'en ajoutent pas d'autre : le RPO se ferme par
+`v0.3.27`, l'échec réseau temporaire est tenu par les preuves de la section 2.
 
 ## 4. Documentation du §12
 
@@ -181,6 +187,15 @@ les suivre seul.
    Recommandation : **la tenir par les preuves de la section 2**, en l'écrivant
    ici, plutôt que d'inventer une panne pour la campagne.
 
+**Décidé par Damien le 2026-10-25**, les trois recommandations suivies :
+
+1. le CPU reste au **plan gratuit, sous dérogation** : écrite au §6 du plan
+   et à la section 3, à signer ;
+2. le RPO est tenu par **un second déclenchement** : `v0.3.27` sauvegarde la
+   production une seconde fois chaque jour, à 15:17 UTC, et ne lance rien
+   d'autre à cette heure-là ;
+3. l'échec réseau temporaire est **tenu par les preuves** de la section 2.
+
 ## 6. Décision (point F)
 
 Conditions d'un **go** :
@@ -191,7 +206,11 @@ Conditions d'un **go** :
   le résultat (ADR 0010 : sans elle, aucune boutique ne passe en production
   pour vendre) ;
 - le procès-verbal de recette signé, sans anomalie bloquante ;
-- `v0.3.25` publiée, le pilote monté, un nocturne vert.
+- `v0.3.26` publiée (elle porte les corrections de `v0.3.25`, jamais
+  taguée), le pilote monté, un nocturne vert — fait le 2026-10-25 (#37,
+  `Deploy` 40236611288, nocturne 40237706569) ;
+- `v0.3.27` publiée, le pilote monté, un run de l'après-midi vert : la ligne
+  RPO.
 
 Ce que la décision dit aussi : ce que devient la boutique `pilote-certif`
 (laissée fermée, rouverte avec des clés live pour vendre, ou supprimée par

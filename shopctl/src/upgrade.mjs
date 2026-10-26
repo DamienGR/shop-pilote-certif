@@ -127,10 +127,31 @@ export function localCoreTags(cwd) {
  * difference between a shop that received an upgrade and one that was merely
  * offered it.
  */
-export function mergedCoreTags(cwd) {
-  const result = git(cwd, ['tag', '--list', '--merged', 'HEAD']);
+export function mergedCoreTags(cwd, ref = 'HEAD') {
+  const result = git(cwd, ['tag', '--list', '--merged', ref]);
   if (result.status !== 0) return [];
   return lines(result.stdout).filter(isCoreTag).sort(compareVersions);
+}
+
+/**
+ * The core tag a shop was on BEFORE the merge that brought `tag`, read from
+ * that merge's first parent.
+ *
+ * Asked on a resumption, when `tag` is already merged into HEAD. "The newest
+ * local tag below the target" is not the same question: a shop on v0.3.24
+ * resuming its step to v0.3.26 in a clone that has fetched v0.3.25 would start
+ * from v0.3.25, and its pull request would drop that version's notes and
+ * migrations. Null when no merge on the first-parent line carries `tag`.
+ */
+export function previousCoreTag(cwd, tag) {
+  const merges = git(cwd, ['rev-list', '--first-parent', '--merges', 'HEAD']);
+  if (merges.status !== 0) return null;
+  for (const commit of lines(merges.stdout)) {
+    if (git(cwd, ['merge-base', '--is-ancestor', tag, `${commit}^2`]).status !== 0) continue;
+    if (git(cwd, ['merge-base', '--is-ancestor', tag, `${commit}^1`]).status === 0) continue;
+    return mergedCoreTags(cwd, `${commit}^1`).at(-1) ?? null;
+  }
+  return null;
 }
 
 /** The core version this shop is actually on, from its history. Null when no
@@ -260,18 +281,26 @@ export function checkoutBranch(cwd, branch) {
  * in that tree and an automatic `--abort` would throw away the only copy of the
  * three-way state the operator needs. The caller decides what to say about it.
  *
- * @returns {{ ok: boolean, conflicts: Array<{ path: string, owner: string }>, output: string }}
+ * A conflict on a GENERATED file is the exception, and is resolved here: nobody
+ * chooses between two outputs of a generator. The new core's copy is taken, and
+ * the upgrade re-renders `wrangler.jsonc` from the shop's manifest right after.
+ * The shop's rendering conflicts with the core's own `wrangler.jsonc` at every
+ * version that edits it, since the two differ from the first line: v0.3.26
+ * stopped the pilot's upgrade there for a file the next step rewrote anyway
+ * (certification, step 11).
+ *
+ * @returns {{ ok: boolean, conflicts: Array<{ path: string, owner: string }>, resolved: string[], output: string }}
  */
 export function mergeCoreTag(cwd, tag, { message } = {}) {
   const result = git(cwd, ['merge', '--no-ff', '--no-edit', ...(message ? ['-m', message] : []), tag]);
-  if (result.status === 0) return { ok: true, conflicts: [], output: result.stdout.trim() };
+  if (result.status === 0) return { ok: true, conflicts: [], resolved: [], output: result.stdout.trim() };
 
   const unmerged = git(cwd, ['diff', '--name-only', '--diff-filter=U']);
-  const conflicts = lines(unmerged.stdout).map((path) => ({
+  const found = lines(unmerged.stdout).map((path) => ({
     path,
     owner: classifyPath(path)?.owner ?? 'unclassified',
   }));
-  if (conflicts.length === 0) {
+  if (found.length === 0) {
     // Not a conflict: the merge itself refused (unrelated histories, a tag that
     // is not an ancestor of anything, an index git could not lock). Relaying
     // git's own first line beats inventing a diagnosis.
@@ -280,7 +309,24 @@ export function mergeCoreTag(cwd, tag, { message } = {}) {
       lines(result.stderr).at(0) ?? lines(result.stdout).at(0) ?? null,
     );
   }
-  return { ok: false, conflicts, output: `${result.stdout}${result.stderr}`.trim() };
+
+  const resolved = [];
+  for (const entry of found) {
+    if (entry.owner !== 'generated') continue;
+    if (git(cwd, ['checkout', '--theirs', '--', entry.path]).status !== 0) continue;
+    if (git(cwd, ['add', '--', entry.path]).status === 0) resolved.push(entry.path);
+  }
+  const conflicts = found.filter((entry) => !resolved.includes(entry.path));
+  if (conflicts.length > 0) {
+    return { ok: false, conflicts, resolved, output: `${result.stdout}${result.stderr}`.trim() };
+  }
+  // Every conflict was a generated file: the merge commit is the record, with
+  // the message the merge was given.
+  const commit = git(cwd, ['commit', '--quiet', '--no-edit']);
+  if (commit.status !== 0) {
+    throw externalError(`la fusion de ${tag} n'a pas pu être validée.`, lines(commit.stderr).at(0) ?? null);
+  }
+  return { ok: true, conflicts: [], resolved, output: `${result.stdout}${result.stderr}`.trim() };
 }
 
 /** Back out of a merge that conflicted, leaving the branch as it was. */
