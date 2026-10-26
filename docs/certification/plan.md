@@ -1164,7 +1164,20 @@ une boutique de démonstration : ses pages légales portent une identité
 fictive, signalée en tête de chacune. La montée a trouvé deux défauts de
 `core upgrade`, corrigés en `v0.3.27` : un conflit sur `wrangler.jsonc`,
 fichier généré, arrêtait la fusion, et une montée reprise lisait son point
-de départ dans le dernier tag local plutôt que dans la boutique.
+de départ dans le dernier tag local plutôt que dans la boutique. Les pages en
+ligne ont montré deux défauts du socle, corrigés en `v0.3.28` : la meta
+description collait les mots de part et d'autre d'un saut de ligne
+(« parcours decertification »), et chaque page légale affichait son titre deux
+fois, les squelettes de 0040 le répétant en tête du texte.
+
+Le 2026-10-26, `v0.3.27` publiée et la montée du pilote ouverte (#40), les
+quatre pages légales saisies, sans marqueur. Damien a reporté la relecture
+juridique et la validation comptable à la première boutique réelle, sous
+deux dérogations (§6) : le vendeur du pilote n'existe pas, et ce qu'un
+conseil ou un expert-comptable dirait de lui ne vaudrait pour personne. La
+recette, d'abord voulue réelle, est tenue par les preuves des étapes 4 à 11,
+qui ont joué chacun de ses scénarios ; la personne extérieure attend la
+recette de livraison de la première boutique réelle, sous dérogation (§6).
 
 ## 5. Livrables du jalon 10
 
@@ -1240,3 +1253,42 @@ de départ dans le dernier tag local plutôt que dans la boutique.
   Risque restant : une boutique dont le trafic rend les dépassements
   réguliers, ce que la charge de vingt acheteurs n'a pas produit. À rouvrir
   à la première nuit où la surveillance relève une invocation arrêtée.
+- **relecture des pages légales et du consentement aux CGV** (étape 11,
+  écrite le 2026-10-26) : le pilote est une boutique de démonstration, au
+  vendeur fictif ; ses quatre pages sont écrites en entier et l'annoncent en
+  tête. Mesures compensatoires : les textes d'une boutique sont ceux du
+  commerçant ([matrice des responsabilités](../operations/responsabilites.md)),
+  et la [mise en ligne](../operations/mise-en-ligne.md) les demande relus par
+  un conseil ; une page légale naît en brouillon (migration 0040), et la
+  production refuse d'en publier une qui porte un marqueur (`v0.3.25`) ; le
+  consentement tient (étape 4) : la case, le refus du serveur sans elle, la
+  version et l'heure sur chaque commande et dans l'export. Risque restant :
+  un point du parcours (la case, le bouton de paiement, le récapitulatif)
+  qu'un conseil jugerait insuffisant, à reprendre dans le socle. À rouvrir à
+  la première boutique réelle, dont les textes et le parcours sont relus
+  avant la mise en ligne, avec la section 2 de la
+  [fiche de l'étape 11](etape-11-commandes.md).
+- **validation TVA et facturation** (étape 11, écrite le 2026-10-26) : le
+  pilote ne vend pas, ses commandes sont des tests remboursés. Mesures
+  compensatoires : `invoiceStrategy` reste `pending-validation`, que l'ADR
+  0010 interdit de mettre en production pour vendre ; la mise en ligne
+  demande la réponse écrite de l'expert-comptable ; la ventilation de la TVA
+  est tirée une fois du total payé (`vatIncludedCents()`), et l'export porte
+  le taux, la TVA incluse et le net. Risque restant : une réponse qui demande
+  ce que le socle n'a pas — une facture numérotée, la franchise en base, ou
+  le reçu de la boutique comme valeur de `invoiceStrategy` —, un
+  développement avant la première vente. À rouvrir à la première boutique
+  réelle, avec les questions de la section 3 de la fiche.
+- **recette par une personne extérieure** (étape 11, écrite le 2026-10-26) :
+  le procès-verbal ferait confirmer au vendeur fictif du pilote des textes
+  qui ne sont pas les siens, et chaque scénario du
+  [modèle](../operations/recette.md) a déjà été joué, en test et en réel, par
+  les étapes 4 à 11 ([dossier](dossier-de-decision.md), section 5). Mesures
+  compensatoires : ces preuves, scénario par scénario ; la porte navigateur
+  et la porte distante à chaque version ; la
+  [mise en ligne](../operations/mise-en-ligne.md) demande la recette et son
+  procès-verbal signé avant que la boutique s'annonce. Risque restant : ce
+  que seule une personne extérieure voit, un libellé ou un chemin qu'elle ne
+  suit pas sans explication orale ; et l'alerte du commerçant, jamais lue en
+  production. À rouvrir à la recette de livraison de la première boutique
+  réelle.

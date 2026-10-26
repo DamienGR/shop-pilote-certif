@@ -134,12 +134,22 @@ voient les clients. Ensuite, dans Admin → Réglages :
   avec lui : la boutique envoie déjà le sien, et Stripe en ajoute un second si
   « Paiements réussis » est activé dans ses E-mails aux clients ;
 - [ ] les **pages légales** écrites par le commerçant, relues par un conseil
-  et publiées, le menu du pied de page. Aucune ne garde un « [À COMPLÉTER] » :
+  et publiées, le menu du pied de page. La page affiche son titre : le texte
+  ne le répète pas en `# Titre`, sans quoi il paraît deux fois (les squelettes
+  l'ont fait jusqu'à `v0.3.28`). Aucune ne garde un « [À COMPLÉTER] » :
   depuis `v0.3.25`, la production refuse d'en publier une, mais elle laisse en
   ligne celle qui l'était déjà (la production du pilote a vendu sous des CGV
   en squelette, étape 11 de la certification). Avant la première commande,
   `legal.termsVersion` dans `src/store.config.ts` nomme le texte publié ;
   il monte à chaque changement que l'acheteur devrait réaccepter.
+- [ ] la **TVA et la facturation** validées par écrit par l'expert-comptable
+  du commerçant, sur les questions de la section 3 de la
+  [fiche de l'étape 11](../certification/etape-11-commandes.md), et
+  `commerce.invoiceStrategy` qui en dit le résultat : un manifeste qui porte
+  encore `pending-validation` ne vend pas ([ADR 0010](../architecture/decisions/0010-tva-facturation-et-consentement.md)).
+  Une facture numérotée ou la franchise en base, si la réponse les demande,
+  se construisent dans le socle avant la première vente (la certification
+  les a reportées à la première boutique réelle).
 
 Les contenus sont saisis sur B, jamais recopiés depuis A (ADR 0015) : le
 catalogue par l'administration, ou par `shopctl catalog import --env production`
@@ -171,6 +181,15 @@ gh workflow run nightly.yml
 
 Attendu : `Production backup` vert, `backup verify` qui ouvre l'archive avec la
 clé ; `Production error rate and quotas` vert.
+
+Enfin la **recette**, sur la boutique publique, avec un vrai paiement
+remboursé : le commerçant, ou une personne qu'il désigne et qui n'a ni
+développé ni exploité la boutique, avec le [modèle](recette.md) seul.
+
+- [ ] le procès-verbal signé, sans anomalie bloquante. Il marque la
+  livraison : la boutique ne s'annonce qu'après. La certification n'a pas
+  fait faire la sienne au pilote, dont le vendeur est fictif : la première
+  boutique réelle est la première à passer par une personne extérieure.
 
 ## 7. Détruire la copie de l'agence
 

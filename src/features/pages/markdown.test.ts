@@ -234,6 +234,14 @@ describe('markdownExcerpt', () => {
     expect(excerpt).toBe('Returns We accept returns within 30 days.');
   });
 
+  it('keeps a space where the source wraps a line', () => {
+    // A wrapped paragraph's line break is a softbreak token, not text: dropped,
+    // it glued "parcours de\ncertification" into "decertification" on a store.
+    const excerpt = markdownExcerpt('Ce site sert à éprouver le parcours de\ncertification du socle.');
+    expect(excerpt).toBe('Ce site sert à éprouver le parcours de certification du socle.');
+    expect(markdownExcerpt('Première ligne  \nseconde ligne')).toBe('Première ligne seconde ligne');
+  });
+
   it('truncates on a word boundary with an ellipsis', () => {
     const excerpt = markdownExcerpt('word '.repeat(60), 40);
     expect(excerpt.length).toBeLessThanOrEqual(40);

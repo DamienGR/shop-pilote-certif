@@ -777,6 +777,15 @@ if [[ "$terms_draft" != "0" ]]; then
   echo "D1 integration failed: the terms page ships published (expected a draft, got published=$terms_draft)" >&2
   exit 1
 fi
+# The page prints its title above the body: a skeleton that opens on its own
+# `# <title>` showed it twice, and the merchant's text kept it (migration 0046).
+terms_opening="$(npx wrangler d1 execute DB --local --persist-to "$state_dir" --json \
+  --command "SELECT substr(body_markdown, 1, 2) AS opening FROM pages WHERE slug = 'conditions-generales-de-vente';" |
+  node -e 'let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s)[0].results[0].opening))')"
+if [[ "$terms_opening" == "# " ]]; then
+  echo "D1 integration failed: the terms skeleton repeats its title as a heading (the page already prints it)" >&2
+  exit 1
+fi
 npx wrangler d1 execute DB --local --persist-to "$state_dir" \
   --command "UPDATE pages SET published = 1 WHERE slug = 'conditions-generales-de-vente'" >/dev/null
 stock_before_refusal="$(npx wrangler d1 execute DB --local --persist-to "$state_dir" --json \
