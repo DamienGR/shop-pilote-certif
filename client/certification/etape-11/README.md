@@ -27,8 +27,8 @@ déploiements, et saisi les pages. Les heures sont en UTC.
 | validation TVA et facturation par un expert-comptable | ce README | **dérogation** : `invoiceStrategy` reste `pending-validation` ; le courrier et ses cinq questions sont prêts, hors du dépôt |
 | recette par une personne extérieure | ce README, le dossier (section 5) | **dérogation** : chaque scénario du modèle joué par les étapes 4 à 11, scénario par scénario dans le dossier |
 | documentation du §12 complète | le dossier, section 4 | chaque document présent ; les quatre écrits pour l'étape relus par Damien le 2026-10-26, sans remarque |
-| rapports assemblés, dérogations signées | le dossier, sections 2 et 3 | (à venir) |
-| décision go/no-go (point F) | le dossier, section 6 | (à venir) |
+| rapports assemblés, dérogations acceptées | le dossier, sections 2 et 3 | chaque critère du §8 tenu ou sous dérogation ; les dix dérogations acceptées par écrit par Damien le 2026-10-27, sans exemplaire signé |
+| décision go/no-go (point F) | le dossier, section 6 | **go sous conditions**, le 2026-10-27 |
 
 ## Les déploiements
 
@@ -114,4 +114,11 @@ Prises par Damien, écrites dans la section 5 du dossier :
    extérieure attendant la recette de livraison de la première boutique
    réelle, sous dérogation.
 
-La décision du point F : (à venir).
+La décision du point F, prise par Damien le 2026-10-27 à 21:02 : **go sous
+conditions**. Les trois conditions (la relecture par un conseil, la réponse
+écrite d'un expert-comptable, la recette par une personne extérieure) sont
+tenues par la première boutique réelle avant sa première vente. Le pilote
+reste fermé, boutique de référence montée à chaque version du socle ; au
+premier client sont promises les limites du plan gratuit. Aucun exemplaire
+signé : Damien a accepté les dérogations et la décision par écrit, dans la
+session de l'agent, ce que le critère de sortie du jalon 10 demande.
