@@ -56,9 +56,14 @@ depuis l'étape 9.
 `v0.3.28`, vert en entier, le 2026-10-27. GitHub l'a lancé à 09:07, près de
 six heures après son heure.
 
-La ligne RPO : (à venir) le premier run de l'après-midi, à 15:17 UTC, que
-`v0.3.27` ajoute. La montée a été fusionnée à 15:46 le 26, après le créneau de
-ce jour-là.
+`nocturne-apres-midi.txt` : le run 40574601169, le premier du créneau de
+15:17 que `v0.3.27` ajoute (la montée a été fusionnée à 15:46 le 26, après
+le créneau de ce jour-là), le 2026-10-27. GitHub l'a lancé à 20:03. Seuls
+« Is this a shop? » et « Production backup » ont tourné, verts ; la suite,
+l'audit et `monitor` sont restés au run du matin. La ligne RPO tient : deux
+archives de la production le même jour, `pilote-certif-production-20261027T090839Z`
+et `pilote-certif-production-20261027T200412Z`, à 10 h 56 d'écart, la
+seconde ouverte par `backup verify` dans le même run.
 
 ## Ce qui ne laisse pas de fichier
 
