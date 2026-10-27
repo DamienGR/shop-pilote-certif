@@ -1,0 +1,38 @@
+
+✓ main Nightly · 40237706569
+Triggered via workflow_dispatch about 5 minutes ago
+
+JOBS
+✓ Dependency audit in 12s (ID 121302721742)
+✓ Is this a shop? in 4s (ID 121302721889)
+✓ Clean D1 and full suite in 5m22s (ID 121302721900)
+✓ Production error rate and quotas in 25s (ID 121302748491)
+✓ Production backup in 1m5s (ID 121302748515)
+- Staging in 0s (ID 121302750338)
+
+ANNOTATIONS
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+Dependency audit: .github#1
+
+- Staging détruit le 2026-10-23 (variable STAGING_RETIRED) : ses contrôles ne tournent plus ; la production est sauvegardée et surveillée.
+Is this a shop?: .github#17
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+Is this a shop?: .github#1
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+Clean D1 and full suite: .github#1
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+Production error rate and quotas: .github#1
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+Production backup: .github#1
+
+
+ARTIFACTS
+nightly-pilote-certif-production-backup-40237706569
+nightly-pilote-certif-production-40237706569
+
+For more information about a job, try: gh run view --job=<job-id>
+View this run on GitHub: https://github.com/DamienGR/shop-pilote-certif/actions/runs/40237706569

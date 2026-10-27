@@ -1,0 +1,4 @@
+conditions-generales-de-vente 200 0
+mentions-legales 200 0
+politique-de-confidentialite 200 0
+droit-de-retractation 200 0

@@ -1,0 +1,78 @@
+
+✓ main Nightly · 40574601169
+Triggered via schedule about 5 minutes ago
+
+JOBS
+✓ Is this a shop? in 6s (ID 122437518188)
+- Clean D1 and full suite in 0s (ID 122437520806)
+- Dependency audit in 0s (ID 122437520824)
+✓ Production backup in 1m11s (ID 122437597911)
+- Staging in 0s (ID 122437600263)
+- Production error rate and quotas in 0s (ID 122437601129)
+
+ANNOTATIONS
+- Staging détruit le 2026-10-23 (variable STAGING_RETIRED) : ses contrôles ne tournent plus ; la production est sauvegardée et surveillée.
+Is this a shop?: .github#17
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+Is this a shop?: .github#1
+
+- "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"
+Production backup: .github#1
+
+
+ARTIFACTS
+nightly-pilote-certif-production-backup-40574601169
+
+For more information about a job, try: gh run view --job=<job-id>
+View this run on GitHub: https://github.com/DamienGR/shop-pilote-certif/actions/runs/40574601169
+
+Production backup (job 122437597911), lignes de shopctl backup puis backup verify :
+✓ SHOPCTL_BACKUP_KEY — clé a08808754f049baf
+✓ Miijot (***)
+✓ wrangler.jsonc rendu pour minshop-pilote-certif-production
+✓ 26 table(s), schéma 0046_legal_pages_title_once.sql (47 migration(s) appliquée(s))
+✓ index non sauvegardés, reconstruits à la restauration : products_fts
+✓ 106 ligne(s) lues
+✓ 8 image(s), 0 fichier(s) privé(s)
+✓ 8 objet(s) emportés
+✓ pilote-certif-production-20261027T200412Z — 12442 octet(s) chiffrés
+✓ pilote-certif-production-20261027T200412Z copiée dans minshop-pilote-certif-production-backups (10 fichier(s))
+✓ pilote-certif — production, 2026-10-27T20:04:23.774Z, socle 0.3.28
+✓ taille du corps — 12442 octet(s), le manifeste en annonce 12442
+✓ empreinte du corps — 62d2b886454fef62198ef5dfaedebfa15b6b5062fe6a2af576fda5fcc7d6e8b5
+✓ objet media/053b6b97fc5ccaf2b08c.png — intact
+✓ objet media/57d97735a1aad93e22d6.png — intact
+✓ objet media/9a337e73d21f749e20e3.png — intact
+✓ objet media/b630063abd1cec42c79d.png — intact
+✓ objet media/bde9ce8d5d67b3a6925c.png — intact
+✓ objet media/c305815dae2ad10c293b.png — intact
+✓ objet media/c35201cd8b09cc286be4.png — intact
+✓ objet media/e9df9de207b06c5bf0b8.png — intact
+✓ ouverture — authentifiée par le manifeste en clair
+✓ table admin_login_attempts — 1 ligne(s)
+✓ table categories — 4 ligne(s)
+✓ table checkout_reservations — 1 ligne(s)
+✓ table media — 8 ligne(s)
+✓ table menu_items — 4 ligne(s)
+✓ table order_guest_access — 1 ligne(s)
+✓ table order_item_ids — 1 ligne(s)
+✓ table order_reference_aliases — 0 ligne(s)
+✓ table orders — 1 ligne(s)
+✓ table pages — 4 ligne(s)
+✓ table pending_payments — 0 ligne(s)
+✓ table products — 21 ligne(s)
+✓ table refund_sync_events — 1 ligne(s)
+✓ table settings — 13 ligne(s)
+✓ table sweep_cursors — 0 ligne(s)
+✓ table order_inventory_exceptions — 0 ligne(s)
+✓ table order_items — 1 ligne(s)
+✓ table order_notifications — 2 ligne(s)
+✓ table page_media — 0 ligne(s)
+✓ table product_categories — 23 ligne(s)
+✓ table product_extras — 0 ligne(s)
+✓ table product_images — 10 ligne(s)
+✓ table product_variants — 9 ligne(s)
+✓ table refunds — 1 ligne(s)
+✓ table shipping_label_attempts — 0 ligne(s)
+✓ table shipping_labels — 0 ligne(s)
