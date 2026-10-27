@@ -26,7 +26,7 @@ déploiements, et saisi les pages. Les heures sont en UTC.
 | relecture des pages légales et du consentement aux CGV | `pages-avant.txt`, `pages-apres.txt`, `pages.json` | 14, 9, 5 et 4 lignes à marqueur avant ; 0 après, 200 partout ; les textes en ligne identiques aux projets ; les CGV en version 2 (#39). La relecture par un conseil : **dérogation** |
 | validation TVA et facturation par un expert-comptable | ce README | **dérogation** : `invoiceStrategy` reste `pending-validation` ; le courrier et ses cinq questions sont prêts, hors du dépôt |
 | recette par une personne extérieure | ce README, le dossier (section 5) | **dérogation** : chaque scénario du modèle joué par les étapes 4 à 11, scénario par scénario dans le dossier |
-| documentation du §12 complète | le dossier, section 4 | (à venir) |
+| documentation du §12 complète | le dossier, section 4 | chaque document présent ; les quatre écrits pour l'étape relus par Damien le 2026-10-26, sans remarque |
 | rapports assemblés, dérogations signées | le dossier, sections 2 et 3 | (à venir) |
 | décision go/no-go (point F) | le dossier, section 6 | (à venir) |
 
@@ -51,6 +51,10 @@ modification comprise.
 premier déploiement, vert en entier, audit des dépendances compris (rouge les
 24 et 25 octobre, avant `v0.3.26`). Le staging est sauté : il est détruit
 depuis l'étape 9.
+
+`nocturne-matin.txt` : le run 40478447587, le premier du créneau de 03:17 en
+`v0.3.28`, vert en entier, le 2026-10-27. GitHub l'a lancé à 09:07, près de
+six heures après son heure.
 
 La ligne RPO : (à venir) le premier run de l'après-midi, à 15:17 UTC, que
 `v0.3.27` ajoute. La montée a été fusionnée à 15:46 le 26, après le créneau de
