@@ -48,6 +48,10 @@ Quatre règles valent pour tous :
   brute de ces runbooks se lance avec `CLOUDFLARE_ACCOUNT_ID=<id>` devant, l'id
   du compte de l'environnement (`cloudflare.accountId`, ou
   `cloudflare.productionAccountId` pour la production). `shopctl` le fait seul.
+  Sur le compte mutualisé (ADR 0019), une commande brute atteint toutes les
+  boutiques : le nom de la ressource (`minshop-<slug>-<env>…`) se relit avant
+  de l'exécuter. `shopctl` relit le marqueur de propriétaire de la base ;
+  wrangler, non.
 
 ## Supervision
 
@@ -108,6 +112,36 @@ fois le staging détruit (étape 9), la variable de dépôt `STAGING_RETIRED`
 
 Le run nocturne qui échoue est une notification que GitHub envoie déjà ; il n'y
 a pas de second canal à entretenir.
+
+### Sur le compte mutualisé
+
+Le dépôt d'une boutique du compte mutualisé ne porte aucun jeton Cloudflare
+(ADR 0019) : la variable `MINSHOP_FLEET` y nomme le dépôt de flotte, et son
+Nightly ne garde que la suite, l'audit et les portes distantes. Le Nightly du
+dépôt de flotte fait le reste pour chaque boutique de `fleet.json`, une à la
+fois : la sauvegarde de la production à 03:17 et 15:17 UTC, contrôlée avec la
+clé, et `monitor` au plan du compte, que la variable `MINSHOP_ACCOUNT_PLAN` du
+dépôt de flotte nomme (`paid` si elle est absente). Une boutique en échec
+n'arrête pas les autres, et son job porte son slug.
+
+En Workers Paid, ce qui remplace les quotas, c'est la facture : chaque nuit,
+`shopctl fleet usage` compare la consommation du mois du compte entier aux
+volumes inclus et projette la facture. Le job échoue si elle dépasse la
+variable `MINSHOP_MONTHLY_BUDGET` du dépôt de flotte, ou si le compte porte
+deux cents Workers : c'est le moment d'ouvrir un second compte (ADR 0019),
+avant le plafond de 250 crons. Son rapport classe les Workers les plus actifs :
+une dérive de la facture a presque toujours une boutique.
+
+En Workers Free (`MINSHOP_ACCOUNT_PLAN=free`, le démarrage du compte avec une
+ou deux très petites boutiques), les quotas du jour sont ceux du compte :
+`fleet usage --plan free` additionne les boutiques du jour le plus chargé, et
+échoue à 70 % d'un quota, sur une invocation arrêtée, sur une base proche de
+ses 500 Mo, ou à cinq Workers (cinq crons, le plafond du plan). Chacun de ces
+échecs est le jour de passer le compte en Paid : tableau de bord → Workers &
+Pages → Plans, puis `gh variable set MINSHOP_ACCOUNT_PLAN --body paid -R
+<propriétaire/flotte>`. Le passage lève les limites en quelques minutes, sans
+redéployer. Le Nightly ne regarde qu'une fois par jour : un pic soudain se
+découvre en panne, et le même passage la répare.
 
 ### Ce qui reste manuel
 

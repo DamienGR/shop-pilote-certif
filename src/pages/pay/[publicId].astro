@@ -98,7 +98,9 @@ if (
 // abandoned tab can't poll forever and an expired demo can't settle.
 const lightningExpired = isLightning && payExpired;
 
-const { storeName } = getConfig();
+// The name set in Admin → Réglages, as the header shows it — not the build-time
+// default, which reads « Ma boutique » on a shop named in /admin/setup.
+const storeName = Astro.locals.settings?.storeName ?? getConfig().storeName;
 const title = isDemo ? t('pay.demo.title') : t('pay.lightning.title');
 const description = isDemo
   ? t('pay.demo.description', { boutique: storeName })
@@ -118,6 +120,6 @@ const description = isDemo
       <p class="text-muted">{t('pay.demo.expired.body')}</p>
     </Fragment>
   )}
-  {isDemo && !demoClosed && !payExpired && <DemoCheckout pending={pending} declined={declined} />}
+  {isDemo && !demoClosed && !payExpired && <DemoCheckout pending={pending} declined={declined} storeName={storeName} />}
   {isLightning && <LightningPay pending={pending} expired={lightningExpired} />}
 </Layout>

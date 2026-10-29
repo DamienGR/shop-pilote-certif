@@ -12,8 +12,8 @@ export` fails outright** on a database carrying FTS5 virtual tables, which this
 one has since migration 0003. So the backup is applicative, table by table.
 
 ```
-shopctl/src/backup/   schema  dump  crypto  archive   ← pure
-                      store                            ← the only file with wrangler in it
+shopctl/src/backup/   schema  dump  crypto  archive  pool   ← pure
+                      store                                  ← the only file with wrangler in it
 ```
 
 The split is the same one the catalogue import uses, for the same reason: it is
@@ -25,13 +25,19 @@ Six properties hold, and each one is a test:
   file stops being complete at the first migration nobody updates it for, and
   the table missing from the list is the table missing from the archive —
   silently, until a restore. Left out: `sqlite_*`, `_cf_*`, `d1_migrations`
-  (that is the schema, not the data), and the FTS5 index with its shadow tables,
-  which migration 0003's triggers rebuild as the rows go back in.
+  (that is the schema, not the data), the FTS5 index with its shadow tables,
+  which migration 0003's triggers rebuild as the rows go back in, and
+  `_minshop_owner`, the marker saying which shop the DATABASE belongs to
+  (ADR 0019, `shopctl/src/owner.mjs`): carried in an archive, it would follow
+  one shop's data into another's database and stamp it with the source's name.
 - **an archive is a directory of ordinary files** — `manifest.json` in the clear,
   `data.bin` (gzip then AES-256-GCM), `objects/<hash>.bin` per R2 object. The
   manifest carries the schema version, per-table row counts and checksums, and
   the R2 inventory, so `backup list` and `backup verify` answer WITHOUT the key
-  and without decrypting a hundred bodies to find one.
+  and without decrypting a hundred bodies to find one. Format 2 (v0.3.32) seals
+  an object for its bucket and key rather than for the archive, which is what
+  lets one copy in the media pool serve every archive (below); format 1 still
+  opens (`objectContext` in `archive.mjs`).
 - **the cleartext manifest is authenticated with the body.** It is the GCM
   additional data, so an archive cannot be re-labelled to claim another shop,
   another environment or another schema — it simply stops opening. `cipher` and
@@ -77,7 +83,35 @@ to it.
 What CI takes does not stay on the runner. `backup --upload` copies the sealed
 files into the environment's private `-backups` bucket (manifest last, so a
 half-copied archive has no manifest), and `backup pull <id>` brings one back and
-checks it as `verify` would. `deploy --env production` takes one, uploads it and
+checks it as `verify` would.
+
+**The media pool** (ADR 0019, `pool.mjs`). An R2 key never changes content —
+media keys are random or a content hash, a deliverable sits under a fresh UUID
+— so `--upload` seals each object ONCE into `-backups/pool/<digest>.bin` and
+later archives name that copy instead of re-reading it: an unchanged shop's
+backup reads and writes no media. Three things keep that safe:
+
+- **a pool file is never overwritten.** It is named by the digest of its
+  ciphertext, unique by its IV. Two runs that race, or an index lost half-way,
+  cost a duplicate copy, never an archive whose object changed under it;
+- **the pool outlives the archives that name it, by the bucket's own rules.**
+  `provision` expires the archives after 90 days by their prefix
+  (`archivePrefix`) and the pool after 180. `reuseWindow` DERIVES from the
+  rules the bucket actually has how long a copy may be reused (83 days here);
+  a bucket still under the single bucket-wide rule of v0.3.31, or rules that
+  cannot be read, give zero, and every archive carries its objects under its
+  own prefix as before. Nothing is ever deleted by the CLI: removed media and
+  a destroyed shop's bucket empty themselves by age;
+- **the index is sealed with the backup key.** What it says flows into
+  authenticated manifests; an edited index would make archives that fail only
+  at restore time. Sealed, an edit (or a new key) makes the index not open,
+  and the run starts a fresh pool.
+
+The price: an archive taken with `--upload` holds locally only what it read.
+`verify` counts the rest without reading it, `restore` refuses before writing
+a row and gives the command, and `backup pull <id>` completes a local copy
+without rewriting what it has — the nightly drill pulls before it restores,
+which is the one read the pooled copies get. `deploy --env production` takes one, uploads it and
 only then migrates (plan §9) — no flag skips that. The nightly run takes one of
 production too, in the `backup` GitHub environment (default branch only, a
 token that reads D1 and writes R2, never the deploy token), and `verify`s it
@@ -87,9 +121,10 @@ deployed once a month would otherwise be backed up once a month. It runs TWICE a
 day: a second schedule, twelve hours after the night's, runs that job and
 nothing else, because GitHub started the 03:17 run up to five hours late and one
 run a day left two archives more than 24 hours apart (certification, step 11).
-The bucket's lifecycle rule is
-`--keep-days`' 90, and it is an AGE rule only: R2 cannot count, so the "never
-lose the last one" half of `prune` does not hold there. What holds it instead is
+The bucket's lifecycle rules are
+`--keep-days`' 90 for the archives and twice that for the pool, AGE rules
+only: R2 cannot count, so the "never lose the last one" half of `prune` does
+not hold there. What holds it instead is
 the nightly run failing loudly — a nightly that stopped is an incident, not a
 quiet week. The CI's key is the operator's, placed by `shopctl repo` and KEPT
 when already there: archives are encrypted with it.

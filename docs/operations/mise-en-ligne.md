@@ -1,22 +1,66 @@
 # Procédure — mise en ligne d'une boutique
 
-La checklist de lancement, rejouable pour chaque boutique. Elle couvre le
-dernier temps du cycle de l'ADR 0015 : la boutique a été construite sur le
-compte de l'agence (A) et prévisualisée derrière Access ; elle est mise en
-production sur le compte du client (B), ses contenus y sont saisis, puis la
-copie de l'agence est détruite. Écrite d'après l'étape 9 de la certification
-(répétée le 2026-10-20, passée en réel du 2026-10-21 au 2026-10-23) ; chaque
+La checklist de lancement, rejouable pour chaque boutique. Par défaut, la
+boutique se construit directement en production sur le compte du client (B),
+fermée jusqu'à l'ouverture, ses contenus y sont saisis, puis elle se certifie
+par le [parcours court](../certification/par-boutique.md) (ADR 0015, amendé le
+2026-10-27). Une boutique qui a eu une preview sur le compte de l'agence (A)
+suit la même liste, puis la section 7. Écrite d'après l'étape 9 de la
+certification (répétée le 2026-10-20, passée en réel du 2026-10-21 au
+2026-10-23) ; chaque
 commande se lance depuis l'arbre de la boutique, à jour de `main`, sous
 Node 22. Un clone qui porte aussi le remote `core` fait refuser à `gh` de
 choisir son dépôt : `gh repo set-default <owner>/<boutique>` une fois avant.
 
 La production est **publique dès son premier déploiement** : le domaine
 répond, son certificat est publié dans les journaux de transparence, et les
-robots le trouvent dans l'heure. Deux protections tiennent la fenêtre entre ce
-déploiement et l'ouverture : l'administration a déjà son mot de passe (étape
-3), et le paiement de démonstration est coupé (étape 2) — le panier dit que la
-commande est indisponible tant qu'aucun moyen de paiement réel n'est configuré.
-N'annoncer la boutique qu'à la fin.
+robots le trouvent dans l'heure. Trois protections tiennent la fenêtre entre
+ce déploiement et l'ouverture : l'administration a déjà son mot de passe
+(section 3) ; le paiement de démonstration est coupé (section 2), et le panier
+dit que la commande est indisponible ; et la vitrine demande aux moteurs de ne
+pas l'indexer (`noindex`, depuis `v0.3.29`). Les deux dernières tombent
+d'elles-mêmes au premier moyen de paiement réel. N'annoncer la boutique qu'à
+la fin.
+
+## Sur le compte mutualisé
+
+Une nouvelle boutique se construit sur le compte Cloudflare de l'agence
+([ADR 0019](../architecture/decisions/0019-compte-cloudflare-mutualise.md)),
+et non plus sur un compte du commerçant. La liste ci-dessous reste la bonne ;
+six sections changent ainsi :
+
+- **0. Prérequis** : le commerçant n'ouvre pas de compte Cloudflare. Il garde
+  son domaine chez son registrar, ouvre Resend et Stripe à son nom, et ajoutera
+  un CNAME à la section 2. Côté agence, une fois pour toutes : le compte
+  mutualisé (Workers Paid, ou Free le temps d'une ou deux très petites
+  boutiques, la variable `MINSHOP_ACCOUNT_PLAN` du dépôt de flotte le dit ; un
+  seul Super Administrator, clé de sécurité matérielle), sa zone SaaS et son origine de repli (SSL/TLS → Custom
+  Hostnames), le dépôt de flotte (`shopctl fleet init` puis `fleet repo`), et
+  un widget Turnstile par lot de dix noms d'hôte. Le manifeste porte
+  `cloudflare.accountId` = le compte mutualisé et `cloudflare.saasZone` = la
+  zone SaaS, sans `productionAccountId` ;
+- **1. Le dépôt** : aucun jeton Cloudflare dans le dépôt de la boutique.
+  `npm run shopctl -- repo --fleet <propriétaire/flotte>` (ou `shopctl new
+  --create-repo --fleet` à la création), puis la boutique inscrite dans le
+  `fleet.json` du dépôt de flotte avec son `repository`, par une pull request
+  de la flotte. Les relecteurs de la production et le jeton de lecture de
+  `monitor` sont ceux de la flotte ;
+- **2 et 3. Ressources et mot de passe** : depuis le poste de l'opérateur, avec
+  son propre jeton du compte mutualisé (exporté sans écho, jamais posé dans un
+  dépôt). `provision --env production` crée aussi le nom d'hôte personnalisé et
+  affiche le CNAME à transmettre au commerçant : `<domaine> → <origine de
+  repli>`. Le certificat suit seul une fois le CNAME en place ;
+- **4. Le premier déploiement** : par le Deploy de la flotte,
+  `gh workflow run deploy.yml -R <propriétaire/flotte> -f shop=<slug> -f environment=production`.
+  Il refuse un nom d'hôte encore en attente : attendre le CNAME, ou relancer
+  plus tard ;
+- **6. Certifier** : le nocturne est celui de la flotte
+  (`gh workflow run nightly.yml -R <propriétaire/flotte>`), qui sauvegarde et
+  surveille chaque boutique de `fleet.json`. `certify` lit la flotte seule ;
+- **7 et 8.** Une preview vit sur le même compte : elle se détruit sans changer
+  de compte, `npm run shopctl -- destroy --env staging --confirm <slug>`. Les
+  notifications du compte vont à l'agence seule : aucun commerçant n'est
+  membre du compte mutualisé.
 
 ## 0. Prérequis sur le compte du client (B)
 
@@ -53,8 +97,8 @@ la branche par défaut et y pose le jeton de sauvegarde, le compte de B et la
 clé de sauvegarde ; il refuse le jeton de production à cette place. Toujours
 avec `--reviewer` : sans lui, l'environnement `production` est reposé sans
 relecteur, ce que la commande signale. Sans `CLOUDFLARE_API_TOKEN_STAGING`, il
-le dit et laisse le secret de staging tel quel : le staging vit jusqu'à la
-section 7.
+le dit et laisse l'environnement `staging` vide : sans preview, il ne sert pas,
+et le nocturne n'interroge aucun staging qu'il ne voit pas déclaré.
 
 Le jeton de lecture va dans les secrets du dépôt :
 
@@ -130,7 +174,9 @@ voient les clients. Ensuite, dans Admin → Réglages :
   l'endpoint de webhook du mode live sur `https://<domaine>/api/webhook` avec
   ses cinq événements ([plan, §2.3](../certification/plan.md)), et la carte
   de Réglages qui dit « mode live ». La production refuse une clé de test
-  depuis `v0.3.22` : avec elle, une carte de test passait commande. Et le reçu de Stripe, à décider
+  depuis `v0.3.22` : avec elle, une carte de test passait commande. Stripe
+  configuré, le panier s'ouvre et la vitrine devient indexable, sans
+  déploiement. Et le reçu de Stripe, à décider
   avec lui : la boutique envoie déjà le sien, et Stripe en ajoute un second si
   « Paiements réussis » est activé dans ses E-mails aux clients ;
 - [ ] les **pages légales** écrites par le commerçant, relues par un conseil
@@ -160,40 +206,58 @@ depuis le CSV du commerçant, les images avec lui. L'import lit le
 Un second run du workflow `Deploy` : le test de fumée vert, sans
 avertissement.
 
-## 6. Contrôler la boutique publique
+## 6. Certifier
 
-```sh
-BASE_URL=https://<domaine> npm run test:security:remote -- --limiteurs
-```
-
-Depuis le poste de l'opérateur : son adresse ne pourra plus se connecter à
-l'administration pendant un quart d'heure, ni passer commande pendant une
-minute. Attendu : tout vert, la connexion refusée au plus tard à la sixième
-tentative. Tant que Stripe n'est pas configuré, le contrôle des champs de carte
-dit « aucun moyen de paiement configuré » : le relancer une fois Stripe en
-place.
-
-Puis le nocturne, à la main, pour voir la sauvegarde de la production :
+Le nocturne doit avoir tourné au moins une fois sur la production : s'il
+n'est pas encore passé, le lancer à la main.
 
 ```sh
 gh workflow run nightly.yml
 ```
 
-Attendu : `Production backup` vert, `backup verify` qui ouvre l'archive avec la
-clé ; `Production error rate and quotas` vert.
+Attendu : `Production backup` vert, `backup verify` qui ouvre l'archive avec
+la clé ; `Production error rate and quotas` vert ; « Aucun staging déclaré »
+en avis, sans preview.
 
-Enfin la **recette**, sur la boutique publique, avec un vrai paiement
+Puis, depuis la session qui a provisionné la production (section 2), `gh`
+authentifié. La porte navigateur demande Chromium sur le poste, et Lighthouse
+une clé d'API Google (gratuite, l'API PageSpeed Insights activée) : sans elle,
+le quota anonyme est épuisé et les quatre mesures sont sautées.
+
+```sh
+npx playwright install chromium        # une fois par poste
+read -rs PAGESPEED_API_KEY && export PAGESPEED_API_KEY
+npm run shopctl -- certify --env production
+```
+
+Elle lit tout ce que la [certification par boutique](../certification/par-boutique.md)
+juge — socle, arbre, compte, base, vitrine publique, dépôt — en lecture seule,
+et chaque ligne rouge dit quoi faire. Les limiteurs ne tournent qu'avec
+`--rate-limits`, depuis le poste de l'opérateur : son adresse ne pourra plus se
+connecter à l'administration pendant un quart d'heure, ni passer commande
+pendant une minute.
+
+Ensuite la **recette**, sur la boutique publique, avec un vrai paiement
 remboursé : le commerçant, ou une personne qu'il désigne et qui n'a ni
-développé ni exploité la boutique, avec le [modèle](recette.md) seul.
+développé ni exploité la boutique, avec le [modèle](recette.md) seul. Son
+achat est celui des attestations : l'agence n'en fait pas un second.
 
 - [ ] le procès-verbal signé, sans anomalie bloquante. Il marque la
-  livraison : la boutique ne s'annonce qu'après. La certification n'a pas
-  fait faire la sienne au pilote, dont le vendeur est fictif : la première
-  boutique réelle est la première à passer par une personne extérieure.
+  livraison : la boutique ne s'annonce qu'après. La première boutique réelle
+  est la première à passer par une personne extérieure : le vendeur du pilote
+  est fictif.
+- [ ] `client/certification/attestations.yaml` rempli (achat, e-mails,
+  téléphone, procès-verbal, relecture des pages légales, réponse de
+  l'expert-comptable), sans adresse ni nom de client ;
+- [ ] `npm run shopctl -- certify --env production --write` vert, et
+  `client/certification/<date>/` avec les attestations versés par une pull
+  request de la boutique. Sa fusion vaut certification.
 
-## 7. Détruire la copie de l'agence
+## 7. Avec une preview : détruire la copie de l'agence
 
-Sur le compte A, une fois la production saisie et contrôlée :
+Seulement pour une boutique construite d'abord sur le compte de l'agence
+(ADR 0015, étapes 1 et 2). Sur le compte A, une fois la production saisie et
+contrôlée :
 
 ```sh
 CLOUDFLARE_ACCOUNT_ID=<id de A> npm run shopctl -- destroy --env staging --confirm <slug>

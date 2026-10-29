@@ -24,6 +24,12 @@
 # verification and a bookmark in front of every production deployment, which is
 # not a thing to do implicitly. The shop to deploy is named because the core
 # repository carries witness manifests and no shop of its own.
+#
+# A shop on the shared Cloudflare account (ADR 0019) is not deployed from here:
+# no token can be limited to one shop's database, so its repository holds none,
+# and the repository variable MINSHOP_FLEET (set by `shopctl repo --fleet`)
+# names the fleet repository whose own Deploy does it. This workflow then
+# refuses, by name, rather than failing on a missing token half-way through.
 name: Deploy
 
 on:
@@ -56,6 +62,19 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  fleet:
+    name: Deployed by the fleet
+    if: ${{ vars.MINSHOP_FLEET != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Point at the fleet repository
+        env:
+          FLEET: ${{ vars.MINSHOP_FLEET }}
+        run: |
+          echo "::error::Cette boutique est sur le compte mutualisé : elle se déploie depuis le dépôt de flotte $FLEET (ADR 0019), par son workflow Deploy."
+          exit 1
+
   # The gate, before the approval rather than after it. A reviewer asked to
   # approve a production deployment should be approving something that has
   # already been proven to build and pass its suite — otherwise the approval is
@@ -65,7 +84,7 @@ jobs:
     name: Verify
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: ${{ inputs.run-verify-job }}
+    if: ${{ inputs.run-verify-job && vars.MINSHOP_FLEET == '' }}
 
     steps:
       - name: Check out repository
@@ -80,7 +99,7 @@ jobs:
     # `always()` so the job still runs when `verify` was skipped by the input;
     # the second clause keeps a FAILED verification blocking, which is the
     # distinction a bare `always()` would lose.
-    if: ${{ always() && needs.verify.result != 'failure' && needs.verify.result != 'cancelled' }}
+    if: ${{ always() && vars.MINSHOP_FLEET == '' && needs.verify.result != 'failure' && needs.verify.result != 'cancelled' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
 

@@ -12,6 +12,8 @@ import {
   pendingToPaidOrder,
 } from './lightning/pending';
 import { toMajorUnits } from '../../money';
+import { t } from '../i18n';
+import { readStoreName } from '../settings/storeName';
 
 /**
  * OpenNode — hosted Lightning checkout (custodial processor). Behaves like Stripe:
@@ -53,6 +55,7 @@ export function createOpenNodeProvider(
         params.lineItems.reduce((s, l) => s + l.amountCents * l.quantity, 0) + shippingCents;
       const origin = new URL(params.successUrl).origin;
       const publicId = params.metadata?.public_id ?? crypto.randomUUID();
+      const storeName = await readStoreName(db);
 
       const res = await fetch(`${base}/v1/charges`, {
         method: 'POST',
@@ -60,7 +63,10 @@ export function createOpenNodeProvider(
         body: JSON.stringify({
           amount: toMajorUnits(totalCents, currency), // OpenNode wants the fiat main-unit amount (currency-scaled)
           currency: currency.toUpperCase(),
-          description: `Order ${publicId.slice(0, 8)}`,
+          description: t('payment.invoice.description', {
+            boutique: storeName,
+            reference: publicId.slice(0, 8),
+          }),
           order_id: publicId,
           // Per-provider route so OpenNode is verified as OpenNode even when it
           // ISN'T the store's default rail (the bare /api/webhook route verifies

@@ -1,6 +1,7 @@
 # ADR 0002 — Propriété des comptes et des fournisseurs
 
-- **Statut** : Accepté
+- **Statut** : Accepté ; remplacé pour Cloudflare par
+  l'[ADR 0019](0019-compte-cloudflare-mutualise.md)
 - **Date** : 2026-08-28
 - **Jalon** : 0
 

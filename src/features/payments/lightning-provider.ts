@@ -14,6 +14,8 @@ import {
   pendingToPaidOrder,
 } from './lightning/pending';
 import { getConfig } from '../../config';
+import { t } from '../i18n';
+import { readStoreName } from '../settings/storeName';
 
 export interface MintLightningOrderInput {
   origin: string;
@@ -50,13 +52,19 @@ export async function mintLightningOrder(
   const shippingCents = input.shippingCents ?? 0;
   const totalCents = input.subtotalCents + shippingCents;
 
-  const fiatPerBtc = await getBtcRate(input.currency, ln.rateUrl);
+  const [fiatPerBtc, storeName] = await Promise.all([
+    getBtcRate(input.currency, ln.rateUrl),
+    readStoreName(db),
+  ]);
   const amountSat = fiatCentsToSats(totalCents, fiatPerBtc, input.currency);
   const expirySeconds = ln.invoiceExpiryMinutes * 60;
 
   const invoice = await backend.createInvoice({
     amountSat,
-    description: `${cfg.storeName} — order ${input.publicId.slice(0, 8)}`,
+    description: t('payment.invoice.description', {
+      boutique: storeName,
+      reference: input.publicId.slice(0, 8),
+    }),
     externalId: input.publicId,
     expirySeconds,
     // Per-provider path so Lightning settlements route to the Lightning verifier

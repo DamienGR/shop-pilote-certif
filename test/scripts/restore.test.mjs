@@ -6,7 +6,9 @@ import { describe, expect, it, vi } from 'vitest';
 // node builtins have no declarations in a .ts file here.
 import { EXIT_CODES } from '../../shopctl/src/errors.mjs';
 import { generatedColumns } from '../../shopctl/src/backup/schema.mjs';
-import { insertStatements, restoreScript } from '../../shopctl/src/backup/dump.mjs';
+import { digest, insertStatements, restoreScript } from '../../shopctl/src/backup/dump.mjs';
+import { authenticatedHeader, objectContext } from '../../shopctl/src/backup/archive.mjs';
+import { loadKey, open, seal } from '../../shopctl/src/backup/crypto.mjs';
 import { HOSTILE, IMAGE_BYTES, IMAGE_KEY, names, seededShop, takeBackup } from '../helpers/backup-shop.mjs';
 import { ACCOUNT } from '../helpers/provisioned-shop.mjs';
 
@@ -34,6 +36,34 @@ function emptyTheShop(target) {
     'DELETE FROM media;',
     'DELETE FROM settings;',
   ]);
+}
+
+/**
+ * Turn an archive into what v0.3.31 and earlier wrote: format 1, each object
+ * sealed for the ARCHIVE rather than for its bucket and key. Every archive in a
+ * backups bucket today is one of those, and must still come back.
+ */
+function asFormatOne(target, id) {
+  const directory = join(target.root, 'backups', id);
+  const manifest = JSON.parse(readFileSync(join(directory, 'manifest.json'), 'utf8'));
+  const { key } = loadKey({ root: target.root, file: '.shopctl/backup.key' });
+  const older = { ...manifest, format: 1, r2: { buckets: manifest.r2.buckets.map((bucket) => ({ ...bucket })) } };
+  for (const bucket of older.r2.buckets) {
+    bucket.inventory = bucket.inventory.map(({ pool, ...object }) => {
+      if (!object.file) return object;
+      const file = join(directory, object.file);
+      const bytes = open({ ...object.cipher, ciphertext: readFileSync(file) }, key, objectContext(manifest, bucket.name, object.key));
+      const sealed = seal(bytes, key, objectContext(older, bucket.name, object.key));
+      writeFileSync(file, sealed.ciphertext);
+      return { ...object, digest: digest(sealed.ciphertext), cipher: { iv: sealed.iv, tag: sealed.tag } };
+    });
+  }
+  const body = open({ ...manifest.cipher, ciphertext: readFileSync(join(directory, 'data.bin')) }, key, authenticatedHeader(manifest));
+  const sealed = seal(body, key, authenticatedHeader(older));
+  writeFileSync(join(directory, 'data.bin'), sealed.ciphertext);
+  older.cipher = { ...manifest.cipher, iv: sealed.iv, tag: sealed.tag };
+  older.data = { ...manifest.data, bytes: sealed.ciphertext.length, digest: digest(sealed.ciphertext) };
+  writeFileSync(join(directory, 'manifest.json'), JSON.stringify(older, null, 2));
 }
 
 vi.setConfig({ testTimeout: 60_000 });
@@ -166,6 +196,22 @@ describe('shopctl restore', () => {
       const file = join(target.root, 'recovered.bin');
       const got = target.wrangler(['r2', 'object', 'get', `${bucket}/${IMAGE_KEY}`, '--file', file, '--remote', '-J', 'eu']);
       expect(got.status).toBe(0);
+      expect(readFileSync(file)).toEqual(IMAGE_BYTES);
+    });
+
+    it('still restores an archive sealed before v0.3.32, objects included', () => {
+      const target = seededShop();
+      const id = takeBackup(target);
+      asFormatOne(target, id);
+      expect(target.json(['backup', 'verify', id]).report.failures).toBe(0);
+      const bucket = names('atelier-test', 'staging').images;
+      target.wrangler(['r2', 'object', 'delete', `${bucket}/${IMAGE_KEY}`, '--remote', '-J', 'eu']);
+      emptyTheShop(target);
+
+      const restored = target.json(['restore', '--env', 'staging', '--from', id]);
+      expect(restored.status, restored.stderr).toBe(EXIT_CODES.ok);
+      const file = join(target.root, 'recovered.bin');
+      target.wrangler(['r2', 'object', 'get', `${bucket}/${IMAGE_KEY}`, '--file', file, '--remote', '-J', 'eu']);
       expect(readFileSync(file)).toEqual(IMAGE_BYTES);
     });
 

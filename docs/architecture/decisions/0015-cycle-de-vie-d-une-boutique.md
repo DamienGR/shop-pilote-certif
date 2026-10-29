@@ -1,6 +1,8 @@
 # ADR 0015 — Cycle de vie d'une boutique, de la construction à la livraison
 
-- **Statut** : Accepté
+- **Statut** : Accepté ; amendé le 2026-10-27 (la preview devient facultative) ;
+  frontière entre les comptes remplacée par
+  l'[ADR 0019](0019-compte-cloudflare-mutualise.md)
 - **Date** : 2026-08-31
 - **Jalon** : 6
 
@@ -94,6 +96,41 @@ supposait sans que le socle les porte.
   `shopctl deploy --env staging` avertit quand une preview privée n'en déclare
   aucun.
 
+### Amendement (2026-10-27) — la preview devient facultative
+
+Le pilote a passé les quatre étapes, et la deuxième a coûté plus qu'elle n'a
+rapporté : une application Access, son jeton de service, le contournement du
+webhook, les secrets du nocturne de staging, puis la destruction et les
+révocations, soit 45 min à 1 h par boutique, pour montrer au commerçant une
+boutique qu'il saisit ensuite lui-même sur son compte. Sur une boutique de
+quelques heures, vendue quelques centaines d'euros, c'est le poste le plus
+lourd de la mise en ligne ([certification par boutique](../../certification/par-boutique.md)).
+
+Décidé par Damien le 2026-10-27 : **par défaut, la boutique se construit
+directement en production sur le compte du client**, et les étapes 1, 2 et 4
+de la décision se réduisent à une seule. La preview privée sur le compte de
+l'agence reste possible quand un commerçant veut voir avant de donner son
+compte ; tout ce qui précède s'applique alors tel quel.
+
+Une production construite en public demande qu'elle reste fermée jusqu'à
+l'ouverture. Deux protections existaient : le mot de passe de
+l'administration, posé avant le premier déploiement (`shopctl admin
+password`), et le paiement de démonstration coupé par `provision`, qui fait
+dire au panier que la commande est indisponible. Une troisième entre dans le
+socle avec cet amendement : **tant qu'aucun moyen de paiement réel n'est
+ouvert, la vitrine demande aux moteurs de ne pas l'indexer** (`<meta
+name="robots" content="noindex">`, `src/features/storefront/indexable.ts`).
+Sans elle, un catalogue à moitié saisi est ce que les résultats de recherche
+retiennent. Le premier moyen réel l'ouvre, sans déploiement ; un catalogue
+dont le panier est coupé par choix reste indexé.
+
+Le nocturne n'interroge plus qu'un staging **déclaré** — `stagingDomain` dans
+le manifeste, ou la variable de dépôt `STAGING_URL` — et le dit quand il n'y
+en a pas : une boutique sans preview n'a pas de nuit rouge à expliquer.
+
+La frontière entre les comptes ne bouge pas : les données ne vivent jamais
+que sur le compte du client, et il n'y a toujours aucune migration à écrire.
+
 ## Alternatives écartées
 
 - **Frontière à la mise en ligne** (construire ET faire saisir sur le compte de
@@ -130,4 +167,8 @@ supposait sans que le socle les porte.
   (`test/scripts/manifest.test.mjs`, `test/scripts/deploy.test.mjs`) ;
 - `provision --env production` vise `productionAccountId` quand il est
   déclaré, et `shopctl repo` donne à chaque environnement son compte
-  (`test/scripts/provision.test.mjs`, `test/scripts/repo.test.mjs`).
+  (`test/scripts/provision.test.mjs`, `test/scripts/repo.test.mjs`) ;
+- la vitrine porte `noindex` tant qu'aucun moyen de paiement réel n'est
+  ouvert, et plus après (`src/features/storefront/indexable.test.ts`) ;
+- le nocturne ne lance ses contrôles de staging que pour un staging déclaré
+  et encore en place (`test/scripts/nightly.test.mjs`).

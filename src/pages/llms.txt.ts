@@ -22,9 +22,13 @@ const oneLine = (s: string | null, max = 100) => {
 // /llms.txt — the llmstxt.org convention: a concise, link-rich map of the store
 // for LLMs/agents. Beyond the usual catalog, it documents the JSON checkout so an
 // agentic buyer can go from "what's for sale" to "place the order" without scraping.
-export const GET: APIRoute = async ({ url }) => {
+export const GET: APIRoute = async ({ url, locals }) => {
   const origin = publicOrigin(url.origin, env.CANONICAL_ORIGIN);
-  const { storeName, currency } = getConfig();
+  const { currency } = getConfig();
+  // The middleware loads the settings overlay for this path as for a page: the
+  // name set in Admin → Réglages wins over the build-time default. A settings
+  // save purges the shell tag this response carries.
+  const storeName = locals.settings?.storeName ?? getConfig().storeName;
 
   const total = await countProducts(env.DB);
   const products = total > 0 ? await listProducts(env.DB, total, 0) : [];

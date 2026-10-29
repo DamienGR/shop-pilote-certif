@@ -25,6 +25,11 @@
  * environment at all — a staging run that could read the production token
  * would make the separation decorative.
  *
+ * On the shared Cloudflare account (ADR 0019), `--fleet <owner/repo>` replaces
+ * steps 3 and 4: no token can be limited to one shop's database, so the shop's
+ * repository gets none, and a variable naming the fleet repository that holds
+ * them (`shopctl fleet repo`) instead.
+ *
  * What it deliberately does NOT do is push protection rules onto an account
  * that cannot have them. On a private repository, required reviewers exist
  * only under GitHub Enterprise; the command attempts them, reports plainly when
@@ -37,6 +42,7 @@ import { ShopctlError, inputError, preconditionError } from '../errors.mjs';
 import { KEY_ENV, keyId, loadKey } from '../backup/crypto.mjs';
 import { capture } from '../process.mjs';
 import { resolveShop } from '../shop.mjs';
+import { FLEET_VARIABLE, fleetRepositoryName, nearestRegistry, readRegistry } from '../fleet.mjs';
 import {
   assertForgeReady,
   branchOnRemote,
@@ -52,12 +58,14 @@ import {
   repository,
   repositoryNameFor,
   repositoryUrl,
+  repositorySecrets,
   restrictEnvironment,
   setEnvironmentSecret,
+  setRepositoryVariable,
   userId,
 } from '../forge.mjs';
 
-export const REPO_OPTIONS = { '--shop': 'slug', '--origin': 'url', '--owner': 'compte', '--branch': 'nom', '--reviewer': 'login' };
+export const REPO_OPTIONS = { '--shop': 'slug', '--origin': 'url', '--owner': 'compte', '--branch': 'nom', '--reviewer': 'login', '--fleet': 'dépôt' };
 
 export const repoUsage = `Usage: shopctl repo [options]
 
@@ -72,6 +80,10 @@ export const repoUsage = `Usage: shopctl repo [options]
   --no-push           Ne pas pousser la branche.
   --dry-run           Interroger GitHub et n'écrire nulle part.
   --shop <slug>       Manifeste à utiliser quand l'arbre en contient plusieurs.
+  --fleet <dépôt>     Boutique du compte mutualisé (ADR 0019) : le dépôt de flotte
+                      (propriétaire/dépôt) la déploie et la sauvegarde. Aucun
+                      environnement ni secret Cloudflare n'est posé ici ; la
+                      variable ${FLEET_VARIABLE} nomme la flotte.
   --json              Rapport lisible par une machine.
 
 Crée ou confirme le dépôt, pousse la branche, crée les environnements
@@ -168,6 +180,7 @@ export function runRepo(args, reporter) {
       .filter(Boolean),
     visibility: args.values['--public'] === true ? 'public' : 'private',
     push: args.values['--no-push'] !== true,
+    fleet: args.values['--fleet'] === undefined ? null : fleetRepositoryName(args.values['--fleet']),
   });
   return 0;
 }
@@ -197,6 +210,7 @@ export function setupRepository({
   reviewers = [],
   visibility = 'private',
   push = true,
+  fleet = null,
   env = process.env,
   emit = true,
 }) {
@@ -204,8 +218,9 @@ export function setupRepository({
 
   reporter.section('GitHub');
   assertForgeReady({ cwd: root });
-  // Refused before anything is written, like every other bad input.
-  const backupToken = backupTokenFor(env);
+  // Refused before anything is written, like every other bad input. A shop of
+  // the fleet places no token at all, so there is none to judge.
+  const backupToken = fleet ? null : backupTokenFor(env);
 
   // Three sources, in decreasing order of how explicit they are: the flag, the
   // remote the tree already has, and the convention. The convention is only
@@ -273,6 +288,13 @@ export function setupRepository({
     pushBranch(root, head);
     pushed = true;
     reporter.ok(`${head} poussée sur origin`);
+  }
+
+  if (fleet) {
+    const report = fleetMember({ shop, reporter, dryRun, target, url, created, derived, visibility, head, pushed, existing, fleet, env });
+    if (emit) reporter.result(report);
+    if (!json) reporter.section(`Dépôt prêt : https://github.com/${target.nameWithOwner}, déployé par ${fleet}.`);
+    return report;
   }
 
   // ── 3. the environments ───────────────────────────────────────────────────
@@ -448,4 +470,84 @@ export function setupRepository({
     );
   }
   return report;
+}
+
+/** What a shop's repository must not hold on the shared account. */
+const CLOUDFLARE_SECRETS = ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID', 'MONITOR_CLOUDFLARE_API_TOKEN', 'MONITOR_CLOUDFLARE_ACCOUNT_ID'];
+
+/**
+ * The shop's half of ADR 0019: its repository names the fleet that deploys
+ * it, and holds no Cloudflare credential.
+ *
+ * No environment is created: the shop's own Deploy refuses to run once the
+ * variable is set, and an environment nobody deploys from would only be a
+ * place for a token to be put back by habit. A token already there is named
+ * with the command that removes it, not removed: deleting a secret from a
+ * repository is the operator's act, and the fleet must be deploying first.
+ */
+function fleetMember({ shop, reporter, dryRun, target, url, created, derived, visibility, head, pushed, existing, fleet, env }) {
+  const { manifest, root } = shop;
+  const slug = manifest.client.slug;
+  reporter.section('Flotte');
+  if (dryRun) reporter.todo(`variable ${FLEET_VARIABLE} = ${fleet} serait posée`);
+  else {
+    setRepositoryVariable(target.nameWithOwner, FLEET_VARIABLE, fleet, { cwd: root });
+    reporter.ok(`variable ${FLEET_VARIABLE} = ${fleet} posée : les workflows Deploy et Nightly de la boutique laissent le compte à la flotte`);
+  }
+  if (['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_API_TOKEN_STAGING', 'CLOUDFLARE_API_TOKEN_PRODUCTION', 'CLOUDFLARE_API_TOKEN_BACKUP'].some((name) => env[name])) {
+    reporter.warn('des jetons Cloudflare sont exportés : ignorés, une boutique de la flotte n\'en reçoit aucun.', `Ils se posent dans le dépôt de flotte : \`shopctl fleet repo\` depuis ${fleet}.`);
+  }
+
+  // Leftovers from before the fleet: a shop set up by `shopctl repo` alone.
+  const leftovers = [];
+  if (existing && !dryRun) {
+    const scopes = [[null, repositorySecrets(target.nameWithOwner, { cwd: root })]];
+    for (const name of environments(target.nameWithOwner, { cwd: root })) scopes.push([name, environmentSecrets(target.nameWithOwner, name, { cwd: root })]);
+    for (const [scope, names] of scopes) {
+      for (const name of names.filter((secret) => CLOUDFLARE_SECRETS.includes(secret))) {
+        leftovers.push({ env: scope, name });
+        reporter.warn(
+          `${scope ? `environnement ${scope}` : 'dépôt'} : ${name} est encore posé.`,
+          `Un jeton du compte mutualisé ouvre toutes les boutiques (ADR 0019). Une fois la boutique déployée par la flotte : gh secret delete ${name}${scope ? ` --env ${scope}` : ''} --repo ${target.nameWithOwner}`,
+        );
+      }
+    }
+    if (leftovers.length === 0) reporter.ok('aucun secret Cloudflare dans le dépôt de la boutique');
+  }
+
+  // The fleet's registry, when the operator's workspace has one: the fleet's
+  // workflows find the shop there, by its slug, with this repository.
+  const registry = nearestRegistry(root);
+  let registered = null;
+  if (registry) {
+    try {
+      const entry = readRegistry(registry).shops.find((candidate) => candidate.slug === slug);
+      registered = entry?.repository ?? null;
+      if (registered && registered.toLowerCase() === target.nameWithOwner.toLowerCase()) reporter.ok(`${registry} : ${slug} → ${registered}`);
+      else {
+        reporter.todo(
+          `${registry} : ${slug} ${entry ? (registered ? `pointe vers ${registered}` : 'n\'a pas de "repository"') : 'n\'y est pas inscrite'}.`,
+          `Inscrivez-la, committez et poussez le dépôt de flotte : { "slug": "${slug}", "path": "…", "repository": "${target.nameWithOwner}" }.`,
+        );
+      }
+    } catch (error) {
+      if (!(error instanceof ShopctlError)) throw error;
+      reporter.warn(`${registry} est illisible : l'inscription de la boutique n'a pas été vérifiée.`, error.message);
+    }
+  } else {
+    reporter.todo(`aucun fleet.json au-dessus de ${root} : inscrivez la boutique dans celui du dépôt de flotte ${fleet}, avec "repository": "${target.nameWithOwner}".`);
+  }
+
+  return {
+    command: 'repo',
+    ok: true,
+    dryRun,
+    shop: slug,
+    repository: { ...target, url, created, derived, visibility },
+    branch: { name: head, pushed },
+    fleet: { repository: fleet, variable: FLEET_VARIABLE, registered, leftovers },
+    environments: [],
+    secrets: [],
+    missingTokens: [],
+  };
 }

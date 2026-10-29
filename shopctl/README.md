@@ -67,6 +67,9 @@ recours, pas la source. Une bifurcation, un miroir ou un chemin local passé à
 | `shopctl core upgrade --to <tag>` | 9 | Fusionne un tag du socle sur une branche et ouvre sa pull request. |
 | `shopctl fleet status \| verify \| report` | 9 | L'état de la flotte déclarée, en table, en verdict ou en JSON. |
 | `shopctl fleet upgrade --to <tag>` | 9 | La même mise à niveau, boutique par boutique, sans jamais déployer. |
+| `shopctl fleet init \| repo` | après le pilote | Le dépôt de flotte du compte mutualisé (ADR 0019) : ses workflows, puis le dépôt GitHub et ses secrets. |
+| `shopctl fleet usage` | après le pilote | La consommation du compte mutualisé : la facture projetée en Workers Paid, les quotas du jour en Workers Free. |
+| `shopctl certify --env production` | après le pilote | Juge, en lecture seule, si la boutique est certifiable ; `--write` écrit le rapport. |
 
 ## `shopctl new`
 
@@ -235,8 +238,14 @@ pas le site.
 
 ## Le cycle de vie d'une boutique
 
-Quatre étapes, et la frontière entre le compte de l'agence et celui du client
-tombe entre la deuxième et la troisième
+Par défaut depuis le 2026-10-27, la boutique se construit directement en
+production sur le compte du client, fermée jusqu'à l'ouverture (mot de passe
+posé avant le premier déploiement, démonstration coupée, `noindex` tant
+qu'aucun moyen de paiement réel n'est ouvert), puis se certifie par
+`shopctl certify` ([parcours court](../docs/certification/par-boutique.md)).
+La preview privée sur le compte de l'agence est facultative. Avec elle, quatre
+étapes, et la frontière entre le compte de l'agence et celui du client tombe
+entre la deuxième et la troisième
 ([ADR 0015](../docs/architecture/decisions/0015-cycle-de-vie-d-une-boutique.md)) :
 
 | | Où | Commande |
@@ -271,6 +280,28 @@ sur celui de l'agence — le dispositif de la certification —,
 `--env production` le visent, et `shopctl repo` le pose dans l'environnement
 GitHub `production`.
 
+## `shopctl certify`
+
+```sh
+npm run shopctl -- certify --env production            # juge, n'écrit rien
+npm run shopctl -- certify --env production --write    # et écrit le rapport
+```
+
+Le parcours court d'une boutique après le pilote
+([certification par boutique](../docs/certification/par-boutique.md)). Elle
+lit sept groupes — socle, arbre, compte, base, vitrine publique, dépôt,
+attestations — **sans rien écrire sur un compte** : `provision` en simulation,
+un `SELECT` qui masque les secrets dans la requête même, les commandes de
+lecture de `gh`. Chaque contrôle est la porte qui existe déjà ; chaque verdict
+est une fonction pure de `src/certify/judge.mjs`.
+
+Certifiable : aucun échec, rien à attester, rien de sauté. Sinon code 6, après
+le rapport. `--write` pose `client/certification/<date>/certify.json` et
+`certify.md`, versés par une pull request de la boutique, et le modèle de
+`client/certification/attestations.yaml` s'il manque. Le rapport ne porte
+aucune donnée personnelle, et les attestations refusent toute valeur qui
+contient « @ ».
+
 ## `shopctl destroy`
 
 ```sh
@@ -296,6 +327,8 @@ place est un teardown qui supprime ce que personne ne voulait perdre.
 ```sh
 npm run shopctl -- backup keygen                       # une fois, avant tout
 npm run shopctl -- backup --env production
+npm run shopctl -- backup --env production --upload    # copie aussi dans -backups
+npm run shopctl -- backup pull <id> --env production   # la rapatrie, ou la complète
 npm run shopctl -- backup list
 npm run shopctl -- backup verify <id>
 npm run shopctl -- backup prune --keep 30 --keep-days 90
@@ -332,6 +365,17 @@ sans être restaurée** — `backup list` et `backup verify` lisent le manifeste
 sans déchiffrer cent corps pour trouver le bon — et elle se **relit sans
 Cloudflare**, donc dans un autre compte, ce qui est la condition d'une sortie
 propre du client.
+
+**Dans le bucket `-backups`, un média n'est copié qu'une fois**
+([ADR 0019](../docs/architecture/decisions/0019-compte-cloudflare-mutualise.md)).
+`--upload` scelle chaque objet dans le pool du bucket (`pool/`), et les
+archives suivantes nomment cette copie au lieu de relire l'objet : la
+sauvegarde d'une boutique inchangée ne lit ni n'écrit plus aucun média. Le
+bucket expire ses archives à 90 jours et son pool à 180, et une copie n'est
+reprise que si elle survit à l'archive qui la nomme. Une archive prise avec
+`--upload` ne porte donc localement que ce qu'elle a lu : `backup pull <id>`
+la complète depuis le pool, et `restore` le demande avant d'écrire quoi que ce
+soit.
 
 **Le manifeste en clair est authentifié avec le corps.** Il est passé à AES-GCM
 comme donnée additionnelle : une archive ne peut pas être ré-étiquetée pour
@@ -456,6 +500,69 @@ Une boutique que personne n'y a inscrite n'est pas dans la flotte : la commande
 qui lit cette liste écrit. Une boutique en défaut n'arrête pas les autres — son
 échec est rapporté contre elle, et le code de sortie est non nul à la fin.
 
+**Sur le compte Cloudflare mutualisé** (ADR 0019), le répertoire de `fleet.json`
+devient un dépôt à part entière, le **dépôt de flotte**, et chaque boutique qu'il
+déploie y porte son dépôt GitHub : `"repository": "agence/shop-premiere-boutique"`.
+Aucun jeton Cloudflare ne se limite à la base d'une boutique ; les jetons vivent
+donc là, et nulle part ailleurs :
+
+```sh
+npm run shopctl -- fleet init                         # workflows Deploy et Nightly du parc
+git add -A && git commit -m "Flotte"
+npm run shopctl -- fleet repo --reviewer <login>      # dépôt public, environnements, secrets
+npm run shopctl -- repo --fleet agence/minshop-fleet  # depuis chaque boutique
+```
+
+`fleet init` écrit `.github/workflows/deploy.yml`, `.github/workflows/nightly.yml`
+et `.github/fleet/shops.mjs` depuis les modèles de `shopctl/templates/fleet/` ;
+relancé, il les réécrit. Le Deploy du parc extrait la boutique choisie et y lance
+`shopctl provision` puis `shopctl deploy`, avec le shopctl de **son** socle ; le
+Nightly sauvegarde la production de chaque boutique deux fois par jour, une à la
+fois, la vérifie, et la surveille. Une boutique sous le socle v0.3.32, qui ne
+marque pas sa base, est refusée avant `npm ci`.
+
+`fleet repo` crée le dépôt **public** par défaut (`--private` sinon) : sous
+GitHub Free, seul un dépôt public a des secrets d'environnement et des relecteurs
+obligatoires. Les jetons viennent de l'environnement — `CLOUDFLARE_API_TOKEN`
+(ou `_STAGING`, `_PRODUCTION`), `CLOUDFLARE_API_TOKEN_BACKUP`,
+`CLOUDFLARE_API_TOKEN_MONITOR`, `SHOPCTL_BACKUP_KEY`, et `SHOPS_READ_TOKEN` quand
+les dépôts de boutique sont privés —, le compte des manifestes des boutiques
+inscrites, qui doivent tous nommer le même.
+
+`repo --fleet` pose la variable `MINSHOP_FLEET` dans le dépôt de la boutique et
+aucun environnement : le Deploy de la boutique refuse alors de tourner, son
+Nightly saute ce qui demande un jeton, et un jeton resté d'avant est nommé avec
+la commande qui le retire.
+
+Sur Workers Paid, les volumes inclus sont ceux du **compte**, partagés par toutes
+ses boutiques : aucune n'a plus de quota à elle. `fleet usage` pose la question
+au compte entier, avec le jeton de surveillance :
+
+```sh
+CLOUDFLARE_API_TOKEN=… npm run shopctl -- fleet usage --account <id> --budget 20
+```
+
+Chaque volume facturé (requêtes et CPU des Workers, lignes et stockage D1,
+opérations et stockage R2, opérations KV, noms d'hôte SaaS estimés à un par
+Worker de production) est comparé à ce que le plan inclut, projeté sur le mois,
+puis chiffré. La commande échoue (code 6) si la facture projetée dépasse
+`--budget`, ou si le compte porte deux cents Workers, le jour d'ouvrir le
+suivant, avant le plafond de 250 crons. Un volume au-delà de l'inclus est
+signalé, pas en échec : il est facturé, pas bloqué. Le Nightly de la flotte la
+lance chaque nuit ; le budget est la variable `MINSHOP_MONTHLY_BUDGET` du dépôt
+de flotte, posée à la main :
+`gh variable set MINSHOP_MONTHLY_BUDGET --body 20 -R <propriétaire/flotte>`.
+
+Un compte qui démarre en Workers Free, le temps d'une ou deux très petites
+boutiques, n'a pas de facture mais des quotas quotidiens, et ce sont ceux du
+compte : `fleet usage --plan free` additionne les boutiques du jour UTC le plus
+chargé contre 100 000 requêtes, 5 millions de lignes D1 lues et 100 000
+écrites, et échoue à 70 % de l'un d'eux, sur une invocation arrêtée, sur une
+base proche de ses 500 Mo, ou à cinq Workers (les cinq crons du plan). Le
+Nightly de la flotte prend le plan dans la variable `MINSHOP_ACCOUNT_PLAN`
+(`paid` si elle est absente) ; `--budget` n'a pas de sens au plan gratuit, et
+la commande le refuse.
+
 **Côté socle**, publier une version passe par une porte :
 
 ```sh
@@ -521,7 +628,8 @@ vrai `shopctl new` depuis un socle réel tagué deux fois : thème et manifeste
 inchangés (hors `coreVersion`), conflit volontaire signalé fichier par fichier,
 migration additive appliquée aux quarante-trois vraies migrations et écriture de
 l'ancienne version toujours acceptée par le nouveau schéma. `release.test.mjs`
-tient la porte de publication.
+tient la porte de publication. `fleet-repository.test.mjs` écrit et relit les
+workflows du dépôt de flotte et pose ses secrets contre le double de `gh`.
 
 `test/scripts/repo.test.mjs`, `provision.test.mjs` et `deploy.test.mjs`
 installent `test/fixtures/wrangler-double.mjs` et `test/fixtures/gh-double.mjs`

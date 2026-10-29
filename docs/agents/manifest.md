@@ -24,16 +24,21 @@ the browser gate and local development render, none of which reach an account.
 `x-staging` colliding with the staging family of `x` is a gate failure rather
 than a discovery.
 
-Every field a shop DECIDES is required. The six `optional` ones under
+Every field a shop DECIDES is required. Six of the seven `optional` ones under
 `cloudflare` are values a shop LEARNS: `accountId` exists only after
 provisioning has run, `productionAccountId` only once the client's own account
 does (ADR 0015), `imagesDomain` only if a domain was ever attached to
 production's images bucket (only the production render names it, and a
 production `deploy` refuses it unattached),
 `stagingDomain` only for a private preview, and `stagingAccessTeam` /
-`stagingAccessAud` only once an Access application stands in front of it. A new
-optional field is a deliberate act; `test/scripts/manifest.test.mjs` pins the
-list by name.
+`stagingAccessAud` only once an Access application stands in front of it. The
+seventh, `saasZone`, is a hosting choice (ADR 0019): the agency's Cloudflare for
+SaaS zone on the shared account, through which production's domain is served
+as a custom hostname while the merchant keeps their DNS. Production then renders
+a route `<domain>/*` on that zone instead of a custom domain — unless the domain
+is inside the zone, which is on the account like any other; staging never goes
+through it. A new optional field is a deliberate act;
+`test/scripts/manifest.test.mjs` pins the list by name.
 
 No credential ever goes in the manifest — the schema is closed and a
 `no-credentials` rule scans the values that are allowed. An account id is not a

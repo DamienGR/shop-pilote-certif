@@ -60,14 +60,14 @@ describe('buildSortModel', () => {
   it('flips direction on the field already sorting the list', () => {
     const active = buildSortModel('/products', 'price', 'asc').options.find((o) => o.current);
 
-    expect(active?.label).toBe('Price');
+    expect(active?.label).toBe('Prix');
     expect(active?.direction).toBe('asc');
     expect(active?.href).toContain('dir=desc');
   });
 
   it('applies each inactive field its own natural direction', () => {
     const name = buildSortModel('/products', 'price', 'asc').options.find(
-      (o) => o.label === 'Name',
+      (o) => o.label === 'Nom',
     );
 
     expect(name?.current).toBe(false);

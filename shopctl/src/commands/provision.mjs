@@ -32,17 +32,20 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
-  addRetentionRule,
+  POOL_RULE,
+  RETENTION_RULE,
+  addLifecycleRule,
   applyMigrations,
   bucketExposure,
   createBucket,
   createDatabase,
   databaseInfo,
-  hasRetentionRule,
+  lifecycleRules,
   listBuckets,
   listDatabases,
   listSecrets,
   putSecret,
+  removeLifecycleRule,
   verifyBucketJurisdiction,
   whoami,
   expectedAccount,
@@ -53,9 +56,12 @@ import { ShopctlError, verificationError } from '../errors.mjs';
 import { applyScript, query } from '../backup/store.mjs';
 import { requireEnvironment, resolveShop } from '../shop.mjs';
 import { renderWrangler, resourceNames, wranglerSubstitutions } from '../../../scripts/manifest.mjs';
-import { DEFAULT_KEEP_DAYS } from '../backup/archive.mjs';
+import { DEFAULT_KEEP_DAYS, archivePrefix } from '../backup/archive.mjs';
+import { POOL_KEEP_DAYS, POOL_PREFIX } from '../backup/pool.mjs';
+import { describeOwner, judgeOwner, markOwner, ownerRefusal, readClaim, readOwner, shopRepository } from '../owner.mjs';
+import { cnameInstruction, createCustomHostname, fallbackOrigin, findCustomHostname, hostnameState, locateHostname } from '../saas.mjs';
 
-export const PROVISION_OPTIONS = { '--env': 'environnement', '--shop': 'slug', '--account': 'id' };
+export const PROVISION_OPTIONS = { '--env': 'environnement', '--shop': 'slug', '--account': 'id', '--claim': 'slug' };
 
 export const provisionUsage = `Usage: shopctl provision --env <staging|production> [options]
 
@@ -63,6 +69,8 @@ export const provisionUsage = `Usage: shopctl provision --env <staging|productio
   --dry-run                   Interroger le compte et n'écrire nulle part.
   --account <id>              Compte Cloudflare attendu, si le manifeste ne le déclare pas.
   --shop <slug>               Manifeste à utiliser quand l'arbre en contient plusieurs.
+  --claim <slug>              Réécrire le marqueur d'une base marquée pour un autre
+                              dépôt (dépôt renommé ou transféré). Le slug, saisi.
   --json                      Rapport lisible par une machine.
 
 Crée ou confirme, pour cette boutique et cet environnement :
@@ -72,8 +80,17 @@ Crée ou confirme, pour cette boutique et cet environnement :
   minshop-<slug>-<env>-images   le bucket R2 des images produit
   minshop-<slug>-<env>-files    le bucket R2 privé des fichiers vendus
 
+et, en production, quand cloudflare.saasZone sert le domaine du commerçant
+(ADR 0019), son nom d'hôte personnalisé sur cette zone — par l'API de
+Cloudflare, avec CLOUDFLARE_API_TOKEN.
+
 La commande est rejouable : elle relit le compte à chaque étape, ne recrée rien
 et reprend une exécution interrompue sans option particulière.
+
+La base porte le marqueur de sa boutique (le dépôt et le slug) : une base
+existante marquée pour une autre boutique est refusée avant toute écriture,
+puisque sur un compte mutualisé deux boutiques au même nom se partageraient
+leurs données (ADR 0019).
 `;
 
 /**
@@ -114,7 +131,7 @@ export function renderEnvironmentConfig({ root, manifest, env, databaseId, out =
   return { out, substitutions };
 }
 
-export function runProvision(args, reporter) {
+export async function runProvision(args, reporter) {
   if (args.positionals.length > 0) {
     throw new ShopctlError(`provision ne prend pas d'argument positionnel ; reçu « ${args.positionals.join('", "')} ».`, {
       kind: 'usage',
@@ -129,6 +146,10 @@ export function runProvision(args, reporter) {
   const { manifest, root } = shop;
   const names = resourceNames(manifest, { env });
   const jurisdiction = manifest.cloudflare.jurisdiction;
+  const slug = manifest.client.slug;
+  // Read before the account is asked anything: a typo here should not cost
+  // the operator a round of wrangler calls.
+  const claim = readClaim(args.values['--claim'], slug);
 
   reporter.section(`Compte Cloudflare`);
   const identity = whoami({ cwd: root });
@@ -177,6 +198,15 @@ export function runProvision(args, reporter) {
     databaseId = created.uuid;
     record('base D1', names.database, 'create', `juridiction ${jurisdiction}, ${databaseId}`);
   }
+
+  // ── Whose database ────────────────────────────────────────────────────────
+  //
+  // Asked of an existing database before anything else is created or written:
+  // on a shared account (ADR 0019) a database found by its name may be another
+  // shop's, and adopting it would deploy this shop onto that one's orders. A
+  // new database is marked at once, so a run that stops before the buckets
+  // still leaves it claimed.
+  const owner = markDatabase({ database: names.database, existing: Boolean(existing), root, slug, env, claim, dryRun, reporter });
 
   // ── R2 ────────────────────────────────────────────────────────────────────
   const buckets = [['bucket images', names.images], ['bucket fichiers', names.files], ['bucket sauvegardes', names.backups]];
@@ -316,25 +346,52 @@ export function runProvision(args, reporter) {
   // A bucket can only express an age, not "keep the last N", and that is
   // acceptable here because the nightly run keeps adding recent archives; the
   // rule `backup prune` applies locally, both bounds at once, is unchanged.
+  //
+  // Two rules since v0.3.32 (ADR 0019): the archives by their prefix, and the
+  // media pool for twice as long, so that a pooled copy outlives the archives
+  // that name it (backup/pool.mjs). A bucket still on the single bucket-wide
+  // rule has it replaced; until then its backups simply reuse nothing.
   reporter.section('Conservation des sauvegardes');
+  const wantedRules = [
+    { name: RETENTION_RULE, prefix: archivePrefix(manifest.client.slug, env), days: DEFAULT_KEEP_DAYS, what: 'archives' },
+    { name: POOL_RULE, prefix: POOL_PREFIX, days: POOL_KEEP_DAYS, what: 'médias du pool' },
+  ];
+  const describeRule = (rule) => `${rule.what} (${rule.prefix}) expirées après ${rule.days} jours`;
   let retention = null;
-  if (dryRun && !bucketsInJurisdiction.includes(names.backups)) {
-    reporter.todo(`${names.backups} — les objets de plus de ${DEFAULT_KEEP_DAYS} jours seraient expirés`);
+  const rules = dryRun && !bucketsInJurisdiction.includes(names.backups) ? [] : lifecycleRules(names.backups, { cwd: root, jurisdiction });
+  if (rules === null) {
+    reporter.warn(
+      `${names.backups} — les règles de cycle de vie n'ont pas pu être lues.`,
+      `Vérifiez dans le tableau de bord : ${wantedRules.map(describeRule).join(' ; ')}.`,
+    );
   } else {
-    const present = hasRetentionRule(names.backups, { cwd: root, jurisdiction });
-    if (present === true) {
-      retention = { days: DEFAULT_KEEP_DAYS, action: 'keep' };
-      reporter.ok(`${names.backups} — règle de conservation déjà posée`);
-    } else if (present === null) {
-      reporter.warn(`${names.backups} — les règles de cycle de vie n'ont pas pu être lues.`, `Vérifiez dans le tableau de bord qu'une règle expire les objets après ${DEFAULT_KEEP_DAYS} jours.`);
-    } else if (dryRun) {
-      reporter.todo(`${names.backups} — les objets de plus de ${DEFAULT_KEEP_DAYS} jours seraient expirés`);
-    } else {
-      addRetentionRule(names.backups, DEFAULT_KEEP_DAYS, { cwd: root, jurisdiction });
-      retention = { days: DEFAULT_KEEP_DAYS, action: 'create' };
-      reporter.ok(`${names.backups} — objets expirés après ${DEFAULT_KEEP_DAYS} jours`);
+    const outcomes = wantedRules.map((wanted) => {
+      const found = rules.find((rule) => rule.name === wanted.name);
+      if (found && found.enabled && found.prefix === wanted.prefix && found.days === wanted.days) return { ...wanted, action: 'keep' };
+      return { ...wanted, action: found ? 'update' : 'create', found };
+    });
+    for (const outcome of outcomes) {
+      if (outcome.action === 'keep') reporter.ok(`${names.backups} — ${describeRule(outcome)}`);
+      else if (dryRun) reporter.todo(`${names.backups} — ${describeRule(outcome)}${outcome.action === 'update' ? ' (règle à remplacer)' : ''}`);
+      else {
+        if (outcome.found) removeLifecycleRule(names.backups, outcome.name, { cwd: root, jurisdiction });
+        addLifecycleRule(names.backups, outcome, { cwd: root, jurisdiction });
+        reporter.ok(`${names.backups} — ${describeRule(outcome)}${outcome.action === 'update' ? ' (règle remplacée)' : ''}`);
+      }
     }
+    const action = outcomes.every((outcome) => outcome.action === 'keep')
+      ? 'keep'
+      : outcomes.some((outcome) => outcome.action === 'update') ? 'update' : 'create';
+    retention = {
+      days: DEFAULT_KEEP_DAYS,
+      poolDays: POOL_KEEP_DAYS,
+      action,
+      rules: outcomes.map(({ name, prefix, days, action: ruleAction }) => ({ name, prefix, days, action: ruleAction })),
+    };
   }
+
+  // ── The merchant's domain, on the SaaS zone ───────────────────────────────
+  const hostname = await ensureHostname({ manifest, env, account, dryRun, reporter });
 
   const failures = reporter.entries.filter((entry) => entry.status === 'fail');
 
@@ -398,10 +455,12 @@ export function runProvision(args, reporter) {
     jurisdiction,
     resources: names,
     databaseId,
+    owner,
     steps,
     jurisdictionChecks: checks,
     exposure: { files: filesExposure, images: imagesExposure, backups: backupsExposure },
     retention,
+    hostname,
     config: config?.out ?? null,
     migrations,
     demoCheckout,
@@ -424,6 +483,105 @@ export function runProvision(args, reporter) {
     );
   }
   return 0;
+}
+
+/**
+ * Read the database's marker, decide, and write it — or say what would be
+ * written, in a dry run.
+ *
+ * A database marked for another shop stops the run here, before the buckets,
+ * unless the operator typed `--claim <slug>`: the case it exists for is a
+ * repository renamed or transferred, where the marker is stale and the data is
+ * this shop's. An unmarked one is claimed, because every database provisioned
+ * before ADR 0019 is unmarked and lives on its merchant's own account, where
+ * no other shop could have taken the name.
+ *
+ * @returns {{ repository: string|null, verdict: string, action: 'create'|'keep'|'update'|'claim' }}
+ */
+function markDatabase({ database, existing, root, slug, env, claim, dryRun, reporter }) {
+  const repository = shopRepository(root);
+  const marker = existing ? readOwner(database, { cwd: root }) : null;
+  const verdict = judgeOwner(marker, { repository, slug });
+  const owner = describeOwner({ repository, slug });
+
+  let action;
+  if (verdict === 'foreign' || verdict === 'unproven') {
+    if (!claim) throw ownerRefusal(verdict, { database, marker, repository, slug, env });
+    action = 'claim';
+    reporter.warn(`${database} était marquée pour ${describeOwner(marker)} ; marqueur ${dryRun ? 'à réécrire' : 'réécrit'} pour ${owner} (--claim).`);
+  } else if (verdict === 'unmarked') {
+    action = 'create';
+    if (dryRun) reporter.todo(`${database} serait marquée pour ${owner}`);
+    else reporter.ok(`${database} — marquée pour ${owner}${existing ? ' (base antérieure au marqueur)' : ''}`);
+  } else if (!marker.repository && repository) {
+    action = 'update';
+    if (dryRun) reporter.todo(`${database} — le marqueur serait complété du dépôt ${repository}`);
+    else reporter.ok(`${database} — marqueur complété du dépôt ${repository}`);
+  } else {
+    action = 'keep';
+    reporter.ok(`${database} — marquée pour ${describeOwner(marker)}`);
+  }
+
+  if (!dryRun && action !== 'keep') markOwner(database, { cwd: root, repository, slug });
+  if (!repository && action !== 'keep') {
+    reporter.warn(
+      'cet arbre n\'a pas de remote origin : le marqueur ne nomme que le slug.',
+      'Relancez `shopctl provision` une fois le dépôt créé (`shopctl repo`) : il complète le marqueur, et seul le dépôt distingue deux boutiques au même slug.',
+    );
+  }
+  return { repository, verdict, action };
+}
+
+/**
+ * The merchant's domain as a custom hostname of the SaaS zone: found, or
+ * created, and its state said in the words the merchant needs.
+ *
+ * Created before the merchant's CNAME exists, on purpose: Cloudflare then
+ * validates it the moment the record appears, and the operator has the exact
+ * line to send the merchant now rather than on the morning of the launch. A
+ * pending hostname is a step to do, not a failure — `deploy` is what refuses
+ * to smoke-test a domain nothing answers on yet.
+ *
+ * @returns {null|{ hostname: string, zone: string, action: string|null, status: string|null, ssl: string|null, active: boolean, cname: string|null }}
+ */
+async function ensureHostname({ manifest, env, account, dryRun, reporter }) {
+  const located = await locateHostname({ manifest, env, account, reporter, required: !dryRun });
+  if (!located) return null;
+  const { hostname, zoneName, token, zone } = located;
+  const report = { hostname, zone: zoneName, action: null, status: null, ssl: null, active: false, cname: null };
+  if (!token) return report;
+
+  // Set once per zone, by hand (docs/agents/shopctl.md): every merchant's CNAME
+  // points at it, so a zone without one serves nobody.
+  const fallback = await fallbackOrigin(zone.id, { token });
+  report.cname = fallback?.origin ?? null;
+  if (fallback?.status === 'active') reporter.ok(`origine de repli de ${zoneName} : ${fallback.origin}`);
+  else {
+    reporter.warn(
+      `l'origine de repli de ${zoneName} est ${fallback ? `en état « ${fallback.status} »` : 'absente ou illisible'}.`,
+      `Réglage unique de la zone : un enregistrement proxifié (AAAA 100::) posé comme origine de repli, dans SSL/TLS → Custom Hostnames. Les CNAME des commerçants pointent vers lui.`,
+    );
+  }
+
+  let record = await findCustomHostname(zone.id, hostname, { token });
+  report.action = record ? 'keep' : 'create';
+  if (!record && dryRun) {
+    reporter.todo(`${hostname} serait créé comme nom d'hôte personnalisé de ${zoneName}`, cnameInstruction(hostname, fallback, zoneName));
+    return report;
+  }
+  if (!record) record = await createCustomHostname(zone.id, hostname, { token });
+
+  const state = hostnameState(record);
+  Object.assign(report, { status: state.status, ssl: state.ssl, active: state.active });
+  const created = report.action === 'create' ? 'créé' : 'déjà présent';
+  if (state.active) reporter.ok(`${hostname} — ${created}, actif, certificat actif`);
+  else {
+    reporter.todo(
+      `${hostname} — ${created}, en attente du DNS du commerçant (état ${state.status ?? 'inconnu'}, certificat ${state.ssl ?? 'inconnu'})`,
+      `${cnameInstruction(hostname, fallback, zoneName)}${state.errors.length > 0 ? ` Cloudflare dit : ${state.errors.join(' ; ')}.` : ''}`,
+    );
+  }
+  return report;
 }
 
 /** The setting Admin → Réglages → Paiements writes: the methods switched OFF. */

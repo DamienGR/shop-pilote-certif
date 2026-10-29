@@ -26,7 +26,7 @@ const { model, purchase } = Astro.props;
 
 <a
   href={model.backHref}
-  class="mt-10 inline-block text-[10px] font-medium uppercase tracking-[0.24em] text-[color:var(--studio-muted)] hover:text-brand"
+  class="mt-10 inline-block text-[10px] font-medium uppercase tracking-[0.24em] text-[color:var(--studio-muted)] hover:text-accent"
 >
   &larr; {t('product.backToShop')}
 </a>
@@ -49,7 +49,7 @@ const { model, purchase } = Astro.props;
       model.categories.length > 0 && (
         <nav
           aria-label={t('catalog.categories.label')}
-          class="mb-7 flex flex-wrap gap-x-5 gap-y-1 text-[10px] font-medium uppercase tracking-[0.2em] text-brand"
+          class="mb-7 flex flex-wrap gap-x-5 gap-y-1 text-[10px] font-medium uppercase tracking-[0.2em] text-accent"
         >
           {model.categories.map((category) => (
             <a href={category.href} class="hover:text-[color:var(--studio-bone)]">
@@ -63,7 +63,7 @@ const { model, purchase } = Astro.props;
     <h1 class="font-serif text-[clamp(2.4rem,4.4vw,4rem)] font-normal leading-[0.95] tracking-[-0.03em]">
       {model.name}
     </h1>
-    {model.digitalDelivery && <p class="mt-3 text-xs uppercase tracking-[0.2em] text-brand">{t('product.digitalDelivery')}</p>}
+    {model.digitalDelivery && <p class="mt-3 text-xs uppercase tracking-[0.2em] text-accent">{t('product.digitalDelivery')}</p>}
 
     <p
       class="mt-6 text-sm tracking-[0.12em] text-[color:var(--studio-muted)]"
@@ -75,7 +75,7 @@ const { model, purchase } = Astro.props;
       {model.formattedPrice}
     </p>
 
-    {model.lowStock && <p data-low-stock class="mt-2 text-xs tracking-[0.16em] text-brand">{t('product.lowStock')}</p>}
+    {model.lowStock && <p data-low-stock class="mt-2 text-xs tracking-[0.16em] text-accent">{t('product.lowStock')}</p>}
 
     {
       model.descriptionHtml && (
@@ -89,7 +89,7 @@ const { model, purchase } = Astro.props;
       type="button"
       data-share
       data-share-title={model.name}
-      class="mt-8 hidden w-fit items-center gap-2 text-[10px] font-medium uppercase tracking-[0.24em] text-[color:var(--studio-muted)] hover:text-brand"
+      class="mt-8 hidden w-fit items-center gap-2 text-[10px] font-medium uppercase tracking-[0.24em] text-[color:var(--studio-muted)] hover:text-accent"
     >
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />

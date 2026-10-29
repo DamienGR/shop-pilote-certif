@@ -32,6 +32,12 @@ Two things follow from that when you edit it:
   asserts a REFUSAL — `shopctl catalog import` stops when the tree's
   configuration names another shop or another environment — and not only the
   absence of rows afterwards.
+- **a name is not proof of ownership on a shared account** (ADR 0019). Each
+  database carries `_minshop_owner`, the repository and slug `provision` wrote,
+  and the gate asserts each one names its own shop. The REFUSALS — a second
+  tree with the same slug and another repository, stopped by `provision`,
+  `deploy`, `backup` and `destroy` before any write — live in
+  `test/scripts/owner.test.mjs`, which builds that collision on purpose.
 - **a teardown finds its resources by name on a shared account.** The gate
   ends by destroying the canary's staging and checking that exactly its six
   resources left — Worker, sessions namespace, three buckets, database — and

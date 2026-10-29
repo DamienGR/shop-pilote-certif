@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseStoreSettings } from '../settings/db';
-import { enabledMethods, isMethodAvailable, isMethodEnabled } from './index';
+import { enabledMethods, isMethodAvailable } from './methods';
+import { isMethodEnabled } from './index';
 
 const STRIPE_KEYS = [
   { key: 'enc:stripe_secret_key', value: 'sealed' },

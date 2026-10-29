@@ -1,0 +1,184 @@
+# __GENERATED__
+#
+# Deploying one shop of the fleet on the shared Cloudflare account (ADR 0019).
+#
+# The same command a shop's own Deploy runs — `shopctl deploy --env <env>`,
+# from the shop's tree, with the shopctl of the core that shop is on — and the
+# same two things CI adds: a GitHub Environment per target, `production`
+# carrying the required reviewers, and credentials that are on nobody's
+# machine. What moved is WHERE those credentials live. No Cloudflare token can
+# be limited to one shop's database, so on a shared account a token in a
+# shop's repository would be a key to every shop's buyers: they live here, in
+# this repository's environments, and the shops' repositories hold none.
+#
+# Manual dispatch only, for the reason the shop's own Deploy gives: the merge
+# button is not the deploy button. The shop is named by its slug and found in
+# fleet.json, whose `repository` says which repository to check out.
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      shop:
+        description: Slug de la boutique (fleet.json)
+        required: true
+        type: string
+      environment:
+        description: Environnement cible
+        required: true
+        type: choice
+        options: [staging, production]
+      ref:
+        description: Branche, tag ou commit de la boutique (vide = sa branche par défaut)
+        required: false
+        default: ''
+        type: string
+      run-verify-job:
+        description: Lancer `npm run verify` dans un job dédié avant l'approbation
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+# One deployment at a time per shop and environment, never cancelled in flight:
+# a run interrupted between the migrations and the upload leaves the new schema
+# under the old code.
+concurrency:
+  group: deploy-${{ inputs.shop }}-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  # The registry is read from THIS repository's default-branch copy, which is
+  # what the reviewers of a production run are approving against.
+  shop:
+    name: Find the shop
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      repository: ${{ steps.shop.outputs.repository }}
+    steps:
+      - name: Check out the fleet
+        uses: actions/checkout@v6
+
+      - name: Read fleet.json
+        id: shop
+        env:
+          SHOP: ${{ inputs.shop }}
+        run: |
+          set -euo pipefail
+          node .github/fleet/shops.mjs repository "$SHOP" >> "$GITHUB_OUTPUT"
+
+  verify:
+    name: Verify
+    needs: shop
+    if: ${{ inputs.run-verify-job }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
+    steps:
+      - name: Check out the shop
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ needs.shop.outputs.repository }}
+          ref: ${{ inputs.ref }}
+          # Only when the shops' repositories are private: a token that reads
+          # them, and nothing else. A public shop needs none.
+          token: ${{ secrets.SHOPS_READ_TOKEN || github.token }}
+
+      # The commit verified is the commit deployed: `--skip-verify` below is
+      # only true of this exact tree, and a branch can move during an approval.
+      - name: Name the commit
+        id: sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Run the verification suite
+        uses: ./.github/actions/run-verify
+
+  deploy:
+    name: Deploy ${{ inputs.shop }} (${{ inputs.environment }})
+    needs: [shop, verify]
+    if: ${{ always() && needs.shop.result == 'success' && needs.verify.result != 'failure' && needs.verify.result != 'cancelled' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ steps.deploy.outputs.origin }}
+
+    env:
+      # Scoped to the environment above, as in a shop's own Deploy: a staging
+      # run cannot read the production token. The account is the shared one,
+      # and a shop whose manifest names another is refused by shopctl itself:
+      # two sources that disagree stop the run.
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      SHOPCTL_BACKUP_KEY: ${{ secrets.SHOPCTL_BACKUP_KEY }}
+
+    steps:
+      - name: Check out the shop
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ needs.shop.outputs.repository }}
+          ref: ${{ needs.verify.outputs.sha || inputs.ref }}
+          token: ${{ secrets.SHOPS_READ_TOKEN || github.token }}
+          path: shop
+
+      - name: Check out the fleet
+        uses: actions/checkout@v6
+        with:
+          path: fleet
+
+      # A shop on a core older than the owner marker would find another shop's
+      # database by its name and never ask whose it is (ADR 0019).
+      - name: Check the shop's core
+        run: node fleet/.github/fleet/shops.mjs core shop
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: shop/.nvmrc
+          check-latest: true
+          cache: npm
+          cache-dependency-path: shop/package-lock.json
+
+      - name: Install dependencies
+        working-directory: shop
+        run: npm ci
+
+      - name: Provision or confirm the environment
+        working-directory: shop
+        env:
+          SHOP: ${{ inputs.shop }}
+          TARGET: ${{ inputs.environment }}
+        run: |
+          set -euo pipefail
+          node shopctl/bin/shopctl.mjs provision --env "$TARGET" --shop "$SHOP" --json | tee provision.json
+
+      - name: Deploy
+        id: deploy
+        working-directory: shop
+        env:
+          SHOP: ${{ inputs.shop }}
+          TARGET: ${{ inputs.environment }}
+          VERIFIED_ALREADY: ${{ inputs.run-verify-job }}
+        run: |
+          set -euo pipefail
+          args=(deploy --env "$TARGET" --shop "$SHOP" --yes --json)
+          if [ "$VERIFIED_ALREADY" = "true" ]; then args+=(--skip-verify); fi
+          node shopctl/bin/shopctl.mjs "${args[@]}" | tee deploy.json
+          origin="$(node -p "JSON.parse(require('node:fs').readFileSync('deploy.json','utf8')).origin || ''")"
+          echo "origin=$origin" >> "$GITHUB_OUTPUT"
+
+      - name: Keep the deployment reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: deploy-${{ inputs.shop }}-${{ inputs.environment }}-${{ github.run_id }}
+          path: |
+            shop/provision.json
+            shop/deploy.json
+          retention-days: 90
+          if-no-files-found: warn

@@ -34,6 +34,7 @@ import {
   resourceNames,
 } from '../../../scripts/manifest.mjs';
 import { setupRepository } from './repo.mjs';
+import { fleetRepositoryName, nearestRegistry, readRegistry } from '../fleet.mjs';
 import { assertForgeReady, defaultOwner, gitProtocol, repositoryNameFor, repositoryUrl } from '../forge.mjs';
 import { RESERVED_THEME_IDS, SHOP_SIGNATURES_DIR, SIGNATURES_DIR, THEMES_DIR, isValidThemeId, normalizeThemeId } from '../../../scripts/themes.mjs';
 import { CORE_ROOT, corePackage } from '../paths.mjs';
@@ -114,6 +115,7 @@ export const NEW_OPTIONS = {
   '--account': 'value',
   '--reviewer': 'value',
   '--owner': 'value',
+  '--fleet': 'value',
 };
 
 export const newUsage = `Usage: shopctl new <slug> [options]
@@ -136,6 +138,8 @@ export const newUsage = `Usage: shopctl new <slug> [options]
                       (enveloppe la CLI gh)
   --owner <compte>    Compte ou organisation GitHub du dépôt déduit
   --reviewer <login>  Relecteur obligatoire en production, avec --create-repo
+  --fleet <dépôt>     Avec --create-repo, sur le compte mutualisé : le dépôt de
+                      flotte la déploie, aucun secret Cloudflare n'est posé
   --no-install        Ne pas installer les dépendances
   --no-verify         Ne pas exécuter la vérification minimale
   --json              Rapport de création lisible par une machine
@@ -342,6 +346,8 @@ export function runNew(args, reporter) {
   // the clone already does it. Deriving it later would leave a shop whose
   // `origin` was added by a different step than every other shop's.
   const createRepo = args.values['--create-repo'] === true;
+  const fleet = args.values['--fleet'] === undefined ? null : fleetRepositoryName(args.values['--fleet']);
+  if (fleet && !createRepo) throw usageError('--fleet ne vaut qu\'avec --create-repo.', 'Sans dépôt créé, `shopctl repo --fleet <dépôt>` le pose ensuite depuis la boutique.');
   const originUrl = args.values['--origin']
     ? String(args.values['--origin'])
     : createRepo
@@ -379,6 +385,8 @@ export function runNew(args, reporter) {
   if (witnesses.length > 0) throw takenByWitness(slug, witnesses, 'Nothing was created.');
 
   const cwd = process.cwd();
+  const registered = fleetCollisions(manifest, cwd, reporter);
+  if (registered.shops.length > 0) throw takenInFleet(slug, registered);
   // Under --json, stdout belongs to the report and nothing else, so a child's
   // stdout (npm's install log, above all) is pointed at our stderr rather than
   // interleaved into a document a caller is about to parse.
@@ -559,6 +567,7 @@ export function runNew(args, reporter) {
           .split(',')
           .map((entry) => entry.trim())
           .filter(Boolean),
+        fleet,
         json: reporter.json,
         // `new` emits its own document; a second one on the same stdout would
         // break every caller that pipes it into a parser.
@@ -718,6 +727,59 @@ export function witnessClaims(gate, slug) {
     files.includes(CLIENT_MANIFEST) && files.every((file) => file === CLIENT_MANIFEST || isWitnessFile(file));
   if (!collisions.every(betweenShopAndWitness)) return [];
   return [...new Set(collisions.flatMap(({ files }) => files.filter(isWitnessFile)))];
+}
+
+const NEW_SHOP = '(nouvelle boutique)';
+
+/**
+ * The fleet shops a would-be shop collides with, in the registry found walking
+ * up from `cwd` (ADR 0019).
+ *
+ * On the shared account two shops are told apart by their names alone, so a
+ * slug the registry already lists, or a name a registered shop's manifest
+ * already derives, would put the new shop on the other one's resources. The
+ * slug is asked of the registry itself, because a registered shop need not be
+ * cloned on this machine; the derived names, of every manifest that is. A
+ * registry that cannot be read is said rather than fatal: `fleet verify`
+ * refuses it on its own, and a shop created outside any fleet is the ordinary
+ * case.
+ *
+ * @returns {{ file: string|null, shops: string[] }}
+ */
+export function fleetCollisions(manifest, cwd, reporter) {
+  const file = nearestRegistry(cwd);
+  if (!file) return { file: null, shops: [] };
+  let fleet;
+  try {
+    fleet = readRegistry(file);
+  } catch (error) {
+    if (!(error instanceof ShopctlError)) throw error;
+    reporter.warn(`${file} est illisible : le slug n'a pas été comparé à la flotte.`, error.message);
+    return { file, shops: [] };
+  }
+  const registered = fleet.shops.filter((shop) => shop.slug === manifest.client.slug).map((shop) => shop.slug);
+  // Valid manifests only, as `detectFleetCollisions` asks; `core: null`
+  // because a fleet's shops sit on other core versions than this one, and
+  // their names are theirs whatever the version.
+  const claims = fleet.shops
+    .filter((shop) => shop.isShop)
+    .map((shop) => ({ file: shop.slug, loaded: loadManifest(CLIENT_MANIFEST, { root: shop.root, core: null, checkTheme: false }) }))
+    .filter(({ loaded }) => loaded.errors.length === 0)
+    .map(({ file: slug, loaded }) => ({ file: slug, manifest: loaded.manifest }));
+  const derived = detectFleetCollisions([{ file: NEW_SHOP, manifest }, ...claims])
+    .filter((claim) => claim.files.includes(NEW_SHOP))
+    .flatMap((claim) => claim.files.filter((slug) => slug !== NEW_SHOP));
+  return { file, shops: [...new Set([...registered, ...derived])] };
+}
+
+function takenInFleet(slug, { file, shops }) {
+  return inputError(
+    `« ${slug} » revendique les noms d'une boutique de la flotte : ${shops.join(', ')} (${file}).`,
+    [
+      'Sur le compte mutualisé, deux boutiques ne sont séparées que par leurs noms (ADR 0019) : celle-ci partagerait les ressources de l\'autre.',
+      'Choisissez un autre slug, ou un autre --domain. Rien n\'a été créé.',
+    ].join('\n'),
+  );
 }
 
 function takenByWitness(slug, files, outcome) {

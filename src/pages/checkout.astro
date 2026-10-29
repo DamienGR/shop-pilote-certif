@@ -155,11 +155,23 @@ const carry = productPublicId ?? '';
 const carryVariantId = buyNowVariantId ?? '';
 const carryExtraIds = buyNowExtraIds;
 
+// One predicate for the checkbox and for the refusal below — see
+// features/legal/terms.ts. Open (no consent asked, none required) until the
+// merchant publishes the terms page.
+const terms = await readTermsGate(env.DB, cfg.legal);
+// On the first hop the cart's acceptance arrives in the query (api/checkout.ts);
+// past it, only the posted form counts. A query never stands in for a POST.
+const termsAccepted = isAcceptance(
+  isPost ? fld('accept_terms') : Astro.url.searchParams.get('accept_terms'),
+);
+
 const editAddressHref = (() => {
   const params = new URLSearchParams({ method: rail });
   if (carry) params.set('product_id', carry);
   if (carryVariantId) params.set('variant_id', carryVariantId);
   for (const id of carryExtraIds) params.append('extra', id);
+  // Going back to the address keeps the acceptance already given.
+  if (termsAccepted) params.set('accept_terms', '1');
   return `/checkout?${params}`;
 })();
 
@@ -192,12 +204,6 @@ const addr = {
   postal: fld('postal') || (prefill?.postal ?? ''),
   country: (fld('country') || prefill?.country || geoDefault || knownCountries[0] || 'US').toUpperCase(),
 };
-
-// One predicate for the checkbox and for the refusal below — see
-// features/legal/terms.ts. Open (no consent asked, none required) until the
-// merchant publishes the terms page.
-const terms = await readTermsGate(env.DB, cfg.legal);
-const termsAccepted = isAcceptance(fld('accept_terms'));
 
 let stage: 'address' | 'shipping' = 'address';
 let options: { label: string; amountCents: number; pickup?: boolean }[] = [];
@@ -238,12 +244,17 @@ if (submitted) {
           }),
         );
         errors.push(
-          `We can't calculate shipping for ${quote.missingWeight.map((m) => m.name).join(', ')} right now. Please contact us to complete this order.`,
+          t('checkout.error.missingWeightFor', {
+            produits: quote.missingWeight.map((m) => m.name).join(', '),
+          }),
         );
       } else if (overweight) {
         errors.push(t('checkout.error.overweight'));
       } else {
-        errors.push(`Sorry, we don't ship to ${addr.country} yet.`);
+        // Named when it is a real code; a malformed one is echoed as typed,
+        // because Intl.DisplayNames throws on it.
+        const pays = isCountryCode(addr.country) ? countryName(addr.country) : addr.country;
+        errors.push(t('checkout.error.noShippingToCountry', { pays }));
       }
     } else {
       stage = 'shipping';
@@ -359,8 +370,8 @@ if (submitted) {
               );
               errors.push(
                 rail === 'lightning'
-                  ? 'Lightning is temporarily unavailable. Please try again in a moment, or choose another payment method.'
-                  : 'That payment method is temporarily unavailable. Please try again in a moment, or choose another.',
+                  ? t('checkout.error.lightningUnavailable')
+                  : t('checkout.error.railUnavailable'),
               );
             }
           }
@@ -462,7 +473,7 @@ const hasErrors = errors.length > 0;
                 />
                 <span>
                   {t('terms.accept')}{' '}
-                  <a href={terms.href} class="underline hover:text-brand">
+                  <a href={terms.href} class="underline hover:text-accent">
                     {t('terms.linkLabel')}
                   </a>{' '}
                   ({t('terms.version', { version: terms.version })}).
@@ -485,6 +496,8 @@ const hasErrors = errors.length > 0;
           {carryExtraIds.map((id) => (
             <input type="hidden" name="extra" value={id} />
           ))}
+          {/* The acceptance given on the cart, carried to the step that asks for it. */}
+          {terms.required && termsAccepted && <input type="hidden" name="accept_terms" value="on" />}
           <label class="block text-sm">
             <span class="mb-1 block font-medium">{t('checkout.field.email')}</span>
             <input

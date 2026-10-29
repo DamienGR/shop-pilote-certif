@@ -48,9 +48,10 @@ import { resourceNames } from '../../../scripts/manifest.mjs';
 import { restoreScript, tableDigest } from '../backup/dump.mjs';
 import { classifyTables, generatedColumns, orderTables, seededTables } from '../backup/schema.mjs';
 import { applyScript, countRows, putObject, query, readSchema, readTables } from '../backup/store.mjs';
-import { DATA_FILE, authenticatedHeader, readArchive } from '../backup/archive.mjs';
+import { DATA_FILE, authenticatedHeader, objectContext, readArchive } from '../backup/archive.mjs';
 import { keyId, keyMatches, loadKey, open } from '../backup/crypto.mjs';
 import { backupContext } from './backup.mjs';
+import { guardOwner } from '../owner.mjs';
 
 const LOCAL_DATABASE_ID = '00000000-0000-4000-8000-00000000c0de';
 
@@ -205,6 +206,9 @@ export function runRestore(args, reporter) {
       );
     }
     const databaseId = database.uuid ?? database.database_id;
+    // A restore with --overwrite replaces what is there: on a shared account
+    // (ADR 0019) the database of this name has to be proven this shop's first.
+    guardOwner({ database: names.database, root, manifest, env, reporter });
     renderEnvironmentConfig({ root, manifest, env, databaseId });
     reporter.ok(`${names.database} (${databaseId}) — wrangler.jsonc rendu`);
   }
@@ -295,6 +299,23 @@ export function runRestore(args, reporter) {
   }
   const uncarried = (archive.r2?.buckets ?? []).flatMap((bucket) => bucket.inventory.filter((object) => !object.file).map((object) => object.key));
 
+  // Every byte this restore will write is on disk before the first row is: an
+  // archive taken with --upload leaves in the backups bucket's pool the objects
+  // the pool already had, and a restore that found that out after the rows
+  // were in would leave a database whose images point at nothing.
+  const notOnDisk = storedMedia.filter((object) => !existsSync(join(entry.path, object.file)));
+  if (notOnDisk.length > 0) {
+    const inPool = notOnDisk.every((object) => object.pool);
+    throw (inPool ? preconditionError : verificationError)(
+      inPool
+        ? `${notOnDisk.length} objet(s) de ${archive.id} sont restés dans le pool du bucket de sauvegarde.`
+        : `${notOnDisk.length} objet(s) de ${archive.id} manquent à l'archive : ${notOnDisk.slice(0, 3).map((object) => object.key).join(', ')}${notOnDisk.length > 3 ? '…' : ''}.`,
+      inPool
+        ? `Rapatriez-les : shopctl backup pull ${archive.id} --env ${archive.env}. Rien n'a été écrit.`
+        : 'Cette copie est incomplète ; rapatriez-la de nouveau avec shopctl backup pull. Rien n\'a été écrit.',
+    );
+  }
+
   if (dryRun) {
     reporter.section('Simulation');
     reporter.todo(`${statements.length} instruction(s) seraient appliquées à ${names.database}`);
@@ -327,7 +348,7 @@ export function runRestore(args, reporter) {
 
   for (const object of storedMedia) {
     // Sealed under the SOURCE bucket's name: it is what the backup authenticated.
-    const bytes = open({ iv: object.cipher.iv, tag: object.cipher.tag, ciphertext: readFileSync(join(entry.path, object.file)) }, key, `${archive.id}:${object.source}:${object.key}`);
+    const bytes = open({ iv: object.cipher.iv, tag: object.cipher.tag, ciphertext: readFileSync(join(entry.path, object.file)) }, key, objectContext(archive, object.source, object.key));
     // A local bucket has no jurisdiction; wrangler would refuse the flag there.
     putObject(object.key, bytes, { cwd: root, bucket: object.bucket, remote, jurisdiction: remote ? jurisdiction : [] });
   }

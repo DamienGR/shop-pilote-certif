@@ -157,3 +157,59 @@ describe('check-secrets', () => {
     }
   });
 });
+
+describe('check-secrets --artifacts', () => {
+  // The Cloudflare Vite plugin copies the local secrets next to the generated
+  // config, so `npm run preview` reads them. Scanned as output, that copy made
+  // `verify` red for anyone who had followed .dev.vars.example; the bundle
+  // beside it is what has to stay clean.
+  const SECRET = ['local', 'kek', 'Zq8Lm3Rt7Vx2Nc5Bk9Wd4Hs6'].join('-');
+
+  /** A built tree with a local .dev.vars and the plugin's quoted copy of it. */
+  function built() {
+    const repo = repository();
+    writeFileSync(join(repo.root, '.dev.vars'), `SECRETS_KEK=${SECRET}\n`);
+    mkdirSync(join(repo.root, 'dist/server'), { recursive: true });
+    mkdirSync(join(repo.root, 'dist/client'), { recursive: true });
+    writeFileSync(join(repo.root, 'dist/server/.dev.vars'), `SECRETS_KEK='${SECRET}'\n`);
+    writeFileSync(join(repo.root, 'dist/server/entry.mjs'), 'export default {};\n');
+    return repo;
+  }
+
+  it('leaves the preview copy of .dev.vars alone', () => {
+    const repo = built();
+    try {
+      const scan = repo.scan('--artifacts');
+      expect(scan.stderr).toBe('');
+      expect(scan.status).toBe(0);
+    } finally {
+      repo.dispose();
+    }
+  });
+
+  it('still finds a local value compiled into the bundle', () => {
+    const repo = built();
+    try {
+      writeFileSync(join(repo.root, 'dist/server/entry.mjs'), `export const kek = ${JSON.stringify(SECRET)};\n`);
+      const scan = repo.scan('--artifacts');
+      expect(scan.status).toBe(1);
+      expect(scan.stderr).toContain('dist/server/entry.mjs  local .dev.vars value compiled into the build output');
+      expect(scan.stderr).not.toContain(SECRET);
+    } finally {
+      repo.dispose();
+    }
+  });
+
+  it('still refuses a .dev.vars anywhere else in the build output', () => {
+    const repo = built();
+    try {
+      writeFileSync(join(repo.root, 'dist/client/.dev.vars'), `SECRETS_KEK=${SECRET}\n`);
+      const scan = repo.scan('--artifacts');
+      expect(scan.status).toBe(1);
+      expect(scan.stderr).toContain('dist/client/.dev.vars');
+      expect(scan.stderr).not.toContain('dist/server/.dev.vars');
+    } finally {
+      repo.dispose();
+    }
+  });
+});

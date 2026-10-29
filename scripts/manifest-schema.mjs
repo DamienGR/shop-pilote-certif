@@ -174,6 +174,12 @@ export const MANIFEST_SPEC = {
         description:
           'Cloudflare account production lives on, when it is not `accountId`. ADR 0015 builds staging on the agency\'s account and puts production on the client\'s, and both exist at once from the moment the client starts entering content until the agency copy is torn down. Absent, production lives on `accountId` like everything else.',
       },
+      saasZone: {
+        optional: true,
+        schema: { type: 'string', pattern: DOMAIN, minLength: 4, maxLength: 253 },
+        description:
+          'Cloudflare for SaaS zone of the shared account (ADR 0019) that serves `productionDomain` as a custom hostname, so the merchant\'s domain keeps its own DNS: the merchant adds one CNAME to the zone\'s fallback origin, and production is routed to this shop\'s Worker by hostname. Absent, or when `productionDomain` is inside this zone, production is a Workers custom domain, which needs the domain\'s zone on the shop\'s account. Staging is never served through it.',
+      },
       imagesDomain: {
         optional: true,
         schema: { type: 'string', pattern: DOMAIN, minLength: 4, maxLength: 253 },
@@ -340,6 +346,21 @@ export const CROSS_FIELD_RULES = [
           path: 'cloudflare.stagingDomain',
           message:
             'is the production domain. Two environments on one hostname means whichever deployed last is serving the shop, and the one taking orders is the one nobody chose.',
+        };
+      }
+      return null;
+    },
+  },
+  {
+    id: 'saas-zone-is-not-production',
+    description: 'The production domain is a hostname of the SaaS zone, not the zone itself.',
+    check(m) {
+      const zone = m.cloudflare?.saasZone;
+      if (zone && zone === m.cloudflare?.productionDomain) {
+        return {
+          path: 'cloudflare.saasZone',
+          message:
+            'is the production domain. Cloudflare for SaaS refuses a custom hostname equal to its zone name, and the zone is the agency\'s: every shop of the shared account is served through it.',
         };
       }
       return null;

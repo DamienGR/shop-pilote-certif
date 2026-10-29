@@ -1,0 +1,281 @@
+# __GENERATED__
+#
+# The fleet's night (ADR 0019): what each shop's own Nightly did with a
+# Cloudflare token, done here for every shop of fleet.json, because the tokens
+# of the shared account live here and nowhere else.
+#
+#   - production's backup (ADR 0005: RPO 24 h), twice a day as in a shop's
+#     Nightly — 03:17 and 15:17 UTC, twelve hours apart so that GitHub starting
+#     one run hours late still leaves every gap below 24 h — to the shop's own
+#     `-backups` bucket, then verified with the key on the runner, never
+#     restored there;
+#   - production's error rate (`shopctl monitor`), with a token that reads
+#     analytics and nothing else;
+#   - the account (`shopctl fleet usage`, plan §13.1 lot 7). On Workers Paid:
+#     every volume billed against what the plan includes, the projected bill
+#     against the repository variable MINSHOP_MONTHLY_BUDGET when it is set,
+#     and the Workers the account carries against the two hundred it aims at.
+#     On Workers Free: the account's busiest day against the daily quotas every
+#     shop shares, and its five crons. Asked once a night, with the first
+#     shop's shopctl and the same token.
+#
+# The account's plan is the repository variable MINSHOP_ACCOUNT_PLAN, `paid`
+# when unset (ADR 0019). `monitor` takes it too: on the free plan it still
+# judges one shop's quotas and stopped invocations, and `fleet usage` the sum.
+#
+# One shop at a time for the backups: the shared account answers 1 200 API
+# calls per five minutes, dashboard included, and a shop's first backup is two
+# calls per object it copies — the later ones read and write only what the
+# backups bucket's media pool does not have yet. A shop's failure is its own:
+# `fail-fast: false`.
+#
+# What stays in each shop's repository, which needs no Cloudflare token: the
+# suite on a clean D1, the dependency audit, and the remote gates against a
+# staging when there is one.
+#
+# Secrets, placed by `shopctl fleet repo`:
+#
+#   in the `backup` environment, limited to the default branch:
+#     CLOUDFLARE_API_TOKEN          D1 Read, Workers R2 Storage Write, Account
+#                                   Settings Read, Memberships and User Details
+#                                   Read — nothing that deploys
+#     CLOUDFLARE_ACCOUNT_ID, SHOPCTL_BACKUP_KEY
+#   as repository secrets:
+#     MONITOR_CLOUDFLARE_API_TOKEN  Account Analytics, D1 and Account Settings
+#                                   Read, Memberships and User Details Read
+#     MONITOR_CLOUDFLARE_ACCOUNT_ID
+#     SHOPS_READ_TOKEN              only when the shops' repositories are private
+#   and, set by hand, the repository variables:
+#     MINSHOP_ACCOUNT_PLAN          free or paid; paid when unset
+#     MINSHOP_MONTHLY_BUDGET        dollars, paid plan only; above it the
+#                                   projected bill fails
+name: Nightly
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+    - cron: '17 15 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  shops:
+    name: Read fleet.json
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.shops.outputs.matrix }}
+    steps:
+      - name: Check out the fleet
+        uses: actions/checkout@v6
+
+      - name: List the shops
+        id: shops
+        run: |
+          set -euo pipefail
+          node .github/fleet/shops.mjs matrix >> "$GITHUB_OUTPUT"
+
+  production-backup:
+    name: Production backup (${{ matrix.slug }})
+    needs: shops
+    if: ${{ needs.shops.outputs.matrix != '[]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: backup
+    strategy:
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.shops.outputs.matrix) }}
+
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      SHOPCTL_BACKUP_KEY: ${{ secrets.SHOPCTL_BACKUP_KEY }}
+
+    steps:
+      - name: Check out the shop
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ matrix.repository }}
+          token: ${{ secrets.SHOPS_READ_TOKEN || github.token }}
+          path: shop
+
+      - name: Check out the fleet
+        uses: actions/checkout@v6
+        with:
+          path: fleet
+
+      - name: Check the shop's core
+        run: node fleet/.github/fleet/shops.mjs core shop
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: shop/.nvmrc
+          check-latest: true
+          cache: npm
+          cache-dependency-path: shop/package-lock.json
+
+      - name: Install dependencies
+        working-directory: shop
+        run: npm ci
+
+      - name: Back up production
+        id: backup
+        working-directory: shop
+        env:
+          SHOP: ${{ matrix.slug }}
+        run: |
+          set -euo pipefail
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN absent de l'environnement backup : la production n'est pas sauvegardée (ADR 0005). Posez CLOUDFLARE_API_TOKEN_BACKUP et relancez shopctl fleet repo."
+            exit 1
+          fi
+          node shopctl/bin/shopctl.mjs backup --env production --shop "$SHOP" --upload --json | tee backup-production.json
+          echo "id=$(node -p "JSON.parse(require('node:fs').readFileSync('backup-production.json','utf8')).id")" >> "$GITHUB_OUTPUT"
+
+      - name: Verify the archive
+        if: ${{ steps.backup.outputs.id != '' }}
+        working-directory: shop
+        env:
+          ARCHIVE: ${{ steps.backup.outputs.id }}
+          SHOP: ${{ matrix.slug }}
+        run: |
+          set -euo pipefail
+          node shopctl/bin/shopctl.mjs backup verify "$ARCHIVE" --shop "$SHOP" --json | tee verify-production.json
+
+      - name: Keep the reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nightly-${{ matrix.slug }}-production-backup-${{ github.run_id }}
+          path: |
+            shop/backup-production.json
+            shop/verify-production.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+  production-watch:
+    name: Production error rate and quotas (${{ matrix.slug }})
+    needs: shops
+    if: ${{ needs.shops.outputs.matrix != '[]' && github.event.schedule != '17 15 * * *' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      max-parallel: 2
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.shops.outputs.matrix) }}
+
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.MONITOR_CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.MONITOR_CLOUDFLARE_ACCOUNT_ID }}
+      PLAN: ${{ vars.MINSHOP_ACCOUNT_PLAN || 'paid' }}
+
+    steps:
+      - name: Check out the shop
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ matrix.repository }}
+          token: ${{ secrets.SHOPS_READ_TOKEN || github.token }}
+          path: shop
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: shop/.nvmrc
+          check-latest: true
+          cache: npm
+          cache-dependency-path: shop/package-lock.json
+
+      - name: Install dependencies
+        working-directory: shop
+        run: npm ci
+
+      - name: Error rate and quotas
+        working-directory: shop
+        env:
+          SHOP: ${{ matrix.slug }}
+        run: |
+          set -euo pipefail
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::MONITOR_CLOUDFLARE_API_TOKEN absent des secrets du dépôt de flotte : la production n'est pas surveillée."
+            exit 1
+          fi
+          node shopctl/bin/shopctl.mjs monitor --env production --shop "$SHOP" --plan "$PLAN" --hours 24 --json | tee monitor-production.json
+
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nightly-${{ matrix.slug }}-production-${{ github.run_id }}
+          path: shop/monitor-production.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+  account-usage:
+    name: Shared account usage
+    needs: shops
+    if: ${{ needs.shops.outputs.matrix != '[]' && github.event.schedule != '17 15 * * *' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.MONITOR_CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.MONITOR_CLOUDFLARE_ACCOUNT_ID }}
+      PLAN: ${{ vars.MINSHOP_ACCOUNT_PLAN || 'paid' }}
+      BUDGET: ${{ vars.MINSHOP_MONTHLY_BUDGET }}
+
+    steps:
+      # shopctl ships with the core, not with the fleet: any shop's copy asks
+      # the same question of the account, and it needs no dependency.
+      - name: Check out the first shop
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ fromJSON(needs.shops.outputs.matrix)[0].repository }}
+          token: ${{ secrets.SHOPS_READ_TOKEN || github.token }}
+          path: shop
+
+      - name: Check out the fleet
+        uses: actions/checkout@v6
+        with:
+          path: fleet
+
+      - name: Check the shop's core
+        run: node fleet/.github/fleet/shops.mjs core shop
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: shop/.nvmrc
+          check-latest: true
+
+      - name: Account usage against its plan
+        working-directory: shop
+        run: |
+          set -euo pipefail
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::MONITOR_CLOUDFLARE_API_TOKEN absent des secrets du dépôt de flotte : la consommation du compte n'est pas suivie."
+            exit 1
+          fi
+          args=(fleet usage --plan "$PLAN" --json)
+          if [ -n "$BUDGET" ] && [ "$PLAN" = paid ]; then
+            args+=(--budget "$BUDGET")
+          fi
+          node shopctl/bin/shopctl.mjs "${args[@]}" | tee usage.json
+
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nightly-account-usage-${{ github.run_id }}
+          path: shop/usage.json
+          retention-days: 30
+          if-no-files-found: ignore

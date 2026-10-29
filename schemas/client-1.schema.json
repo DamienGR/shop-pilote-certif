@@ -201,6 +201,13 @@
           "type": "string",
           "pattern": "^[0-9a-f]{32}$"
         },
+        "saasZone": {
+          "description": "Cloudflare for SaaS zone of the shared account (ADR 0019) that serves `productionDomain` as a custom hostname, so the merchant's domain keeps its own DNS: the merchant adds one CNAME to the zone's fallback origin, and production is routed to this shop's Worker by hostname. Absent, or when `productionDomain` is inside this zone, production is a Workers custom domain, which needs the domain's zone on the shop's account. Staging is never served through it.",
+          "type": "string",
+          "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$",
+          "minLength": 4,
+          "maxLength": 253
+        },
         "imagesDomain": {
           "description": "Public custom domain of the production images bucket, when one is attached. Only the production render uses it; staging and local builds serve images through the Worker. Absent means product images are served through the Worker, which is the default and is never wrong — only slower.",
           "type": "string",
@@ -299,6 +306,10 @@
     {
       "id": "staging-domain-is-not-production",
       "description": "The staging hostname and the production domain must differ."
+    },
+    {
+      "id": "saas-zone-is-not-production",
+      "description": "The production domain is a hostname of the SaaS zone, not the zone itself."
     },
     {
       "id": "staging-access-is-complete",

@@ -62,7 +62,9 @@ if (isBuyNow && productPublicId) {
       : null;
   if (variants.length > 0 && !variant) {
     return Astro.redirect(
-      `/products/${product.slug}?error=${encodeURIComponent(`Please choose a ${product.variant_label || 'option'}.`)}`,
+      `/products/${product.slug}?error=${encodeURIComponent(
+        t('product.error.chooseOption', { option: product.variant_label || t('product.option') }),
+      )}`,
       303,
     );
   }
@@ -70,7 +72,10 @@ if (isBuyNow && productPublicId) {
     ? await getExtrasByPublicIds(env.DB, product.id, extraPublicIds)
     : [];
   if ((variant ? variant.stock : product.stock) <= 0) {
-    return Astro.redirect(`/products/${product.slug}?error=Sold+out`, 303);
+    return Astro.redirect(
+      `/products/${product.slug}?error=${encodeURIComponent(t('checkout.error.soldOut', { produit: product.name }))}`,
+      303,
+    );
   }
   lines = [
     {
@@ -215,7 +220,7 @@ const methodRows = methods.map((m, i) => ({ m, primary: i === 0, copy: paymentMe
             />
             <span>
               {t('terms.accept')}{' '}
-              <a href={terms.href} class="underline hover:text-brand">
+              <a href={terms.href} class="underline hover:text-accent">
                 {t('terms.linkLabel')}
               </a>{' '}
               ({t('terms.version', { version: terms.version })}).
@@ -252,7 +257,7 @@ const methodRows = methods.map((m, i) => ({ m, primary: i === 0, copy: paymentMe
     </form>
     <a
       href={backHref}
-      class="mt-6 inline-block text-xs uppercase tracking-widest text-faint hover:text-brand"
+      class="mt-6 inline-block text-xs uppercase tracking-widest text-faint hover:text-accent"
     >
       &larr; {t('checkout.express.back')}
     </a>

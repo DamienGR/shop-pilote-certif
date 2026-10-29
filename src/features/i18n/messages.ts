@@ -54,6 +54,9 @@ export const fr = {
   'catalog.title.all': 'Tous les produits',
   'catalog.categories.label': 'Catégories',
   'catalog.sort.label': 'Trier',
+  'catalog.sort.newest': 'Nouveautés',
+  'catalog.sort.price': 'Prix',
+  'catalog.sort.name': 'Nom',
   'catalog.pagination.label': 'Pagination',
   'catalog.pagination.prev': 'Précédent',
   'catalog.pagination.next': 'Suivant',
@@ -111,6 +114,8 @@ export const fr = {
   'payment.demo.label': 'Commande de démonstration',
   'payment.demo.hint': 'Simulé — enregistre une vraie commande de test, sans débit',
   'payment.setup.generic': 'Configurer',
+  // Read in the buyer's wallet (Lightning) or on OpenNode's hosted page.
+  'payment.invoice.description': '{boutique} — commande {reference}',
   'payment.rail.lightning': 'Payer en Lightning',
   'payment.rail.opennode': 'Payer en bitcoin',
   'payment.rail.demo': 'Passer la commande de démonstration',
@@ -165,9 +170,12 @@ export const fr = {
   'checkout.error.onlyLeft': 'Il ne reste que {count} × {produit} — ajustez votre panier.',
   'checkout.error.noStripeDestination': 'Les destinations de livraison configurées ne sont pas prises en charge par le paiement par carte. Contactez-nous pour finaliser cette commande.',
   'checkout.error.missingWeight': 'Nous ne pouvons pas calculer les frais de livraison pour l’un de ces articles pour le moment. Contactez-nous pour finaliser cette commande.',
+  'checkout.error.missingWeightFor': 'Nous ne pouvons pas calculer les frais de livraison pour {produits} pour le moment. Contactez-nous pour finaliser cette commande.',
   'checkout.error.noShippingToCountry': 'Nous ne livrons pas encore vers {pays}.',
   'checkout.error.noCardShippingToCountry': 'Le paiement par carte ne permet pas la livraison vers {pays}.',
   'checkout.error.unavailable': 'Le paiement est momentanément indisponible. Réessayez dans un instant.',
+  'checkout.error.lightningUnavailable': 'Lightning est momentanément indisponible. Réessayez dans un instant, ou choisissez un autre moyen de paiement.',
+  'checkout.error.railUnavailable': 'Ce moyen de paiement est momentanément indisponible. Réessayez dans un instant, ou choisissez-en un autre.',
 
   // ─── Conditions générales de vente ─────────────────────────────────────────────
   'terms.accept': 'J’ai lu et j’accepte les',

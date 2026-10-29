@@ -15,6 +15,7 @@ cache-tag: catalog,product:prod_<id>,shell
 <title>Pagination Item 5 — Ma boutique</title>
 <meta name="description" content="pagination fixture">
 <link rel="canonical" href="https://canonical.example/products/pagination-item-5">
+<meta name="robots" content="noindex">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Ma boutique">
 <meta property="og:title" content="Pagination Item 5 — Ma boutique">
@@ -49,26 +50,26 @@ cache-tag: catalog,product:prod_<id>,shell
 </form>
 <nav aria-label="Navigation principale" class="ml-auto flex min-w-0 shrink-0 items-center gap-4 text-xs uppercase tracking-widest text-muted sm:gap-6">
 <div class="hidden min-w-0 items-center gap-4 xl:flex xl:gap-6">
-<a href="/" title="Shop" class="min-w-0 truncate hover:text-brand">Shop</a>
-<a href="/categories/apparel" title="Apparel" class="min-w-0 truncate hover:text-brand">Apparel</a>
-<a href="/pages/about" title="About" class="min-w-0 truncate hover:text-brand">About</a>
-<a href="/products/sample-tee" title="Featured: Sample Tee" class="min-w-0 truncate hover:text-brand">Featured: Sample Tee</a>
+<a href="/" title="Shop" class="min-w-0 truncate hover:text-accent">Shop</a>
+<a href="/categories/apparel" title="Apparel" class="min-w-0 truncate hover:text-accent">Apparel</a>
+<a href="/pages/about" title="About" class="min-w-0 truncate hover:text-accent">About</a>
+<a href="/products/sample-tee" title="Featured: Sample Tee" class="min-w-0 truncate hover:text-accent">Featured: Sample Tee</a>
 </div>
 <details data-nav-disclosure class="relative order-last xl:hidden">
-<summary aria-label="Menu" class="flex cursor-pointer list-none items-center hover:text-brand">
+<summary aria-label="Menu" class="flex cursor-pointer list-none items-center hover:text-accent">
 <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
 <path d="M2 4.5h14M2 9h14M2 13.5h14">
 </path>
 </svg>
 </summary>
 <div class="absolute right-0 z-40 mt-3 flex min-w-44 max-w-[calc(100vw-2rem)] flex-col gap-3 border border-line bg-surface p-4 shadow-lg">
-<a href="/" class="hover:text-brand">Shop</a>
-<a href="/categories/apparel" class="hover:text-brand">Apparel</a>
-<a href="/pages/about" class="hover:text-brand">About</a>
-<a href="/products/sample-tee" class="hover:text-brand">Featured: Sample Tee</a>
+<a href="/" class="hover:text-accent">Shop</a>
+<a href="/categories/apparel" class="hover:text-accent">Apparel</a>
+<a href="/pages/about" class="hover:text-accent">About</a>
+<a href="/products/sample-tee" class="hover:text-accent">Featured: Sample Tee</a>
 </div>
 </details>
-<a href="/search" class="hover:text-brand sm:hidden">
+<a href="/search" class="hover:text-accent sm:hidden">
 <span class="inline-flex h-6 w-6 items-center justify-center" aria-hidden="true">
 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
 <circle cx="8.5" cy="8.5" r="5.5">
@@ -79,7 +80,7 @@ cache-tag: catalog,product:prod_<id>,shell
 </span>
 <span class="sr-only">Rechercher</span>
 </a>
-<a href="/cart" data-cart-open class="inline-flex items-center hover:text-brand">
+<a href="/cart" data-cart-open class="inline-flex items-center hover:text-accent">
 <span class="hidden h-6 w-6 items-center justify-center max-sm:inline-flex" aria-hidden="true">
 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
 <path d="M4.5 6.5h11l-.9 10.5H5.4z">
@@ -96,7 +97,7 @@ cache-tag: catalog,product:prod_<id>,shell
 </div>
 </header>
 <main class="page-shell">
-<a href="/" class="text-xs uppercase tracking-widest text-faint hover:text-brand">&larr; Retour à la boutique</a>
+<a href="/" class="text-xs uppercase tracking-widest text-faint hover:text-accent">&larr; Retour à la boutique</a>
 <div class="mt-6 grid gap-10 md:grid-cols-2 md:gap-16">
 <div class="reveal relative overflow-hidden rounded-lg bg-surface" data-product-hero>
 <img src="/placeholder.png" alt="Pagination Item 5" class="aspect-square w-full bg-surface object-cover" width="600" height="600" loading="eager" fetchpriority="high" decoding="async">
@@ -112,14 +113,14 @@ cache-tag: catalog,product:prod_<id>,shell
 <form method="POST" action="/api/cart">
 <input type="hidden" name="_action" value="add">
 <input type="hidden" name="product_id" value="prod_<id>">
-<button type="submit" class="rounded-md border border-line px-8 py-3 text-sm font-medium uppercase tracking-wider text-muted transition hover:border-brand hover:text-brand">Ajouter au panier</button>
+<button type="submit" class="rounded-md border border-line px-8 py-3 text-sm font-medium uppercase tracking-wider text-muted transition hover:border-accent hover:text-accent">Ajouter au panier</button>
 </form>
 <form method="GET" action="/express">
 <input type="hidden" name="product_id" value="prod_<id>">
 <button type="submit" class="rounded-md bg-brand px-8 py-3 text-sm font-medium uppercase tracking-wider text-on-brand transition hover:bg-brand-hover">Acheter maintenant</button>
 </form>
 </div>
-<button type="button" data-share data-share-title="Pagination Item 5" class="mt-6 hidden w-fit items-center gap-2 text-xs uppercase tracking-widest text-faint transition hover:text-brand">
+<button type="button" data-share data-share-title="Pagination Item 5" class="mt-6 hidden w-fit items-center gap-2 text-xs uppercase tracking-widest text-faint transition hover:text-accent">
 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 <circle cx="18" cy="5" r="3">
 </circle>
@@ -185,7 +186,7 @@ cache-tag: catalog,product:prod_<id>,shell
 <aside data-cart-panel class="absolute right-0 top-0 flex h-full w-full max-w-md translate-x-full flex-col bg-paper shadow-xl transition-transform duration-300">
 <div class="flex items-center justify-between border-b border-line px-6 py-5">
 <h2 class="font-serif text-2xl tracking-tight">Votre panier</h2>
-<button type="button" data-cart-close aria-label="Fermer le panier" class="-mr-2 flex h-11 w-11 items-center justify-center rounded-md text-3xl leading-none text-faint transition-colors hover:bg-surface hover:text-brand">&times;</button>
+<button type="button" data-cart-close aria-label="Fermer le panier" class="-mr-2 flex h-11 w-11 items-center justify-center rounded-md text-3xl leading-none text-faint transition-colors hover:bg-surface hover:text-accent">&times;</button>
 </div>
 <div data-cart-body class="flex-1 overflow-y-auto px-6 py-5">
 </div>

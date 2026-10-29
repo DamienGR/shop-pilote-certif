@@ -60,6 +60,8 @@ import {
 import { ShopctlError, inputError, preconditionError, verificationError } from '../errors.mjs';
 import { requireEnvironment, resolveShop } from '../shop.mjs';
 import { resourceNames } from '../../../scripts/manifest.mjs';
+import { guardOwner } from '../owner.mjs';
+import { deleteCustomHostname, findCustomHostname, locateHostname } from '../saas.mjs';
 
 export const DESTROY_OPTIONS = { '--env': 'environnement', '--shop': 'slug', '--account': 'id', '--confirm': 'slug' };
 
@@ -73,8 +75,10 @@ export const destroyUsage = `Usage: shopctl destroy --env <staging|production> -
   --shop <slug>               Manifeste à utiliser quand l'arbre en contient plusieurs.
   --json                      Rapport lisible par une machine.
 
-Supprime, dans cet ordre : le Worker, le namespace KV des sessions, les trois
-buckets R2 (images, fichiers, sauvegardes), puis la base D1.
+Supprime, dans cet ordre : le Worker, le namespace KV des sessions, le nom
+d'hôte du commerçant sur la zone SaaS (en production, quand cloudflare.saasZone
+le sert ; avec CLOUDFLARE_API_TOKEN), les trois buckets R2 (images, fichiers,
+sauvegardes), puis la base D1.
 La base passe en dernier et seulement si le reste est parti — une exécution
 interrompue laisse une base lisible plutôt que des buckets orphelins.
 
@@ -84,7 +88,7 @@ et le refus est relayé tel quel. Récupérez les archives à garder
 (shopctl backup pull <id>) avant de vider le bucket des sauvegardes.
 `;
 
-export function runDestroy(args, reporter) {
+export async function runDestroy(args, reporter) {
   if (args.positionals.length > 0) {
     throw new ShopctlError(`destroy ne prend pas d'argument positionnel ; reçu « ${args.positionals.join('", "')} ».`, {
       kind: 'usage',
@@ -152,6 +156,22 @@ export function runDestroy(args, reporter) {
     else reporter.ok(`${entry.kind} ${entry.name} — déjà absent`);
   }
 
+  // Before the first deletion: on a shared account (ADR 0019) a database of
+  // this name may be another shop's, and so may everything named beside it.
+  if (database) guardOwner({ database: names.database, root, manifest, env, reporter });
+
+  // The merchant's domain on the SaaS zone is the shop's too (ADR 0019): left
+  // behind, it is a hostname the agency keeps answering for after the client
+  // has gone. Asked before anything is deleted, so a missing token stops the
+  // run here rather than after the Worker.
+  const located = await locateHostname({ manifest, env, account, reporter, required: !dryRun });
+  const hostname = located?.token ? await findCustomHostname(located.zone.id, located.hostname, { token: located.token }) : null;
+  if (located) {
+    present.splice(2, 0, { kind: 'nom d\'hôte du commerçant', name: located.hostname, exists: Boolean(hostname) });
+    if (hostname) reporter.warn(`nom d'hôte du commerçant ${located.hostname} sur ${located.zoneName}`);
+    else if (located.token) reporter.ok(`nom d'hôte du commerçant ${located.hostname} — déjà absent`);
+  }
+
   if (present.every((entry) => !entry.exists)) {
     reporter.result({ command: 'destroy', ok: true, dryRun, shop: manifest.client.slug, env, account: { id: account.id, name: account.name }, removed: [], remaining: [] });
     if (!json) reporter.section(`Rien à supprimer : ${env} n'existe pas sur ce compte.`);
@@ -195,6 +215,15 @@ export function runDestroy(args, reporter) {
 
   if (worker) record(deleteWorker(names.worker, { cwd: root }), 'Worker');
   if (sessions) record(deleteKvNamespace(sessions, { cwd: root }), 'namespace KV des sessions');
+  if (hostname) {
+    try {
+      await deleteCustomHostname(located.zone.id, hostname.id, { token: located.token });
+      record({ name: located.hostname, removed: true }, 'nom d\'hôte du commerçant');
+    } catch (error) {
+      if (!(error instanceof ShopctlError)) throw error;
+      record({ name: located.hostname, removed: false, reason: error.hint ? `${error.message} ${error.hint}` : error.message }, 'nom d\'hôte du commerçant');
+    }
+  }
 
   for (const [kind, name] of [
     ['bucket images', names.images],

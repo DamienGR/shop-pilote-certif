@@ -236,16 +236,48 @@ describe('shopctl provision', () => {
     });
 
     // ADR 0005: a backup carries personal data, so its conservation is
-    // bounded. The bucket can only say it with an age, and it says it once.
-    it('bounds the backups bucket with one retention rule, added once', () => {
+    // bounded. The bucket can only say it with an age, and it says it once —
+    // for the archives by their prefix, and for the media pool twice as long,
+    // so that a pooled copy outlives every archive that names it (ADR 0019).
+    it('bounds the backups bucket with its two retention rules, added once', () => {
       const target = shop();
       const expected = names(target.slug, 'staging');
+      const rules = (action) => [
+        { name: 'shopctl-retention', prefix: `${target.slug}-staging-`, days: 90, action },
+        { name: 'shopctl-pool', prefix: 'pool/', days: 180, action },
+      ];
       const first = target.json(['provision', '--env', 'staging']);
-      expect(first.report.retention).toEqual({ days: 90, action: 'create' });
+      expect(first.report.retention).toEqual({ days: 90, poolDays: 180, action: 'create', rules: rules('create') });
       const second = target.json(['provision', '--env', 'staging']);
-      expect(second.report.retention).toEqual({ days: 90, action: 'keep' });
+      expect(second.report.retention).toEqual({ days: 90, poolDays: 180, action: 'keep', rules: rules('keep') });
       const bucket = target.read().r2.find((entry) => entry.name === expected.backups);
-      expect(bucket.lifecycle).toEqual([{ name: 'shopctl-retention', days: 90 }]);
+      expect(bucket.lifecycle).toEqual([
+        { name: 'shopctl-retention', prefix: `${target.slug}-staging-`, days: 90 },
+        { name: 'shopctl-pool', prefix: 'pool/', days: 180 },
+      ]);
+    });
+
+    // Every bucket provisioned up to v0.3.31 expires EVERYTHING after 90 days,
+    // which would take a pooled copy away from the archives still naming it.
+    // A dry run says so; a real run replaces the rule.
+    it('replaces the bucket-wide rule of v0.3.31 by the scoped ones', () => {
+      const target = shop();
+      const expected = names(target.slug, 'staging');
+      target.run(['provision', '--env', 'staging']);
+      target.account({
+        r2: target.read().r2.map((bucket) => (bucket.name === expected.backups ? { ...bucket, lifecycle: [{ name: 'shopctl-retention', days: 90 }] } : bucket)),
+      });
+
+      const dry = target.json(['provision', '--env', 'staging', '--dry-run']);
+      expect(dry.report.retention.action).toBe('update');
+      expect(target.read().r2.find((entry) => entry.name === expected.backups).lifecycle).toEqual([{ name: 'shopctl-retention', days: 90 }]);
+
+      const real = target.json(['provision', '--env', 'staging']);
+      expect(real.report.retention.rules.map((rule) => rule.action)).toEqual(['update', 'create']);
+      expect(target.read().r2.find((entry) => entry.name === expected.backups).lifecycle).toEqual([
+        { name: 'shopctl-retention', prefix: `${target.slug}-staging-`, days: 90 },
+        { name: 'shopctl-pool', prefix: 'pool/', days: 180 },
+      ]);
     });
 
     it('renders the environment configuration with the id Cloudflare assigned', () => {

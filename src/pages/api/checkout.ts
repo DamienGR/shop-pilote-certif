@@ -268,6 +268,12 @@ export const POST: APIRoute = async ({ request, cookies, url, redirect }) => {
         if (xid) params.append('extra', xid);
       }
     }
+    // The terms box the shopper ticked on the cart rides along. /checkout ticks
+    // its own with it — and the demo rail, which submits that page by itself,
+    // used to refuse the order for want of an acceptance given one click
+    // earlier. It is a pre-tick, not a pass: the form that places a Lightning
+    // or OpenNode order still posts the box, and /checkout refuses without it.
+    if (isAcceptance(form.get('accept_terms'))) params.set('accept_terms', '1');
     return redirect(`/checkout?${params}`, 303);
   }
 

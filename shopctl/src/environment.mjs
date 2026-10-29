@@ -16,6 +16,7 @@ import { listDatabases, expectedAccount, resolveAccount, whoami } from './cloudf
 import { preconditionError } from './errors.mjs';
 import { resourceNames } from '../../scripts/manifest.mjs';
 import { renderEnvironmentConfig } from './commands/provision.mjs';
+import { guardOwner } from './owner.mjs';
 
 /**
  * @param {object} options
@@ -46,6 +47,9 @@ export function openEnvironment({ values, manifest, root, env, reporter, missing
     );
   }
   const databaseId = database.uuid ?? database.database_id;
+  // Before the configuration points `DB` at it: on a shared account (ADR 0019)
+  // a database found by its name has to be proven this shop's.
+  guardOwner({ database: names.database, root, manifest, env, reporter });
 
   renderEnvironmentConfig({ root, manifest, env, databaseId });
   reporter.ok(`wrangler.jsonc rendu pour ${names.worker}`);

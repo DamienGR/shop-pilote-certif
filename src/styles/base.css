@@ -316,8 +316,10 @@
 .markdown-content ul { list-style: disc; }
 .markdown-content ol { list-style: decimal; }
 .markdown-content li { margin-bottom: 0.375rem; }
+/* `accent` is the text-link token. `brand` is a fill: a vivid one, valid behind a
+   button's label, failed 4.5:1 as the text of every content-page link. */
 .markdown-content a {
-  color: var(--color-brand, currentColor);
+  color: var(--color-accent, currentColor);
   text-decoration: underline;
   text-underline-offset: 2px;
 }

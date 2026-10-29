@@ -46,6 +46,12 @@ describe('products orderByClause', () => {
     }
   });
 
+  it('labels the storefront presets in French, through the catalog', () => {
+    // The labels are rendered as-is by CatalogSort, outside any template the
+    // storefront-language scan reads: they shipped as Newest · Price · Name.
+    expect(STORE_SORTS.map((s) => s.label)).toEqual(['Nouveautés', 'Prix', 'Nom']);
+  });
+
   it('canonicalizes public sorting and rejects admin-only columns', () => {
     expect(parseStoreSortQuery(null, null)).toEqual({ sort: 'newest', dir: 'desc' });
     expect(parseStoreSortQuery('price', 'ASC')).toEqual({ sort: 'price', dir: 'asc' });

@@ -9,8 +9,11 @@
  *   fleet verify    the same facts turned into an exit code, for CI
  *   fleet report    the version report of plan §5.7, as JSON or as a table
  *   fleet upgrade   one branch, one merge and one pull request per shop
+ *   fleet init      the fleet repository's workflows (fleet-repository.mjs)
+ *   fleet repo      the fleet repository on GitHub, and its credentials
+ *   fleet usage     the shared account's month and its bill (fleet-usage.mjs)
  *
- * Two properties hold across all four, and both are about a fleet rather than a
+ * Two properties hold across the four, and both are about a fleet rather than a
  * shop.
  *
  * **One failing shop does not stop the others.** A missing checkout, a dirty
@@ -32,12 +35,14 @@
  */
 import { existsSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
-import { CLIENT_MANIFEST, loadManifest } from '../../../scripts/manifest.mjs';
+import { CLIENT_MANIFEST, detectFleetCollisions, loadManifest } from '../../../scripts/manifest.mjs';
 import { ShopctlError, usageError, verificationError } from '../errors.mjs';
 import { loadFleet, selectShops } from '../fleet.mjs';
 import { coreRemoteUrl, publishedCoreTags } from '../upgrade.mjs';
 import { latestVersion, versionFromTag } from '../version.mjs';
 import { coreState, stateFindings, upgradeShop } from './core.mjs';
+import { initFleet, setupFleetRepository } from './fleet-repository.mjs';
+import { FLEET_USAGE_OPTIONS, runFleetUsage } from './fleet-usage.mjs';
 
 export const FLEET_OPTIONS = {
   '--to': 'tag',
@@ -46,9 +51,13 @@ export const FLEET_OPTIONS = {
   '--branch': 'nom',
   '--base': 'branche',
   '--format': 'json|text',
+  '--origin': 'url',
+  '--owner': 'compte',
+  '--reviewer': 'login',
+  ...FLEET_USAGE_OPTIONS,
 };
 
-export const FLEET_FLAGS = ['--dry-run', '--no-verify', '--open-pr', '--offline', '--strict', '--abort-on-conflict'];
+export const FLEET_FLAGS = ['--dry-run', '--no-verify', '--open-pr', '--offline', '--strict', '--abort-on-conflict', '--private', '--no-push'];
 
 export const fleetUsage = `Usage: shopctl fleet <sous-commande> [options]
 
@@ -56,6 +65,12 @@ export const fleetUsage = `Usage: shopctl fleet <sous-commande> [options]
   shopctl fleet verify                 Les mêmes faits, en code de sortie
   shopctl fleet report --format json   Le rapport de versions de la flotte
   shopctl fleet upgrade --to <tag>     Une branche, une fusion, une pull request par boutique
+  shopctl fleet init                   Écrire les workflows du dépôt de flotte (ADR 0019)
+  shopctl fleet repo                   Créer le dépôt de flotte, ses environnements et
+                                       les secrets du compte mutualisé
+  shopctl fleet usage                  Consommation du compte mutualisé : facture
+                                       projetée (Workers Paid) ou quotas du jour
+                                       (Workers Free, --plan free)
 
   --registry <chemin>   Registre de flotte. Défaut : le fleet.json le plus proche.
   --only <slugs>        Se limiter à ces boutiques (séparées par des virgules).
@@ -70,14 +85,42 @@ export const fleetUsage = `Usage: shopctl fleet <sous-commande> [options]
   --strict              verify : un avertissement devient un échec.
   --offline             Ne pas interroger le dépôt du socle.
   --format <json|text>  report : forme du rapport. Défaut : text.
+  --origin <url>        repo : dépôt de flotte. Défaut : le remote « origin », ou
+                        <owner>/minshop-fleet.
+  --owner <compte>      repo : compte GitHub du dépôt déduit.
+  --reviewer <login>    repo : relecteur obligatoire des déploiements de production.
+  --private             repo : créer le dépôt privé. Défaut : public, seul à
+                        porter secrets d'environnement et relecteurs en GitHub Free.
+  --no-push             repo : ne pas pousser la branche.
+  --account <id>        usage : le compte mutualisé. Défaut : CLOUDFLARE_ACCOUNT_ID.
+  --plan <free|paid>    usage : plan Workers du compte. Défaut : paid.
+  --budget <dollars>    usage : échouer (code 6) si la facture projetée le dépasse
+                        (plan payant seulement).
   --json                Rapport lisible par une machine.
+
+Sur le compte mutualisé (ADR 0019), les jetons Cloudflare vivent dans le dépôt de
+flotte et nulle part ailleurs. fleet repo les lit dans l'environnement :
+
+  CLOUDFLARE_API_TOKEN[_STAGING|_PRODUCTION]  déploiement
+  CLOUDFLARE_API_TOKEN_BACKUP                 sauvegarde nocturne (lecture D1,
+                                              écriture R2)
+  CLOUDFLARE_API_TOKEN_MONITOR                surveillance (lecture seule)
+  SHOPCTL_BACKUP_KEY                          clé des archives
+  SHOPS_READ_TOKEN                            lecture des dépôts de boutique
+                                              privés, facultatif
+
+fleet usage lit CLOUDFLARE_API_TOKEN, un jeton « Account Analytics : Read » du
+compte mutualisé. Il échoue aussi quand le compte porte deux cents Workers : le
+jour d'ouvrir le suivant, avant le plafond de 250 crons. Au plan gratuit, il juge
+le jour le plus chargé du compte contre ses quotas quotidiens, partagés par
+toutes les boutiques, et les cinq crons du plan : le jour de passer en Paid.
 
 Une mise à niveau de flotte ne déploie rien et ne fusionne aucune pull request.
 Elle propose une version à plusieurs boutiques ; chacune la prend quand un humain
 approuve la sienne.
 `;
 
-const SUBCOMMANDS = new Set(['status', 'verify', 'report', 'upgrade']);
+const SUBCOMMANDS = new Set(['status', 'verify', 'report', 'upgrade', 'init', 'repo', 'usage']);
 
 export function runFleet(args, reporter) {
   const [sub, ...rest] = args.positionals;
@@ -87,6 +130,9 @@ export function runFleet(args, reporter) {
     throw usageError(`fleet ${sub} ne prend pas d'argument positionnel ; reçu « ${rest.join('", "')} ».`, fleetUsage.trim());
   }
   if (sub === 'upgrade') return upgradeFleet(args, reporter);
+  if (sub === 'init') return initFleet(args, reporter);
+  if (sub === 'repo') return setupFleetRepository(args, reporter);
+  if (sub === 'usage') return runFleetUsage(args, reporter);
   return reportFleet(args, reporter, sub);
 }
 
@@ -113,6 +159,9 @@ export function surveyFleet(cwd, { registry, only, offline = false } = {}) {
     if (repository) published = publishedCoreTags(repository, { cwd: fleet.root });
   }
 
+  // Every manifest that could be read, for the one question no shop can
+  // answer about itself: does another one claim the same names?
+  const claims = [];
   const shops = selected.map((entry) => {
     const at = relative(cwd, entry.root) || '.';
     if (!entry.exists) {
@@ -157,6 +206,9 @@ export function surveyFleet(cwd, { registry, only, offline = false } = {}) {
       };
     }
 
+    // Valid manifests only, as `detectFleetCollisions` asks: one mid-upgrade
+    // may lack a field the names are derived from.
+    if ((loaded.errors ?? []).length === 0) claims.push({ file: entry.slug, manifest: loaded.manifest });
     try {
       const state = coreState(
         { root: entry.root, manifest: loaded.manifest, file: loaded.file, errors: loaded.errors },
@@ -169,6 +221,12 @@ export function surveyFleet(cwd, { registry, only, offline = false } = {}) {
       return { ...entry, at, ok: false, findings: [{ status: 'fail', message: error.message }] };
     }
   });
+
+  for (const finding of collisionFindings(claims)) {
+    const shop = shops.find((candidate) => candidate.slug === finding.slug);
+    shop.findings.push({ status: 'fail', message: finding.message });
+    shop.ok = false;
+  }
 
   const versions = shops.map((shop) => shop.state?.core.merged).filter(Boolean);
   return {
@@ -187,6 +245,41 @@ export function surveyFleet(cwd, { registry, only, offline = false } = {}) {
       shops: shops.filter((shop) => shop.state?.core.merged === version).map((shop) => shop.slug),
     })),
   };
+}
+
+/**
+ * Two shops of the fleet that claim one name, as one finding per shop and per
+ * neighbour.
+ *
+ * `config:validate` asks this of the manifests ONE tree carries; the fleet is
+ * the only place that sees every shop's. On one shared account (ADR 0019) a
+ * worker or database name claimed twice is one set of orders for two shops,
+ * and a hostname claimed twice is served by whichever deployed last. The
+ * registry already refuses two entries with one slug (`fleet.mjs`); what it
+ * cannot see is two slugs deriving the same resources through `workerName`.
+ *
+ * @param {Array<{ file: string, manifest: object }>} claims `file` is the slug
+ * @returns {Array<{ slug: string, message: string }>}
+ */
+export function collisionFindings(claims) {
+  const shared = new Map();
+  for (const collision of detectFleetCollisions(claims)) {
+    for (const slug of collision.files) {
+      for (const other of collision.files.filter((candidate) => candidate !== slug)) {
+        const key = `${slug}\u0000${other}`;
+        if (!shared.has(key)) shared.set(key, { slug, other, values: [] });
+        const values = shared.get(key).values;
+        if (!values.includes(collision.value)) values.push(collision.value);
+      }
+    }
+  }
+  return [...shared.values()].map(({ slug, other, values }) => ({
+    slug,
+    message:
+      `« ${other} » revendique les mêmes identifiants : ${values.slice(0, 3).join(', ')}` +
+      `${values.length > 3 ? ` et ${values.length - 3} autre(s)` : ''}. ` +
+      'Sur un compte mutualisé, les deux boutiques se partageraient ces ressources (ADR 0019) : donnez à l\'une un cloudflare.workerName ou un domaine à elle.',
+  }));
 }
 
 /** The `core` remote of a shop tree, asked of git rather than of the manifest.

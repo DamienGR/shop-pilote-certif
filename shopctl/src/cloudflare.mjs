@@ -465,28 +465,63 @@ export function deleteKvNamespace(namespace, { cwd }) {
   );
 }
 
-/** The lifecycle rule that bounds a backups bucket. Named, so a second
- *  provisioning finds it rather than adding a twin. */
+/** The lifecycle rules that bound a backups bucket: its archives, by their
+ *  prefix, and its media pool (backup/pool.mjs). Named, so a second
+ *  provisioning finds them rather than adding twins. */
 export const RETENTION_RULE = 'shopctl-retention';
+export const POOL_RULE = 'shopctl-pool';
 
 /**
- * Does this bucket already expire its objects under our rule?
+ * A bucket's lifecycle rules, as `{ name, enabled, prefix, days }`.
  *
  * `null` when the account could not be asked: "unknown" is reported as such and
  * never read as "absent", which would add a rule on every run, or as "present",
- * which would leave a bucket that keeps customer data forever.
+ * which would leave a bucket that keeps customer data forever — and, since
+ * v0.3.32, as "no media pool": a backup that cannot read the rules reuses
+ * nothing.
  */
-export function hasRetentionRule(name, { cwd, jurisdiction }) {
+export function lifecycleRules(name, { cwd, jurisdiction }) {
   const result = wrangler(['r2', 'bucket', 'lifecycle', 'list', name, '-J', jurisdiction], { cwd, allowFailure: true });
   if (result.status !== 0) return null;
-  return stripAnsi(`${result.stdout}\n${result.stderr}`).includes(RETENTION_RULE);
+  return parseLifecycleRules(stripAnsi(`${result.stdout}\n${result.stderr}`));
 }
 
-export function addRetentionRule(name, days, { cwd, jurisdiction }) {
+/** wrangler has no --json for this listing: one block of `label: value` lines
+ *  per rule, the prefix spelled "(all prefixes)" when there is none. */
+export function parseLifecycleRules(text) {
+  const rules = [];
+  for (const line of String(text).split('\n')) {
+    const match = /^\s*(name|enabled|prefix|action):\s*(.*?)\s*$/.exec(line);
+    if (!match) continue;
+    const [, field, value] = match;
+    if (field === 'name') {
+      rules.push({ name: value, enabled: true, prefix: '', days: null });
+      continue;
+    }
+    const rule = rules.at(-1);
+    if (!rule) continue;
+    if (field === 'enabled') rule.enabled = value === 'Yes';
+    if (field === 'prefix') rule.prefix = value === '(all prefixes)' ? '' : value;
+    if (field === 'action') {
+      const days = /Expire objects after (\d+(?:\.\d+)?) days/.exec(value);
+      rule.days = days ? Number(days[1]) : null;
+    }
+  }
+  return rules;
+}
+
+export function addLifecycleRule(bucket, { name, prefix, days }, { cwd, jurisdiction }) {
   wrangler(
-    ['r2', 'bucket', 'lifecycle', 'add', name, RETENTION_RULE, '--expire-days', String(days), '-J', jurisdiction, '--force'],
+    ['r2', 'bucket', 'lifecycle', 'add', bucket, name, ...(prefix ? [prefix] : []), '--expire-days', String(days), '-J', jurisdiction, '--force'],
     { cwd },
   );
+}
+
+/** wrangler's `add` appends: a rule is changed by removing it and adding it
+ *  again. Between the two the bucket keeps its other rule, and for those few
+ *  seconds nothing expires early — only late. */
+export function removeLifecycleRule(bucket, name, { cwd, jurisdiction }) {
+  wrangler(['r2', 'bucket', 'lifecycle', 'remove', bucket, '--name', name, '-J', jurisdiction], { cwd });
 }
 
 /** R2 refuses to delete a bucket that still holds objects. That refusal is

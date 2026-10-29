@@ -6,9 +6,14 @@ quel ordre, et qui fait quoi. Les critères eux-mêmes restent ceux du
 [plan d'implémentation](../implementation-plan.md) (§8, §9, jalon 10) ; ce
 document ne les redéfinit pas, il les ordonne.
 
-Il est écrit pour être rejoué : la même campagne certifie le pilote, puis
-chaque nouvelle boutique (plan §1, « une campagne de certification réutilisable
-pour chaque nouvelle boutique »).
+Il était écrit pour être rejoué par chaque nouvelle boutique (plan §1, « une
+campagne de certification réutilisable pour chaque nouvelle boutique »). La
+campagne a certifié le socle, et c'est ce coût-là qui ne se rejoue pas :
+depuis le 2026-10-27, une boutique après le pilote suit le
+[parcours court](par-boutique.md) — hériter d'un socle certifié,
+`shopctl certify`, et les attestations de sa recette. La campagne complète ne
+revient que pour une boutique qui modifie le paiement, le stock,
+l'authentification ou le schéma du socle.
 
 ## 1. Point de départ
 
@@ -1109,14 +1114,21 @@ Fait avancer : jalon 7 (critère de sortie), §8.8.
 
 ### Étape 11 — Validations humaines et décision
 
-- [ ] relecture des pages légales et du consentement aux CGV ;
-- [ ] validation TVA et facturation par un expert-comptable — le manifeste
-  porte encore `invoiceStrategy: pending-validation` ;
-- [ ] recette par une personne extérieure au développement, sur le modèle de
-  procès-verbal du §12 ;
-- [ ] documentation du §12 complète ;
-- [ ] rapports assemblés, dérogations signées ;
-- [ ] décision go/no-go (point de décision F, §11).
+- [x] relecture des pages légales et du consentement aux CGV : les quatre
+  pages écrites en entier, sans marqueur, les CGV en version 2 ; leur
+  relecture par un conseil sous dérogation datée du 2026-10-26 (§6) ;
+- [x] validation TVA et facturation par un expert-comptable — le manifeste
+  porte encore `invoiceStrategy: pending-validation` ; sous dérogation datée
+  du 2026-10-26 (§6), le courrier prêt pour la première boutique réelle ;
+- [x] recette par une personne extérieure au développement, sur le modèle de
+  procès-verbal du §12 : chaque scénario tenu par les preuves des étapes 4 à
+  11 ; la personne extérieure sous dérogation datée du 2026-10-26 (§6) ;
+- [x] documentation du §12 complète — relue par Damien le 2026-10-26 ;
+- [x] rapports assemblés, dérogations acceptées — les dix de la section 3 du
+  dossier, par écrit et datées par Damien le 2026-10-27, sans signature ;
+- [x] décision go/no-go (point de décision F, §11) : **go sous conditions**,
+  le 2026-10-27, les trois conditions tenues par la première boutique réelle
+  avant sa première vente.
 
 Préparée le 2026-10-25, sans compte réel. La fiche de passage est
 [etape-11-commandes.md](etape-11-commandes.md) : ce qu'il faut remettre au
@@ -1178,6 +1190,15 @@ conseil ou un expert-comptable dirait de lui ne vaudrait pour personne. La
 recette, d'abord voulue réelle, est tenue par les preuves des étapes 4 à 11,
 qui ont joué chacun de ses scénarios ; la personne extérieure attend la
 recette de livraison de la première boutique réelle, sous dérogation (§6).
+
+Le 2026-10-27, la ligne RPO tenue : le premier run de l'après-midi
+(40574601169), lancé par GitHub à 20:03 au lieu de 15:17, n'a pris que la
+sauvegarde de la production, à 10 h 56 de celle du matin. Le même soir,
+Damien a accepté les dix dérogations par écrit, sans exemplaire signé, et
+décidé un **go sous conditions** : la relecture juridique, la validation
+comptable et la recette par une personne extérieure sont tenues par la
+première boutique réelle avant sa première vente. L'étape 11 est close, et
+avec elle le jalon 10.
 
 ## 5. Livrables du jalon 10
 

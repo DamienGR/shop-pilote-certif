@@ -78,7 +78,7 @@ const linesForm = 'cart-lines';
     lines.length === 0 ? (
       <p class="text-muted">
         {t('cart.empty')}{' '}
-        <a href={shopHref} class="border-b border-brand text-brand">
+        <a href={shopHref} class="border-b border-accent text-accent">
           {t('cart.continueShopping')}
         </a>
         .
@@ -93,7 +93,7 @@ const linesForm = 'cart-lines';
             <li class="flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-line py-4">
               <a
                 href={`/products/${l.product.slug}`}
-                class="flex min-w-0 flex-1 basis-64 items-center gap-4 hover:text-brand"
+                class="flex min-w-0 flex-1 basis-64 items-center gap-4 hover:text-accent"
               >
                 <ProductImage
                   imageKey={l.product.image_key}
@@ -146,7 +146,7 @@ const linesForm = 'cart-lines';
                     formnovalidate
                     name="_action"
                     value="update_all"
-                    class="text-xs uppercase tracking-widest text-faint hover:text-brand"
+                    class="text-xs uppercase tracking-widest text-faint hover:text-accent"
                   >
                     {t('cart.update')}
                   </button>
@@ -222,7 +222,7 @@ const linesForm = 'cart-lines';
                     />
                     <span>
                       {t('terms.accept')}{' '}
-                      <a href={terms.href} class="underline hover:text-brand">
+                      <a href={terms.href} class="underline hover:text-accent">
                         {t('terms.linkLabel')}
                       </a>{' '}
                       ({t('terms.version', { version: terms.version })}).
@@ -261,7 +261,7 @@ const linesForm = 'cart-lines';
                 ) : (
                   <a
                     href={`/payment-setup?method=${m}`}
-                    class="flex w-full items-center justify-between gap-3 rounded-lg border border-dashed border-line px-5 py-3 text-left text-faint transition hover:border-brand hover:text-brand"
+                    class="flex w-full items-center justify-between gap-3 rounded-lg border border-dashed border-line px-5 py-3 text-left text-faint transition hover:border-accent hover:text-accent"
                   >
                     <span>
                       <span class="block text-sm font-medium">{copy.label}</span>

@@ -256,7 +256,12 @@ export function wranglerSubstitutions(manifest, { databaseId = '00000000-0000-00
   // has a hostname AND workers.dev is shut. Without `stagingDomain`, staging
   // keeps workers.dev, because that is then the only way to reach it at all.
   const host = environmentHost(manifest, env);
-  const routes = host ? [{ pattern: host, custom_domain: true }] : [];
+  // A custom domain needs its zone on the Worker's account. On the shared
+  // account of ADR 0019 the merchant's zone stays with the merchant, so
+  // production is a custom hostname of the agency's SaaS zone instead, and a
+  // route ON THAT ZONE sends the hostname to this shop's Worker.
+  const saasZone = saasZoneFor(manifest, env);
+  const routes = !host ? [] : saasZone ? [{ pattern: `${host}/*`, zone_name: saasZone }] : [{ pattern: host, custom_domain: true }];
   // The images domain is attached to PRODUCTION's images bucket, so only the
   // production render names it. A staging that did would show production's
   // objects — or a broken image for every one uploaded to staging — and so
@@ -307,6 +312,22 @@ export function environmentHost(manifest, env) {
   if (env === 'production') return manifest.cloudflare.productionDomain;
   if (env === 'staging') return manifest.cloudflare.stagingDomain ?? null;
   return null;
+}
+
+/**
+ * The Cloudflare for SaaS zone one environment is served through, or null when
+ * its hostname is a Workers custom domain (or it has none).
+ *
+ * Production only, and only when its domain is OUTSIDE the zone: a hostname
+ * inside the agency's own zone is a custom domain like any other, since that
+ * zone is on the account. Staging always is one — the preview's hostname is
+ * the agency's, and an Access application is bound to it (ADR 0015).
+ */
+export function saasZoneFor(manifest, env) {
+  const zone = manifest.cloudflare.saasZone ?? null;
+  const host = environmentHost(manifest, env);
+  if (env !== 'production' || !zone || !host) return null;
+  return host === zone || host.endsWith(`.${zone}`) ? null : zone;
 }
 
 /** Resolve a shop by slug among the manifests of this tree. */

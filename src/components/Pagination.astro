@@ -25,7 +25,7 @@ function windowed(cur: number, total: number): (number | '…')[] {
 }
 
 const items = totalPages > 1 ? windowed(page, totalPages) : [];
-const linkCls = 'px-3 py-1.5 text-xs uppercase tracking-widest text-muted hover:text-brand';
+const linkCls = 'px-3 py-1.5 text-xs uppercase tracking-widest text-muted hover:text-accent';
 ---
 
 {
@@ -43,7 +43,7 @@ const linkCls = 'px-3 py-1.5 text-xs uppercase tracking-widest text-muted hover:
           <a
             href={hrefFor(it)}
             aria-current={it === page ? 'page' : undefined}
-            class={`${linkCls} ${it === page ? 'font-medium text-brand' : ''}`}
+            class={`${linkCls} ${it === page ? 'font-medium text-accent' : ''}`}
           >
             {it}
           </a>

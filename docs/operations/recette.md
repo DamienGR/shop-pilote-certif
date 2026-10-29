@@ -18,9 +18,10 @@ L'agence prépare, et le note en tête du procès-verbal :
 
 - [ ] l'URL de la boutique, la version du socle (`npm run shopctl -- core
   status`) et le dernier nocturne vert ;
-- [ ] le moyen de payer : un vrai paiement de petit montant remboursé ensuite
-  en production, ou Stripe en mode test sur une preview. Le choix est celui du
-  commerçant ; les frais d'un vrai paiement ne sont pas rendus ;
+- [ ] le moyen de payer : un vrai paiement de petit montant, remboursé
+  ensuite, en production. C'est l'achat que la certification de la boutique
+  cite (`purchase` des attestations) ; Stripe en mode test sur une preview ne
+  le remplace pas. Les frais d'un vrai paiement ne sont pas rendus ;
 - [ ] un produit de recette (prix bas, stock 2, une photo), à désactiver à la
   fin, et un code promotionnel créé dans Stripe si la boutique en accepte
   (`features.promoCodes`) ;
@@ -76,6 +77,22 @@ objet**. Une capture accompagne chaque KO.
 
 Trois questions, réponses libres : qu'est-ce qui a été difficile à trouver ?
 Qu'est-ce qui a surpris ? Qu'est-ce qui manquerait pour tenir la boutique seul ?
+
+## Après la séance : les attestations
+
+L'agence reporte dans `client/certification/attestations.yaml` une date et
+une référence par geste, jamais une adresse ni un nom
+([certification par boutique](../certification/par-boutique.md#les-attestations)) :
+
+| Attestation | Scénarios |
+|---|---|
+| `purchase` : date, identifiant Stripe `pi_…`, date du remboursement | V9, A4 |
+| `emails` : date, messageries où ils sont arrivés | V10, A2, A3, A4 |
+| `phone` : date, appareil | T1, T2 |
+| `acceptance` : date, `merchant` ou `delegate` | le procès-verbal signé |
+
+`legal` (la relecture des pages légales) et `accounting` (la réponse de
+l'expert-comptable) viennent d'ailleurs que de la séance.
 
 ## Anomalies
 

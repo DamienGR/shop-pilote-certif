@@ -20,6 +20,9 @@ export const STATUS = {
   warn: { symbol: '!', label: 'warn' },
   fail: { symbol: '✗', label: 'fail' },
   todo: { symbol: '·', label: 'todo' },
+  // Not run, with its reason. Never a pass: `certify` refuses a verdict on a
+  // check it skipped, whatever the reason was.
+  skip: { symbol: '-', label: 'skip' },
 };
 
 export class Reporter {
@@ -71,6 +74,10 @@ export class Reporter {
 
   todo(message, hint) {
     return this.entry('todo', message, hint);
+  }
+
+  skip(message, hint) {
+    return this.entry('skip', message, hint);
   }
 
   /** A blank line or a heading in human mode; nothing at all under --json,
