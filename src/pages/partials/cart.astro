@@ -48,7 +48,7 @@ const linesForm = 'drawer-lines';
                 />
               </a>
               <div class="flex flex-1 flex-col">
-                <a href={`/products/${l.product.slug}`} class="text-sm leading-snug hover:text-brand">
+                <a href={`/products/${l.product.slug}`} class="text-sm leading-snug hover:text-accent">
                   {l.product.name}
                 </a>
                 {(l.variant || l.extras.length > 0) && (
@@ -74,7 +74,7 @@ const linesForm = 'drawer-lines';
                     <button
                       type="submit"
                       form={linesForm}
-                      class="text-xs uppercase tracking-widest text-faint hover:text-brand"
+                      class="text-xs uppercase tracking-widest text-faint hover:text-accent"
                     >
                       {t('cart.update')}
                     </button>
@@ -115,7 +115,7 @@ const linesForm = 'drawer-lines';
           </form>
           <a
             href="/cart"
-            class="mt-3 block text-center text-xs uppercase tracking-widest text-faint hover:text-brand"
+            class="mt-3 block text-center text-xs uppercase tracking-widest text-faint hover:text-accent"
           >
             {t('cart.viewFull')}
           </a>

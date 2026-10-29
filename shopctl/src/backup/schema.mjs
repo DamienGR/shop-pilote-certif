@@ -7,7 +7,7 @@
  * the archive — silently, until a restore. The same reasoning the security
  * suite applies to admin routes, applied to a schema (plan §5.6, ADR 0005).
  *
- * Four families are left out, and each for its own reason:
+ * Five families are left out, and each for its own reason:
  *
  *  - `sqlite_*` is SQLite's own bookkeeping. `sqlite_sequence` in particular is
  *    NOT restored and must not be: AUTOINCREMENT updates it as the explicit row
@@ -21,8 +21,13 @@
  *    external-content over `products` and its triggers rebuild it as the rows
  *    go back in (migration 0003). Backing up the index would double the archive
  *    to store something the data already determines, and restoring it would
- *    fight the triggers for the right to write it.
+ *    fight the triggers for the right to write it;
+ *  - `_minshop_owner` is the marker that says which shop the DATABASE belongs
+ *    to (ADR 0019, `owner.mjs`), not data of that shop. Carried in an archive,
+ *    it would follow one shop's data into another's database and stamp the
+ *    target with the source's name.
  */
+import { OWNER_TABLE } from '../owner.mjs';
 
 /** D1's and SQLite's own tables, by exact name. */
 export const INTERNAL_TABLES = new Set(['d1_migrations']);
@@ -44,6 +49,7 @@ export function classifyTables(master) {
     if (name.startsWith('sqlite_')) skipped.push({ name, reason: 'sqlite' });
     else if (name.startsWith('_cf_')) skipped.push({ name, reason: 'cloudflare' });
     else if (INTERNAL_TABLES.has(name)) skipped.push({ name, reason: 'migrations' });
+    else if (name === OWNER_TABLE) skipped.push({ name, reason: 'propriétaire' });
     else if (virtual.includes(name)) skipped.push({ name, reason: 'virtuelle' });
     else if (virtual.some((table) => name.startsWith(`${table}_`))) skipped.push({ name, reason: 'index' });
     else tables.push({ name, sql: row.sql ?? '' });

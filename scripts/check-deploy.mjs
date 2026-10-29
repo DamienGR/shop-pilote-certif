@@ -96,10 +96,20 @@ const workerGzip = workerFiles.reduce(
   0,
 );
 
+// The upload carries no local secrets file. The build leaves one next to the
+// generated config, `dist/server/.dev.vars`, for `npm run preview`; the secret
+// scan leaves that copy alone on the strength of this check — wrangler bundles
+// modules, never the file. Asserted on the dry run's output, which is the upload.
+const shippedDevVars = filesUnder(outDir, (name) => name.startsWith('.dev.vars'));
+
 const clientJsFiles = existsSync(clientDir) ? filesUnder(clientDir, isScript) : [];
 const clientJs = clientJsFiles.reduce((total, file) => total + statSync(file).size, 0);
 
 rmSync(outDir, { recursive: true, force: true });
+
+if (shippedDevVars.length > 0) {
+  fail('the deploy would upload a local .dev.vars — its values are real credentials, never part of a Worker');
+}
 
 const measurements = [
   {

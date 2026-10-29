@@ -51,7 +51,7 @@ const {
   links.length > 0 && (
     <div class={inlineClass}>
       {links.map((link) => (
-        <a href={link.href} title={link.text} class="min-w-0 truncate hover:text-brand">
+        <a href={link.href} title={link.text} class="min-w-0 truncate hover:text-accent">
           {link.text}
         </a>
       ))}
@@ -67,7 +67,7 @@ const {
     <details data-nav-disclosure class={disclosureClass}>
       <summary
         aria-label={t('shell.nav.menu')}
-        class="flex cursor-pointer list-none items-center hover:text-brand"
+        class="flex cursor-pointer list-none items-center hover:text-accent"
       >
         <svg
           width="18"
@@ -85,7 +85,7 @@ const {
         class={`absolute ${align === 'start' ? 'left-0' : 'right-0'} z-40 mt-3 flex min-w-44 max-w-[calc(100vw-2rem)] flex-col gap-3 border border-line bg-surface p-4 shadow-lg`}
       >
         {links.map((link) => (
-          <a href={link.href} class="hover:text-brand">
+          <a href={link.href} class="hover:text-accent">
             {link.text}
           </a>
         ))}

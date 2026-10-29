@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import type { AstroCookies } from 'astro';
 import { getConfig } from '../../config';
 import { getSetting } from '../settings/db';
+import { readStoreName } from '../settings/storeName';
 import { getEmailProvider } from '../email';
 import { loginLinkEmail } from '../email/loginLink';
 import { signToken, verifyToken } from './token';
@@ -55,7 +56,7 @@ export async function requestLogin(email: string, origin: string): Promise<void>
   const emailer = await getEmailProvider();
   if (emailer) {
     try {
-      const storeName = (await getSetting(env.DB, 'store_name')) || getConfig().storeName;
+      const storeName = await readStoreName(env.DB);
       await emailer.send(loginLinkEmail(addr, link, storeName));
     } catch (err) {
       console.error('Login email failed:', logSafe(err));

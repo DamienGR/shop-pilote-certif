@@ -151,15 +151,15 @@
   },
   "/pages/about · lien de prose": {
     "backgroundColor": "rgba(0, 0, 0, 0)",
-    "color": "rgb(17, 24, 39)",
+    "color": "rgb(37, 99, 235)",
     "fontFamily": "ui-sans-serif, system-ui, -apple-system, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif",
     "fontSize": "16px",
     "fontWeight": "400",
     "lineHeight": "28px",
     "letterSpacing": "normal",
     "textTransform": "none",
-    "borderTopColor": "rgb(17, 24, 39)",
-    "borderBottomColor": "rgb(17, 24, 39)",
+    "borderTopColor": "rgb(37, 99, 235)",
+    "borderBottomColor": "rgb(37, 99, 235)",
     "borderBottomWidth": "0px",
     "borderRadius": "0px",
     "boxShadow": "none"

@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 // .mjs like its neighbours: tsconfig pins `types` to the Cloudflare types, so
@@ -8,6 +8,8 @@ import { EXIT_CODES } from '../../shopctl/src/errors.mjs';
 import { canonical } from '../../shopctl/src/backup/dump.mjs';
 import { classifyTables, objectInventory, orderTables, references, seededTables } from '../../shopctl/src/backup/schema.mjs';
 import { planPrune } from '../../shopctl/src/backup/archive.mjs';
+import { nextIndex, reusable, reuseWindow } from '../../shopctl/src/backup/pool.mjs';
+import { parseLifecycleRules } from '../../shopctl/src/cloudflare.mjs';
 import { HOSTILE, IMAGE_KEY, names, seededShop, takeBackup } from '../helpers/backup-shop.mjs';
 
 const CORE = new URL('../../', import.meta.url).pathname;
@@ -182,6 +184,65 @@ describe('the backup pipeline', () => {
     it('drops an incomplete directory', () => {
       const plan = planPrune([...entries, { id: 'interrompue', path: '/tmp/x', broken: 'manifeste absent', manifest: null }], { keep: 30, keepDays: 365, now });
       expect(plan.remove.map((entry) => entry.reason)).toEqual(['incomplète']);
+    });
+  });
+
+  /**
+   * A pooled copy may be reused only while it outlives an archive taken now,
+   * and that is read off the rules the bucket HAS, never assumed (ADR 0019).
+   */
+  describe('the media pool', () => {
+    const rule = (prefix, days, enabled = true) => ({ name: 'r', enabled, prefix, days });
+    const prefix = 'atelier-test-production-';
+
+    it('reuses a copy for 83 days under the rules provision writes', () => {
+      expect(reuseWindow([rule(prefix, 90), rule('pool/', 180)], prefix)).toBe(83);
+    });
+
+    it('reuses nothing under the bucket-wide rule of v0.3.31, or rules it cannot read', () => {
+      expect(reuseWindow([rule('', 90)], prefix)).toBeLessThanOrEqual(0);
+      expect(reuseWindow(null, prefix)).toBe(0);
+    });
+
+    it('reuses nothing when the archives never expire and the pool does', () => {
+      expect(reuseWindow([rule('pool/', 180)], prefix)).toBe(-Infinity);
+      expect(reuseWindow([rule(prefix, 90, false), rule('pool/', 180)], prefix)).toBe(-Infinity);
+    });
+
+    it('reuses forever a pool nothing expires', () => {
+      expect(reuseWindow([rule(prefix, 90)], prefix)).toBe(Infinity);
+    });
+
+    it('drops from the index what has aged out of the window', () => {
+      const now = new Date('2026-10-28T00:00:00.000Z');
+      const entry = (key, storedAt) => ({ source: 'images', key, file: `pool/${key}.bin`, storedAt });
+      const previous = [entry('vieux', '2026-07-01T00:00:00.000Z'), entry('jeune', '2026-10-01T00:00:00.000Z')];
+      expect([...reusable(previous, 83, now).keys()]).toEqual(['images\njeune']);
+      const next = nextIndex({ previous, state: 'ok', fresh: [entry('vieux', now.toISOString())], windowDays: 83, now });
+      expect(next.entries.map((candidate) => [candidate.key, candidate.storedAt])).toEqual([
+        ['jeune', '2026-10-01T00:00:00.000Z'],
+        ['vieux', now.toISOString()],
+      ]);
+      expect(nextIndex({ previous: [previous[1]], state: 'ok', fresh: [], windowDays: 83, now }).changed).toBe(false);
+    });
+
+    it('reads wrangler’s listing, which has no --json', () => {
+      const listing = [
+        "Listing lifecycle rules for bucket 'minshop-atelier-test-production-backups'...",
+        'name:     shopctl-retention',
+        'enabled:  Yes',
+        `prefix:   ${prefix}`,
+        'action:   Expire objects after 90 days',
+        '',
+        'name:     shopctl-pool',
+        'enabled:  No',
+        'prefix:   (all prefixes)',
+        'action:   Expire objects after 180 days, Abort incomplete multipart uploads after 7 days',
+      ].join('\n');
+      expect(parseLifecycleRules(listing)).toEqual([
+        { name: 'shopctl-retention', enabled: true, prefix, days: 90 },
+        { name: 'shopctl-pool', enabled: false, prefix: '', days: 180 },
+      ]);
     });
   });
 });
@@ -394,6 +455,10 @@ describe('shopctl backup', () => {
    */
   describe('the backups bucket', () => {
     const remote = (target, bucket) => target.read().r2.find((entry) => entry.name === bucket);
+    const putsInto = (target, bucket, since) =>
+      target.read().calls.slice(since)
+        .map(({ argv }) => argv.join(' '))
+        .filter((call) => call.startsWith(`r2 object put ${bucket}/`));
 
     it('receives the archive as it was sealed, manifest last', () => {
       const target = seededShop();
@@ -402,14 +467,97 @@ describe('shopctl backup', () => {
       const { report, status } = target.json(['backup', '--env', 'staging', '--upload']);
 
       expect(status).toBe(EXIT_CODES.ok);
-      expect(report.uploaded).toEqual({ bucket: expected.backups, prefix: `${report.id}/`, files: 3 });
-      expect(remote(target, expected.backups).objects).toBe(3);
-      const puts = target.read().calls.slice(before)
-        .map(({ argv }) => argv.join(' '))
-        .filter((call) => call.startsWith(`r2 object put ${expected.backups}/`));
-      expect(puts).toHaveLength(3);
+      expect(report.uploaded).toEqual({
+        bucket: expected.backups,
+        prefix: `${report.id}/`,
+        files: 2,
+        objects: { written: 1, pooled: 1, reused: 0 },
+        index: true,
+      });
+      // The object into the pool, the body, the index, the manifest.
+      expect(remote(target, expected.backups).objects).toBe(4);
+      const puts = putsInto(target, expected.backups, before);
+      expect(puts).toHaveLength(4);
+      expect(puts[0]).toMatch(new RegExp(`^r2 object put ${expected.backups}/pool/[0-9a-f]{32}\\.bin `));
+      expect(puts.at(-2)).toContain(`${expected.backups}/pool/index.json`);
       expect(puts.at(-1)).toContain(`${report.id}/manifest.json`);
       expect(puts.every((call) => call.includes('-J eu'))).toBe(true);
+    });
+
+    /**
+     * ADR 0019: on the shared account a backup is two API calls per object,
+     * twice a day, for objects that never change. The pool takes each one
+     * once; a second backup of an unchanged shop reads none from the shop's
+     * buckets and writes none into its backups bucket.
+     */
+    it('reads and writes no media the second time an unchanged shop is backed up', () => {
+      const target = seededShop();
+      const expected = names(target.slug, 'staging');
+      const first = target.json(['backup', '--env', 'staging', '--upload']).report;
+      const before = target.read().calls.length;
+      const { report, status } = target.json(['backup', '--env', 'staging', '--upload']);
+
+      expect(status).toBe(EXIT_CODES.ok);
+      expect(report.id).not.toBe(first.id);
+      expect(report.media).toEqual({ read: 0, reused: 1 });
+      expect(report.uploaded).toMatchObject({ objects: { written: 0, pooled: 0, reused: 1 }, index: false });
+      const calls = target.read().calls.slice(before).map(({ argv }) => argv.join(' '));
+      expect(calls.filter((call) => call.startsWith(`r2 object get ${expected.images}/`))).toEqual([]);
+      expect(putsInto(target, expected.backups, before).map((call) => call.split(' ')[3])).toEqual([
+        `${expected.backups}/${report.id}/data.bin`,
+        `${expected.backups}/${report.id}/manifest.json`,
+      ]);
+
+      // Both archives name the same sealed copy.
+      const images = (id) => archive(target, id).r2.buckets.find((bucket) => bucket.binding === 'BUCKET').inventory[0];
+      expect(images(report.id).pool).toBe(images(first.id).pool);
+      expect(images(report.id).cipher).toEqual(images(first.id).cipher);
+    });
+
+    // A copy is reused only while it outlives an archive taken now. On a bucket
+    // still under the single bucket-wide rule, the pool would expire with the
+    // archive that wrote it and before the ones reusing it: nothing is reused,
+    // and every archive carries its objects under its own prefix, as before.
+    it('reuses nothing on a bucket whose rules would let the pool expire first', () => {
+      const target = seededShop();
+      const expected = names(target.slug, 'staging');
+      target.account({
+        r2: target.read().r2.map((bucket) => (bucket.name === expected.backups ? { ...bucket, lifecycle: [{ name: 'shopctl-retention', days: 90 }] } : bucket)),
+      });
+      target.json(['backup', '--env', 'staging', '--upload']);
+      const before = target.read().calls.length;
+      const { report, stderr } = target.json(['backup', '--env', 'staging', '--upload']);
+
+      expect(report.media).toEqual({ read: 1, reused: 0 });
+      expect(stderr).toMatch(/shopctl provision --env staging/);
+      const puts = putsInto(target, expected.backups, before).map((call) => call.split(' ')[3]);
+      expect(puts).toHaveLength(3);
+      expect(puts.every((path) => path.startsWith(`${expected.backups}/${report.id}/`))).toBe(true);
+      expect(archive(target, report.id).r2.buckets[0].inventory[0].pool).toBeNull();
+
+      // And it comes back from there, as every archive before v0.3.32 does.
+      rmSync(join(target.root, 'backups'), { recursive: true });
+      const pulled = target.json(['backup', 'pull', report.id, '--env', 'staging']);
+      expect(pulled.status, pulled.stderr).toBe(EXIT_CODES.ok);
+      expect(target.json(['backup', 'verify', report.id]).report.failures).toBe(0);
+    });
+
+    // The index flows into manifests that are themselves authenticated: an
+    // edited one would make archives that stop opening only at restore time.
+    // Sealed with the backup key, an edit stops the INDEX opening, at once.
+    it('starts a fresh pool rather than trusting an index that does not open', () => {
+      const target = seededShop();
+      const expected = names(target.slug, 'staging');
+      target.json(['backup', '--env', 'staging', '--upload']);
+      const indexFile = join(dirname(target.statePath), 'r2', expected.backups, `${Buffer.from('pool/index.json', 'utf8').toString('hex')}.bin`);
+      const index = JSON.parse(readFileSync(indexFile, 'utf8'));
+      writeFileSync(indexFile, JSON.stringify({ ...index, tag: Buffer.alloc(16).toString('base64') }));
+
+      const { report, stderr } = target.json(['backup', '--env', 'staging', '--upload']);
+      expect(stderr).toMatch(/l'index du pool ne s'ouvre pas/);
+      expect(report.media).toEqual({ read: 1, reused: 0 });
+      expect(report.uploaded.index).toBe(true);
+      expect(target.json(['backup', '--env', 'staging', '--upload']).report.media).toEqual({ read: 0, reused: 1 });
     });
 
     it('refuses before reading a row when the bucket is not there', () => {
@@ -435,6 +583,40 @@ describe('shopctl backup', () => {
       expect(target.run(['restore', '--env', 'staging', '--from', report.id, '--overwrite', '--dry-run']).status).toBe(EXIT_CODES.ok);
     });
 
+    /**
+     * An archive taken with --upload carries only what the pool did not have.
+     * It says so, `verify` says which level it reached, a restore refuses
+     * before writing a row, and `pull` completes it — the nightly drill's path.
+     */
+    it('leaves pooled objects in the bucket until a pull completes the copy', () => {
+      const target = seededShop();
+      const expected = names(target.slug, 'staging');
+      target.json(['backup', '--env', 'staging', '--upload']);
+      const { report } = target.json(['backup', '--env', 'staging', '--upload']);
+      const object = archive(target, report.id).r2.buckets[0].inventory[0];
+      expect(existsSync(join(target.root, 'backups', report.id, object.file))).toBe(false);
+
+      expect(target.json(['backup', 'list']).report.backups.find((entry) => entry.id === report.id).pooled).toBe(1);
+      const verified = target.json(['backup', 'verify', report.id]);
+      expect(verified.status).toBe(EXIT_CODES.ok);
+      expect(verified.report.checks.find((check) => check.name === 'objets du bucket de sauvegarde').detail).toMatch(/^1 objet/);
+
+      const refused = target.run(['restore', '--env', 'staging', '--from', report.id, '--overwrite']);
+      expect(refused.status).toBe(EXIT_CODES.precondition);
+      expect(refused.stderr).toMatch(new RegExp(`backup pull ${report.id} --env staging`));
+
+      const before = target.read().calls.length;
+      const pulled = target.json(['backup', 'pull', report.id, '--env', 'staging']);
+      expect(pulled.status, pulled.stderr).toBe(EXIT_CODES.ok);
+      expect(pulled.report.fetched).toBe(1);
+      const gets = target.read().calls.slice(before).map(({ argv }) => argv.join(' ')).filter((call) => call.startsWith('r2 object get'));
+      expect(gets).toEqual([expect.stringContaining(`${expected.backups}/${object.pool}`)]);
+      expect(target.json(['backup', 'verify', report.id]).report.checks.some((check) => check.name === 'objets du bucket de sauvegarde')).toBe(false);
+
+      const restored = target.json(['restore', '--env', 'staging', '--from', report.id, '--overwrite']);
+      expect(restored.status, restored.stderr).toBe(EXIT_CODES.ok);
+    });
+
     it('says which archive is missing rather than writing half of one', () => {
       const target = seededShop({ object: false, seed: [] });
       const result = target.run(['backup', 'pull', 'atelier-test-staging-20200101T000000Z', '--env', 'staging']);
@@ -443,11 +625,17 @@ describe('shopctl backup', () => {
       expect(existsSync(join(target.root, 'backups', 'atelier-test-staging-20200101T000000Z'))).toBe(false);
     });
 
-    it('will not overwrite a local copy', () => {
+    it('completes a local copy without touching what it already has', () => {
       const target = seededShop();
       const { report } = target.json(['backup', '--env', 'staging', '--upload']);
-      const result = target.run(['backup', 'pull', report.id, '--env', 'staging']);
-      expect(result.status).toBe(EXIT_CODES.precondition);
+      const body = join(target.root, 'backups', report.id, 'data.bin');
+      const before = readFileSync(body);
+      const calls = target.read().calls.length;
+      const result = target.json(['backup', 'pull', report.id, '--env', 'staging']);
+      expect(result.status).toBe(EXIT_CODES.ok);
+      expect(result.report.fetched).toBe(0);
+      expect(target.read().calls.length).toBe(calls);
+      expect(readFileSync(body)).toEqual(before);
     });
   });
 

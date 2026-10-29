@@ -22,7 +22,7 @@ Utiliser [`0000-template.md`](0000-template.md) pour un nouvel ADR.
 | ADR | Titre | Statut |
 |---|---|---|
 | [0001](0001-modele-isolation.md) | Modèle d'isolation des boutiques | Accepté |
-| [0002](0002-propriete-des-comptes.md) | Propriété des comptes et des fournisseurs | Accepté |
+| [0002](0002-propriete-des-comptes.md) | Propriété des comptes et des fournisseurs | Accepté ; remplacé par 0019 pour Cloudflare |
 | [0003](0003-versionnement-du-socle.md) | Versionnement du socle et stratégie Git | Accepté |
 | [0004](0004-localisation-des-donnees.md) | Localisation des données | Accepté |
 | [0005](0005-strategie-de-sauvegarde.md) | Stratégie de sauvegarde et de restauration | Accepté |
@@ -35,7 +35,8 @@ Utiliser [`0000-template.md`](0000-template.md) pour un nouvel ADR.
 | [0012](0012-identite-du-catalogue-importe.md) | Identité du catalogue importé | Accepté |
 | [0013](0013-environnements-de-deploiement.md) | Environnements de déploiement | Accepté |
 | [0014](0014-automatisation-de-la-forge.md) | Automatisation de la forge | Accepté |
-| [0015](0015-cycle-de-vie-d-une-boutique.md) | Cycle de vie d'une boutique, de la construction à la livraison | Accepté |
+| [0015](0015-cycle-de-vie-d-une-boutique.md) | Cycle de vie d'une boutique, de la construction à la livraison | Accepté ; frontière des comptes remplacée par 0019 |
 | [0016](0016-registre-et-mise-a-niveau-de-la-flotte.md) | Registre de flotte et forme d'une mise à niveau | Accepté |
 | [0017](0017-effacement-et-portabilite.md) | Effacement et portabilité des données d'un acheteur | Accepté |
 | [0018](0018-administration-en-francais.md) | L'administration en français | Accepté |
+| [0019](0019-compte-cloudflare-mutualise.md) | Un compte Cloudflare mutualisé pour les boutiques | Accepté |

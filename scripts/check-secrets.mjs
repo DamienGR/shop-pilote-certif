@@ -35,7 +35,8 @@
  * repository would show it. So the artifacts are read the same way, plus one
  * check the tracked tree cannot have: the literal values in the local
  * `.dev.vars`, which are real credentials by definition, must appear nowhere
- * in `dist/`.
+ * in `dist/` — but in the copy the build makes of that file for `npm run
+ * preview`, which is not output (section 4).
  *
  * `--history` scans every blob any ref still reaches — every branch, every tag,
  * and the pull request heads when they were fetched — because the tree is not
@@ -108,6 +109,9 @@ const scanHistory = process.argv.includes('--history');
 
 /** A bundle is one file where the sources were many, so it gets its own bound. */
 const ARTIFACT_MAX_BYTES = 20_000_000;
+
+/** The local secrets the build copies for `npm run preview` — see section 4. */
+const PREVIEW_DEV_VARS = join('dist', 'server', '.dev.vars');
 
 const tracked = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' })
   .split('\0')
@@ -207,7 +211,16 @@ if (scanArtifacts) {
     );
     process.exit(1);
   }
-  artifacts = walk(dist);
+  // Except one file, which is not output: `dist/server/.dev.vars` is the
+  // Cloudflare Vite plugin's copy of the local secrets, written next to the
+  // generated config so `npm run preview` (`wrangler dev -c
+  // dist/server/wrangler.json`) reads them. Scanned, it reported every local
+  // secret as a leak the moment a `.dev.vars` existed, and `verify` went red on
+  // the setup `.dev.vars.example` asks for. `wrangler deploy` never uploads a
+  // `.dev.vars` — `scripts/check-deploy.mjs` holds the dry run's upload to that
+  // — and the bundle beside it is still read. Anywhere else, `dist/client` (the
+  // served half) above all, a `.dev.vars` is still a finding.
+  artifacts = walk(dist).filter((file) => file !== PREVIEW_DEV_VARS);
   for (const file of artifacts) scanContent(file, { ignoreMarkers: false, maxBytes: ARTIFACT_MAX_BYTES });
 
   // The one check only the artifacts can fail: a value that exists nowhere in

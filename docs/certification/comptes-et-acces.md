@@ -8,6 +8,14 @@ servira. Il ne lance rien sur un compte : les seules commandes sont
 Il se rejoue pour chaque nouvelle boutique : seuls le compte du client, les
 domaines et les adresses changent.
 
+Depuis l'[ADR 0019](../architecture/decisions/0019-compte-cloudflare-mutualise.md),
+une nouvelle boutique n'a plus de compte Cloudflare à elle : elle vit sur le
+compte mutualisé de l'agence, dont les jetons sont ceux du dépôt de flotte. Les
+sections 1 (Stripe), 3 (Resend) et 8 (poste) restent à faire pour elle ; la
+section 2 se réduit au CNAME que `shopctl provision` lui donne, et les sections
+4 à 6 ne concernent plus que le compte mutualisé, une fois pour toutes
+([mise en ligne](../operations/mise-en-ligne.md#sur-le-compte-mutualisé)).
+
 ## Deux règles
 
 - **Un secret naît là où il vit.** Une valeur qui ne s'affiche qu'une fois —
@@ -131,6 +139,7 @@ Workers », puis :
 | Workers R2 Storage, écriture | buckets dans leur juridiction, règle de cycle de vie, objets des sauvegardes |
 | Workers KV Storage, écriture | le namespace des sessions, que wrangler crée au premier `deploy` et que `destroy` supprime |
 | Workers Routes, écriture, sur la zone | le domaine personnalisé du Worker |
+| Zone, lecture, et SSL and Certificates, écriture, sur la zone SaaS (compte mutualisé) | le nom d'hôte personnalisé du commerçant (`cloudflare.saasZone`) : `provision` le crée, `deploy` le lit, `destroy` le supprime |
 | Account Settings et Memberships, lecture | `wrangler whoami`, que `shopctl` lit pour refuser le mauvais compte |
 | Account Analytics, lecture | `shopctl monitor --env staging` dans le nocturne |
 

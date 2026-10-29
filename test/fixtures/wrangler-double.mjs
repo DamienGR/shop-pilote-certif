@@ -452,8 +452,10 @@ if (command === 'r2 bucket dev-url' && positionals[3] === 'get') {
 }
 
 // Lifecycle rules: the real listing prints one `name:` line per rule, then
-// its fields. The double keeps the rules on the bucket record so a second
-// provisioning can find the one the first added.
+// its fields, "(all prefixes)" for a rule without one. The double keeps the
+// rules on the bucket record so a second provisioning can find the one the
+// first added. `add` appends like wrangler's; unlike the API, which the real
+// one then reaches, it refuses a twin outright.
 if (command === 'r2 bucket lifecycle' && positionals[3] === 'list') {
   const bucket = bucketEntry(positionals[4]);
   if (!bucket) fail('The specified bucket does not exist.');
@@ -461,7 +463,9 @@ if (command === 'r2 bucket lifecycle' && positionals[3] === 'list') {
   if (rules.length === 0) done(`Listing lifecycle rules for bucket '${bucket.name}'...\nThere are no lifecycle rules for bucket '${bucket.name}'.`);
   done(
     `Listing lifecycle rules for bucket '${bucket.name}'...\n` +
-      rules.map((rule) => `name:      ${rule.name}\nenabled:   Yes\nprefix:    (all prefixes)\naction:    Expire objects after ${rule.days} days`).join('\n\n'),
+      rules
+        .map((rule) => `name:      ${rule.name}\nenabled:   Yes\nprefix:    ${rule.prefix || '(all prefixes)'}\naction:    Expire objects after ${rule.days} days`)
+        .join('\n\n'),
   );
 }
 
@@ -470,8 +474,18 @@ if (command === 'r2 bucket lifecycle' && positionals[3] === 'add') {
   if (!bucket) fail('The specified bucket does not exist.');
   const name = positionals[5];
   if ((bucket.lifecycle ?? []).some((rule) => rule.name === name)) fail(`A lifecycle rule named '${name}' already exists.`);
-  bucket.lifecycle = [...(bucket.lifecycle ?? []), { name, days: Number(flag('--expire-days')) }];
+  const prefix = positionals[6];
+  bucket.lifecycle = [...(bucket.lifecycle ?? []), { name, days: Number(flag('--expire-days')), ...(prefix ? { prefix } : {}) }];
   done(`✨ Added lifecycle rule '${name}' to bucket '${bucket.name}'.`);
+}
+
+if (command === 'r2 bucket lifecycle' && positionals[3] === 'remove') {
+  const bucket = bucketEntry(positionals[4]);
+  if (!bucket) fail('The specified bucket does not exist.');
+  const name = flag('--name', '--id');
+  if (!(bucket.lifecycle ?? []).some((rule) => rule.name === name)) fail(`Lifecycle rule with ID '${name}' not found in configuration for '${bucket.name}'.`);
+  bucket.lifecycle = bucket.lifecycle.filter((rule) => rule.name !== name);
+  done(`Removing lifecycle rule '${name}' from bucket '${bucket.name}'...\n✨ Removed lifecycle rule '${name}' from bucket '${bucket.name}'.`);
 }
 
 if (command === 'r2 bucket domain' && positionals[3] === 'list') {

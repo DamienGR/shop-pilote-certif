@@ -37,7 +37,17 @@
 #
 # Once staging is destroyed (`shopctl destroy --env staging`, at the launch —
 # ADR 0015), the repository variable STAGING_RETIRED — the date it went — turns
-# the staging half off, said in the run rather than red every night.
+# the staging half off, said in the run rather than red every night. A shop
+# that never had one — built straight on its production, the default since
+# 2026-10-27 — declares none (no stagingDomain, no STAGING_URL), and the run
+# says that instead.
+#
+# A shop on the shared Cloudflare account (ADR 0019) holds no Cloudflare token:
+# none can be limited to one shop's database. The repository variable
+# MINSHOP_FLEET (set by `shopctl repo --fleet`) names the fleet repository whose
+# own Nightly backs its production up and watches it; here, the suite, the audit
+# and the staging's remote gates still run, and the steps that need a token say
+# where they went instead.
 #
 # Each check that needs a credential runs only when its credential is
 # configured, and says so when it is skipped rather than passing silently:
@@ -53,7 +63,9 @@
 #                                 secret so it is masked (a variable, still
 #                                 accepted, is printed in clear)
 #   vars.STAGING_URL              the staging origin, when the manifest
-#                                 declares no stagingDomain (a workers.dev URL)
+#                                 declares no stagingDomain (a workers.dev URL);
+#                                 a REPOSITORY variable, which is how the run
+#                                 learns there is a staging at all
 #
 # in the `backup` environment, placed by `shopctl repo` from
 # CLOUDFLARE_API_TOKEN_BACKUP:
@@ -160,22 +172,37 @@ jobs:
     timeout-minutes: 5
     outputs:
       shop: ${{ steps.shop.outputs.slug }}
+      staging: ${{ steps.shop.outputs.staging }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      # A staging is DECLARED, never presumed: by the manifest's stagingDomain,
+      # or for one on workers.dev by the repository variable STAGING_URL. A shop
+      # built straight on its production (ADR 0015, amended 2026-10-27) has
+      # neither, and its night is the production's backup and watch, not a red
+      # staging job asking for an origin that was never meant to exist.
       - name: Read the manifest
         id: shop
         env:
           STAGING_RETIRED: ${{ vars.STAGING_RETIRED }}
+          STAGING_URL: ${{ vars.STAGING_URL }}
+          FLEET: ${{ vars.MINSHOP_FLEET }}
         run: |
+          if [ -n "$FLEET" ]; then
+            echo "::notice::Boutique du compte mutualisé : sa production est sauvegardée et surveillée par le Nightly du dépôt de flotte $FLEET (ADR 0019)."
+          fi
           if [ -f client/client.yaml ]; then
             slug="$(node --input-type=module -e "import { resolveShop } from './shopctl/src/shop.mjs'; console.log(resolveShop(process.cwd()).manifest.client.slug)")"
+            domain="$(node --input-type=module -e "import { resolveShop } from './shopctl/src/shop.mjs'; console.log(resolveShop(process.cwd()).manifest.cloudflare.stagingDomain ?? '')")"
             echo "slug=$slug" >> "$GITHUB_OUTPUT"
             if [ -n "$STAGING_RETIRED" ]; then
               echo "::notice::Staging détruit le $STAGING_RETIRED (variable STAGING_RETIRED) : ses contrôles ne tournent plus ; la production est sauvegardée et surveillée."
-            else
+            elif [ -n "$domain" ] || [ -n "$STAGING_URL" ]; then
+              echo "staging=true" >> "$GITHUB_OUTPUT"
               echo "Boutique : $slug — les contrôles de staging tournent."
+            else
+              echo "::notice::Aucun staging déclaré (ni cloudflare.stagingDomain, ni variable de dépôt STAGING_URL) : ses contrôles ne tournent pas ; la production est sauvegardée et surveillée."
             fi
           else
             echo "Pas de client/client.yaml : le socle n'a pas de staging à interroger."
@@ -186,7 +213,7 @@ jobs:
     # skipped one showed its expression verbatim. The shop is the repository.
     name: Staging
     needs: detect
-    if: ${{ needs.detect.outputs.shop != '' && vars.STAGING_RETIRED == '' && github.event.schedule != '17 15 * * *' }}
+    if: ${{ needs.detect.outputs.staging == 'true' && github.event.schedule != '17 15 * * *' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: staging
@@ -222,16 +249,26 @@ jobs:
           domain="$(node --input-type=module -e "import { resolveShop } from './shopctl/src/shop.mjs'; console.log(resolveShop(process.cwd()).manifest.cloudflare.stagingDomain ?? '')")"
           origin="${STAGING_URL:-${domain:+https://$domain}}"
           if [ -z "$origin" ]; then
-            echo "::error::Ni cloudflare.stagingDomain dans le manifeste, ni la variable STAGING_URL dans l'environnement staging."
+            echo "::error::Ni cloudflare.stagingDomain dans le manifeste, ni la variable de dépôt STAGING_URL."
             exit 1
           fi
           echo "url=$origin" >> "$GITHUB_OUTPUT"
+
+      # On the shared account the token these three steps need is not in this
+      # repository: said once, rather than three red steps.
+      - name: Leave the account to the fleet
+        if: ${{ vars.MINSHOP_FLEET != '' }}
+        env:
+          FLEET: ${{ vars.MINSHOP_FLEET }}
+        run: |
+          echo "::notice::Compte mutualisé (ADR 0019) : sauvegarde, restauration d'essai et surveillance du staging sautées, aucun jeton Cloudflare dans le dépôt de la boutique ($FLEET les porte)."
 
       # The archive stays on the runner for the restore below and goes to the
       # environment's `-backups` bucket, on the shop's account and in its
       # jurisdiction (decided 2026-10-06). Never to a GitHub artifact.
       - name: Back up staging
         id: backup
+        if: ${{ vars.MINSHOP_FLEET == '' }}
         run: |
           set -euo pipefail
           node shopctl/bin/shopctl.mjs backup --env staging --upload --json | tee backup.json
@@ -240,12 +277,16 @@ jobs:
       # Into the runner's own D1, which is thrown away with it: the archive
       # opens with the key, every table goes back, and the comparison against
       # the archive's digests holds — the RPO half of jalon 8, every night.
+      # The pull first: the backup did not re-read the media the bucket's pool
+      # already had (ADR 0019), so the drill brings them back from there and
+      # checks them, which is the one read those copies get.
       - name: Restore it into a throwaway database
         if: ${{ steps.backup.outcome == 'success' }}
         env:
           ARCHIVE: ${{ steps.backup.outputs.id }}
         run: |
           set -euo pipefail
+          node shopctl/bin/shopctl.mjs backup pull "$ARCHIVE" --env staging --json | tee pull.json
           node shopctl/bin/shopctl.mjs restore --env staging --from "$ARCHIVE" --local --json | tee restore.json
 
       - name: Remote security gate
@@ -275,7 +316,7 @@ jobs:
         run: npm run test:browser:remote
 
       - name: Error rate and quotas
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && vars.MINSHOP_FLEET == '' }}
         run: |
           set -euo pipefail
           node shopctl/bin/shopctl.mjs monitor --env staging --hours 24 --json | tee monitor.json
@@ -320,6 +361,7 @@ jobs:
           name: nightly-${{ needs.detect.outputs.shop }}-${{ github.run_id }}
           path: |
             backup.json
+            pull.json
             restore.json
             monitor.json
           retention-days: 30
@@ -328,7 +370,7 @@ jobs:
   production-backup:
     name: Production backup
     needs: detect
-    if: ${{ needs.detect.outputs.shop != '' }}
+    if: ${{ needs.detect.outputs.shop != '' && vars.MINSHOP_FLEET == '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: backup
@@ -393,7 +435,7 @@ jobs:
   production-watch:
     name: Production error rate and quotas
     needs: detect
-    if: ${{ needs.detect.outputs.shop != '' && github.event.schedule != '17 15 * * *' }}
+    if: ${{ needs.detect.outputs.shop != '' && vars.MINSHOP_FLEET == '' && github.event.schedule != '17 15 * * *' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
 

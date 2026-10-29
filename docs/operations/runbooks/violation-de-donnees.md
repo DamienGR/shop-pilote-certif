@@ -10,12 +10,23 @@ sous-traitante (ADR 0002). C'est au commerçant de notifier la CNIL et, le cas
 échéant, les personnes ; c'est à l'agence de le prévenir sans délai et de lui
 donner de quoi le faire.
 
+**Sur le compte mutualisé** (ADR 0019), une boutique n'est jamais seule en
+cause d'office : un jeton du compte, une session de son administrateur ou un
+incident chez Cloudflare atteignent toutes les boutiques du compte. Chaque
+commerçant est responsable de son propre traitement : chacun est prévenu
+séparément, avec le périmètre de SA boutique, et aucun message ne nomme les
+autres commerçants ni leurs chiffres.
+
 ## 1. Contenir (la première heure)
 
 - révoquer l'accès en cause : jeton, session, compte d'un collaborateur —
   voir [fuite de secret](fuite-de-secret.md) ;
 - conserver les preuves avant de nettoyer : journal d'audit Cloudflare, rapport
   de déploiement, journaux du Worker sur la période ;
+- sur le compte mutualisé, dresser la liste des boutiques que l'accès pouvait
+  atteindre (`fleet.json`, ou toutes celles du compte pour un jeton à la
+  portée du compte), puis réduire cette liste avec le journal d'audit : une
+  boutique ne sort de la liste que sur une preuve ;
 - noter l'heure de **prise de connaissance** : le délai de 72 heures de
   l'article 33 du RGPD court à partir d'elle, pas de l'incident.
 
@@ -30,6 +41,10 @@ meilleurs délais ». Le message dit, sans spéculer :
 - ce qui a été fait pour contenir ;
 - ce dont le commerçant a besoin pour notifier, et quand l'agence le lui
   fournira.
+
+Sur le compte mutualisé, un message par commerçant de la liste dressée en 1,
+le même jour, sans attendre d'avoir fini l'enquête sur les autres boutiques :
+le délai de chacun court déjà.
 
 Aucune donnée personnelle dans ce message : un décompte et des identifiants
 publics de commande suffisent.

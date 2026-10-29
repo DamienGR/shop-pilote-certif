@@ -19,7 +19,7 @@ interface Props {
   iconBelow?: CompactBelow;
 }
 
-const { href, class: className = 'inline-flex items-center hover:text-brand', iconBelow } = Astro.props;
+const { href, class: className = 'inline-flex items-center hover:text-accent', iconBelow } = Astro.props;
 const compact = iconBelow ? COMPACT[iconBelow] : null;
 ---
 

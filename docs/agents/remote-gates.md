@@ -84,7 +84,12 @@ token (`MONITOR_CLOUDFLARE_API_TOKEN`), and `shopctl backup --env production
 default branch, with a token that reads D1 and writes R2 (ADR 0005's RPO once
 staging is gone) — twice a day, the second schedule running that job alone.
 Once staging is destroyed at the launch, the repository
-variable `STAGING_RETIRED` turns the staging half off, with a notice. A check
+variable `STAGING_RETIRED` turns the staging half off, with a notice; and the
+staging half runs only for a DECLARED staging — the manifest's `stagingDomain`,
+or the repository variable `STAGING_URL` — so a shop built straight on its
+production gets a notice instead of a red job. `shopctl certify` reads the
+production jobs' outcome, steps included, and so do their names: renaming one
+is a change to `certify.test.mjs` too. A check
 whose credential is absent is skipped with a warning, never passed silently.
 `test/scripts/nightly.test.mjs` pins what makes it safe: staging only but for
 those reads, shopctl

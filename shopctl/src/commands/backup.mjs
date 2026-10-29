@@ -39,12 +39,12 @@ import { resourceNames } from '../../../scripts/manifest.mjs';
 import { canonical, digest, tableDigest } from '../backup/dump.mjs';
 import { classifyTables, objectInventory, orderTables } from '../backup/schema.mjs';
 import { countRows, getObject, putObject, readSchema, readTables } from '../backup/store.mjs';
-import { listBuckets, expectedAccount, resolveAccount, whoami } from '../cloudflare.mjs';
+import { lifecycleRules, listBuckets, expectedAccount, resolveAccount, whoami } from '../cloudflare.mjs';
 import {
   ARCHIVE_FORMAT,
   DATA_FILE,
   MANIFEST_FILE,
-  archiveFiles,
+  archivePrefix,
   assertBackupId,
   DEFAULT_KEEP,
   DEFAULT_KEEP_DAYS,
@@ -52,15 +52,20 @@ import {
   authenticatedHeader,
   backupId,
   listArchives,
+  objectContext,
   objectFile,
+  pooledElsewhere,
   readArchive,
+  remoteObjectPath,
   removeArchive,
   planPrune,
   repositoryPath,
+  storedObjects,
   verifyStructure,
   writeArchive,
 } from '../backup/archive.mjs';
 import { DEFAULT_KEY_FILE, keyId, keyMatches, loadKey, open, seal, writeKeyFile } from '../backup/crypto.mjs';
+import { POOL_INDEX, nextIndex, openIndex, poolFile, poolKey, reusable, reuseWindow, sealIndex } from '../backup/pool.mjs';
 
 export const BACKUP_OPTIONS = {
   '--env': 'environnement',
@@ -81,7 +86,8 @@ export const backupUsage = `Usage: shopctl backup [sous-commande] [options]
   shopctl backup --env <staging|production>   Prendre une sauvegarde
   shopctl backup list                         Lister les sauvegardes du dépôt
   shopctl backup verify <id>                  Contrôler une sauvegarde
-  shopctl backup pull <id> --env <env>        Rapatrier une sauvegarde du bucket -backups
+  shopctl backup pull <id> --env <env>        Rapatrier une sauvegarde du bucket -backups,
+                                              ou compléter une copie locale de ses médias
   shopctl backup prune                        Appliquer la politique de conservation
   shopctl backup keygen                       Écrire une clé de chiffrement
 
@@ -90,7 +96,8 @@ export const backupUsage = `Usage: shopctl backup [sous-commande] [options]
   --key-file <chemin>         Clé de chiffrement. Défaut : ${DEFAULT_KEY_FILE}, sinon SHOPCTL_BACKUP_KEY.
   --no-media                  Ne pas emporter les octets R2 ; l'inventaire seul.
   --upload                    Copier aussi la sauvegarde dans le bucket -backups
-                              de l'environnement (privé, même juridiction).
+                              de l'environnement (privé, même juridiction). Un
+                              média que le bucket a déjà n'est ni relu ni recopié.
   --keep <nombre>             Sauvegardes conservées par prune. Défaut : ${DEFAULT_KEEP}.
   --keep-days <jours>         Âge maximal conservé par prune. Défaut : ${DEFAULT_KEEP_DAYS}.
   --dry-run                   Tout préparer, ne rien écrire ni supprimer.
@@ -167,8 +174,9 @@ function createBackup(args, reporter) {
   // only produced a file on a runner that is about to be thrown away.
   const upload = args.values['--upload'] === true;
   if (upload && !dryRun) requireBackupsBucket({ manifest, root, env });
+  const pool = upload && !dryRun && withMedia ? openPool({ manifest, root, env, key, reporter }) : null;
 
-  const taken = captureBackup({ manifest, root, env, account, key, repository, withMedia, dryRun, reporter });
+  const taken = captureBackup({ manifest, root, env, account, key, repository, withMedia, dryRun, pool, reporter });
 
   if (dryRun) {
     if (upload) reporter.todo(`la sauvegarde serait copiée dans ${resourceNames(manifest, { env }).backups}`);
@@ -188,7 +196,7 @@ function createBackup(args, reporter) {
     return 0;
   }
 
-  const uploaded = upload ? uploadArchive({ manifest, root, env, path: taken.path, id: taken.id, reporter }) : null;
+  const uploaded = upload ? uploadArchive({ manifest, root, env, path: taken.path, id: taken.id, key, pool, reporter }) : null;
 
   reporter.result({
     command: 'backup',
@@ -201,6 +209,7 @@ function createBackup(args, reporter) {
     schema: taken.schema.version,
     tables: taken.tables,
     r2: taken.r2,
+    media: taken.media,
     bytes: taken.bytes,
     uploaded,
   });
@@ -225,7 +234,7 @@ function createBackup(args, reporter) {
  * configuration (`openEnvironment`, or the deploy's own resource check): the
  * reads below go through the `DB` binding of the `wrangler.jsonc` in the tree.
  */
-export function captureBackup({ manifest, root, env, account, key, repository, withMedia = true, dryRun = false, reporter }) {
+export function captureBackup({ manifest, root, env, account, key, repository, withMedia = true, dryRun = false, pool = null, reporter }) {
   const names = resourceNames(manifest, { env });
   const jurisdiction = ['-J', manifest.cloudflare.jurisdiction];
 
@@ -288,6 +297,12 @@ export function captureBackup({ manifest, root, env, account, key, repository, w
     { binding: 'BUCKET', name: names.images, keys: inventory.images },
     { binding: 'FILES', name: names.files, keys: inventory.files },
   ];
+  // What the backups bucket already holds, sealed under this key and young
+  // enough to outlive this archive (backup/pool.mjs). Empty without --upload:
+  // a local archive carries every object it names.
+  const pooled = pool?.reuse ?? new Map();
+  const pooling = Boolean(pool && pool.window > 0);
+  let reused = 0;
   const objects = [];
   const bucketEntries = [];
   for (const bucket of buckets) {
@@ -298,19 +313,27 @@ export function captureBackup({ manifest, root, env, account, key, repository, w
         entries.push({ key: objectKey, file: null, bytes: null, digest: null, cipher: null });
         continue;
       }
+      const file = objectFile(objectKey);
+      const copy = pooled.get(poolKey(bucket.name, objectKey));
+      if (copy) {
+        reused += 1;
+        entries.push({ key: objectKey, file, pool: copy.file, bytes: copy.bytes, digest: copy.digest, cipher: copy.cipher });
+        continue;
+      }
       const bytes = getObject(objectKey, { cwd: root, bucket: bucket.name, remote: true, jurisdiction });
       if (!bytes) {
         missing += 1;
         entries.push({ key: objectKey, file: null, bytes: null, digest: null, cipher: null, missing: true });
         continue;
       }
-      const file = objectFile(objectKey);
-      const sealed = seal(bytes, key, `${id}:${bucket.name}:${objectKey}`);
+      const sealed = seal(bytes, key, objectContext({ format: ARCHIVE_FORMAT }, bucket.name, objectKey));
+      const fingerprint = digest(sealed.ciphertext);
       entries.push({
         key: objectKey,
         file,
+        pool: pooling ? poolFile(fingerprint) : null,
         bytes: bytes.length,
-        digest: digest(sealed.ciphertext),
+        digest: fingerprint,
         cipher: { iv: sealed.iv, tag: sealed.tag },
       });
       objects.push({ file, bytes: sealed.ciphertext });
@@ -323,7 +346,7 @@ export function captureBackup({ manifest, root, env, account, key, repository, w
     }
     bucketEntries.push({ binding: bucket.binding, name: bucket.name, objects: entries.length, stored: withMedia, inventory: entries });
   }
-  if (withMedia) reporter.ok(`${objects.length} objet(s) emportés`);
+  if (withMedia) reporter.ok(`${objects.length} objet(s) emportés${reused > 0 ? `, ${reused} déjà dans ${names.backups} (ni relus ni recopiés)` : ''}`);
   else reporter.warn('inventaire seul (--no-media).', 'Une restauration dans un compte vide n\'aura pas les images.');
 
   // ── Seal ──────────────────────────────────────────────────────────────────
@@ -367,6 +390,7 @@ export function captureBackup({ manifest, root, env, account, key, repository, w
     schema: manifestDocument.schema,
     tables: tableEntries.map(({ name, rows, digest: fingerprint }) => ({ name, rows, digest: fingerprint })),
     r2: bucketEntries.map(({ name, objects: count, stored }) => ({ name, objects: count, stored })),
+    media: { read: objects.length, reused },
     bytes: sealed.ciphertext.length,
   };
 }
@@ -374,34 +398,104 @@ export function captureBackup({ manifest, root, env, account, key, repository, w
 // ── The remote copy ─────────────────────────────────────────────────────────
 
 /**
+ * What the backups bucket's media pool can lend the backup about to be taken
+ * (backup/pool.mjs): two reads, the bucket's lifecycle rules and the index,
+ * before a single object is.
+ *
+ * The rules decide for how long a pooled copy may be reused, so that it always
+ * outlives the archive about to name it. A bucket still on the bucket-wide rule
+ * of v0.3.31 and earlier, or one whose rules cannot be read, gets a window of
+ * zero: every object is read and carried under the archive's own prefix, as it
+ * always was — and the run says how to change that.
+ */
+export function openPool({ manifest, root, env, key, reporter }) {
+  const names = resourceNames(manifest, { env });
+  const jurisdiction = manifest.cloudflare.jurisdiction;
+  reporter.section(`Médias déjà sauvegardés — ${names.backups}`);
+  const rules = lifecycleRules(names.backups, { cwd: root, jurisdiction });
+  const window = reuseWindow(rules, archivePrefix(manifest.client.slug, env));
+  if (!(window > 0)) {
+    reporter.warn(
+      rules === null
+        ? `les règles de conservation de ${names.backups} n'ont pas pu être lues : chaque objet est relu et recopié.`
+        : `les règles de conservation de ${names.backups} ne laissent pas le pool survivre aux archives : chaque objet est relu et recopié.`,
+      `\`shopctl provision --env ${env}\` pose les deux règles (archives à 90 jours par leur préfixe, pool à 180).`,
+    );
+    return { window: 0, reuse: new Map(), previous: [], state: 'absent' };
+  }
+  const index = openIndex(getObject(POOL_INDEX, { cwd: root, bucket: names.backups, remote: true, jurisdiction: ['-J', jurisdiction] }), key, names.backups);
+  const reuse = reusable(index.entries, window);
+  if (index.state === 'ok') reporter.ok(`${reuse.size} objet(s) réutilisables (copies de moins de ${window} jours)`);
+  else if (index.state === 'absent') reporter.ok('pool vide : les objets sont lus et copiés une fois');
+  else if (index.state === 'other-key') reporter.warn('l\'index du pool est scellé par une autre clé : un nouveau pool commence.', 'Les archives prises avec l\'ancienne clé gardent leurs copies jusqu\'à leur expiration.');
+  else reporter.warn('l\'index du pool ne s\'ouvre pas : un nouveau pool commence.', 'Une édition ou une corruption de pool/index.json ; les archives existantes nomment leurs copies elles-mêmes.');
+  return { window, reuse, previous: index.entries, state: index.state };
+}
+
+/**
  * Copy an archive, as written, into the environment's backups bucket.
  *
  * Where a backup taken by CI survives the runner that took it (decided
- * 2026-10-06: a private bucket per shop and environment, on the shop's own
- * account, in its jurisdiction — ADR 0002 and ADR 0004). The files are the
- * archive's own bytes, already encrypted: nothing is re-sealed on the way, so
- * what `pull` brings back is byte for byte what `verify` checked here.
+ * 2026-10-06: a private bucket per shop and environment, in the shop's
+ * jurisdiction — ADR 0004, ADR 0019). The files are the archive's own bytes,
+ * already encrypted: nothing is re-sealed on the way, so what `pull` brings
+ * back is byte for byte what `verify` checked here.
+ *
+ * The order is the crash story. The objects the pool did not have go first,
+ * each under a name nothing else will ever use; then the body; then the index,
+ * which only names copies that are already there; the manifest LAST, so that a
+ * copy interrupted half-way has no manifest, which every reader already treats
+ * as an incomplete archive. An interruption costs, at worst, pool copies no
+ * index names — they expire with the pool.
  *
  * Refused when the bucket does not exist rather than created: creating a bucket
  * fixes its jurisdiction for good, which is provisioning's decision and nobody
  * else's.
  */
-export function uploadArchive({ manifest, root, env, path, id, reporter }) {
+export function uploadArchive({ manifest, root, env, path, id, key = null, pool = null, reporter }) {
   const names = resourceNames(manifest, { env });
-  const jurisdiction = manifest.cloudflare.jurisdiction;
+  const jurisdiction = ['-J', manifest.cloudflare.jurisdiction];
   requireBackupsBucket({ manifest, root, env, id });
   const archive = JSON.parse(readFileSync(join(path, MANIFEST_FILE), 'utf8'));
-  const files = archiveFiles(archive);
-  for (const file of files) {
-    putObject(`${id}/${file}`, readFileSync(join(path, file)), {
-      cwd: root,
-      bucket: names.backups,
-      remote: true,
-      jurisdiction: ['-J', jurisdiction],
-    });
+  const put = (remotePath, bytes) => putObject(remotePath, bytes, { cwd: root, bucket: names.backups, remote: true, jurisdiction });
+
+  // Only what this run read: a reused copy is not in the directory, and is
+  // already in the bucket.
+  const carried = storedObjects(archive).filter((object) => existsSync(join(path, object.file)));
+  for (const object of carried) put(remoteObjectPath(id, object), readFileSync(join(path, object.file)));
+  put(`${id}/${DATA_FILE}`, readFileSync(join(path, DATA_FILE)));
+
+  const pooledHere = carried.filter((object) => object.pool);
+  let index = false;
+  if (pool && key && pool.window > 0) {
+    const fresh = pooledHere.map(({ source, key: objectKey, pool: file, bytes, digest: fingerprint, cipher }) => ({
+      source,
+      key: objectKey,
+      file,
+      bytes,
+      digest: fingerprint,
+      cipher,
+      storedAt: archive.createdAt,
+    }));
+    const next = nextIndex({ previous: pool.previous, state: pool.state, fresh, windowDays: pool.window });
+    if (next.changed) {
+      put(POOL_INDEX, sealIndex(next.entries, key, names.backups));
+      index = true;
+    }
   }
-  reporter.ok(`${id} copiée dans ${names.backups} (${files.length} fichier(s))`);
-  return { bucket: names.backups, prefix: `${id}/`, files: files.length };
+  put(`${id}/${MANIFEST_FILE}`, readFileSync(join(path, MANIFEST_FILE)));
+
+  const reused = storedObjects(archive).filter((object) => object.pool).length - pooledHere.length;
+  reporter.ok(
+    `${id} copiée dans ${names.backups} : ${carried.length} objet(s) écrit(s)${reused > 0 ? `, ${reused} déjà dans le pool` : ''}`,
+  );
+  return {
+    bucket: names.backups,
+    prefix: `${id}/`,
+    files: 2,
+    objects: { written: carried.length, pooled: pooledHere.length, reused },
+    index,
+  };
 }
 
 function requireBackupsBucket({ manifest, root, env, id = null }) {
@@ -415,13 +509,19 @@ function requireBackupsBucket({ manifest, root, env, id = null }) {
 }
 
 /**
- * Bring an archive back from the backups bucket into the local repository.
+ * Bring an archive back from the backups bucket into the local repository, or
+ * complete a local copy with the objects it left in the pool.
  *
  * By identifier, because wrangler cannot list a bucket's objects: the id is in
  * the deploy report, the nightly run's log, and the name of every file the
- * bucket holds. The manifest comes first and names the rest; the copy is then
- * checked exactly as `backup verify` checks a local one, before anything says
- * it arrived.
+ * bucket holds. The manifest comes first and names the rest — the body under
+ * the archive's prefix, each object where the manifest says it is, the pool
+ * included. The copy is then checked exactly as `backup verify` checks a local
+ * one, before anything says it arrived.
+ *
+ * A local copy is never overwritten: an archive taken here with `--upload`
+ * lacks only the objects the pool already had, and those are all a pull
+ * fetches. That is what the nightly run does before its restore drill.
  */
 function pullBackup(args, reporter, id) {
   if (!id) throw usageError('backup pull demande un identifiant.', 'Il figure dans le rapport du déploiement ou du run nocturne qui l\'a prise.');
@@ -430,56 +530,83 @@ function pullBackup(args, reporter, id) {
   const names = resourceNames(manifest, { env });
   const jurisdiction = ['-J', manifest.cloudflare.jurisdiction];
   const directory = join(repository, id);
-  if (existsSync(join(directory, MANIFEST_FILE))) {
-    throw preconditionError(`${id} est déjà dans ${repository}.`, `Contrôlez-la : shopctl backup verify ${id}`);
-  }
-
-  // The account, but not the database: a pull is what an operator runs when the
-  // database is the thing that went wrong. The bucket's name alone does not say
-  // whose it is — a shop's staging exists on the agency's account and on the
-  // client's (ADR 0015) under the same name.
-  reporter.section('Compte Cloudflare');
-  const account = resolveAccount(
-    expectedAccount(manifest, env, args.values),
-    whoami({ cwd: root }),
-  );
-  reporter.ok(`${account.name} (${account.id})`);
-
-  reporter.section(`Rapatriement de ${id} depuis ${names.backups}`);
-  const fetch = (file) => {
-    const bytes = getObject(`${id}/${file}`, { cwd: root, bucket: names.backups, remote: true, jurisdiction });
-    if (!bytes) {
-      throw inputError(
-        `${id}/${file} est introuvable dans ${names.backups}.`,
-        file === MANIFEST_FILE
-          ? 'Vérifiez l\'identifiant et l\'environnement : une archive sans manifeste n\'a jamais fini d\'être copiée, ou a expiré.'
-          : 'L\'archive distante est incomplète ; elle ne peut pas servir.',
-      );
-    }
-    return bytes;
-  };
-
-  const manifestBytes = fetch(MANIFEST_FILE);
-  const archive = JSON.parse(manifestBytes.toString('utf8'));
-  if (archive.id !== id || archive.shop !== manifest.client.slug || archive.env !== env) {
+  const local = existsSync(join(directory, MANIFEST_FILE)) ? readArchive(repository, id) : null;
+  if (local && (local.manifest.shop !== manifest.client.slug || local.manifest.env !== env)) {
     throw verificationError(
-      `le manifeste distant décrit ${archive.shop}/${archive.env}/${archive.id}, pas ${manifest.client.slug}/${env}/${id}.`,
-      'Rien n\'a été écrit. Une archive se relit dans l\'arbre de la boutique qui l\'a prise.',
+      `la copie locale de ${id} décrit ${local.manifest.shop}/${local.manifest.env}, pas ${manifest.client.slug}/${env}.`,
+      'Rien n\'a été écrit. Une archive se complète depuis le bucket de l\'environnement qui l\'a prise.',
     );
   }
-  for (const file of archiveFiles(archive).filter((name) => name !== MANIFEST_FILE)) {
-    const target = join(directory, file);
-    mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, fetch(file));
+  const missing = local ? pooledElsewhere(local) : null;
+
+  if (local && missing.length === 0) {
+    reporter.section(`Sauvegarde ${id}`);
+    reporter.ok(`déjà complète dans ${repository} : rien à rapatrier`);
+  } else {
+    // The account, but not the database: a pull is what an operator runs when
+    // the database is the thing that went wrong. The bucket's name alone does
+    // not say whose it is — a shop's staging can exist on two accounts under
+    // the same name (ADR 0015).
+    reporter.section('Compte Cloudflare');
+    const account = resolveAccount(
+      expectedAccount(manifest, env, args.values),
+      whoami({ cwd: root }),
+    );
+    reporter.ok(`${account.name} (${account.id})`);
+
+    reporter.section(`Rapatriement de ${id} depuis ${names.backups}`);
+    const fetch = (remotePath, isManifest = false) => {
+      const bytes = getObject(remotePath, { cwd: root, bucket: names.backups, remote: true, jurisdiction });
+      if (!bytes) {
+        throw inputError(
+          `${remotePath} est introuvable dans ${names.backups}.`,
+          isManifest
+            ? 'Vérifiez l\'identifiant et l\'environnement : une archive sans manifeste n\'a jamais fini d\'être copiée, ou a expiré.'
+            : 'L\'archive distante est incomplète ; elle ne peut pas servir.',
+        );
+      }
+      return bytes;
+    };
+    const write = (file, bytes) => {
+      const target = join(directory, file);
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, bytes);
+    };
+
+    if (local) {
+      for (const object of missing) write(object.file, fetch(object.pool));
+      reporter.ok(`${missing.length} objet(s) rapatrié(s) du pool`);
+    } else {
+      const manifestBytes = fetch(`${id}/${MANIFEST_FILE}`, true);
+      const archive = JSON.parse(manifestBytes.toString('utf8'));
+      if (archive.id !== id || archive.shop !== manifest.client.slug || archive.env !== env) {
+        throw verificationError(
+          `le manifeste distant décrit ${archive.shop}/${archive.env}/${archive.id}, pas ${manifest.client.slug}/${env}/${id}.`,
+          'Rien n\'a été écrit. Une archive se relit dans l\'arbre de la boutique qui l\'a prise.',
+        );
+      }
+      write(DATA_FILE, fetch(`${id}/${DATA_FILE}`));
+      const objects = storedObjects(archive);
+      for (const object of objects) write(object.file, fetch(remoteObjectPath(id, object)));
+      // Written last, as `writeArchive` does: until it is there, the directory
+      // is an incomplete archive to every reader.
+      writeFileSync(join(directory, MANIFEST_FILE), manifestBytes);
+      reporter.ok(`${id} et ${objects.length} objet(s) rapatriés`);
+    }
   }
-  // Written last, as `writeArchive` does: until it is there, the directory is
-  // an incomplete archive to every reader.
-  writeFileSync(join(directory, MANIFEST_FILE), manifestBytes);
 
   const checks = verifyStructure(readArchive(repository, id));
   for (const check of checks) (check.ok ? reporter.ok : reporter.fail).call(reporter, `${check.name} — ${check.detail}`);
   const failures = checks.filter((check) => !check.ok);
-  reporter.result({ command: 'backup pull', ok: failures.length === 0, id, path: directory, bucket: names.backups, checks });
+  reporter.result({
+    command: 'backup pull',
+    ok: failures.length === 0,
+    id,
+    path: directory,
+    bucket: names.backups,
+    fetched: local ? missing.length : null,
+    checks,
+  });
   if (failures.length > 0) {
     throw verificationError(`${failures.length} contrôle(s) ont échoué sur la copie de ${id}.`, 'La copie locale est gardée pour examen ; ne la restaurez pas.');
   }
@@ -501,8 +628,9 @@ function listBackups(args, reporter) {
       const { manifest } = entry;
       const rows = manifest.tables.reduce((sum, table) => sum + table.rows, 0);
       const stored = manifest.r2.buckets.filter((bucket) => bucket.stored).length;
+      const elsewhere = pooledElsewhere(entry).length;
       reporter.ok(
-        `${entry.id} — ${manifest.env}, ${rows} ligne(s), schéma ${manifest.schema.version ?? 'inconnu'}, clé ${manifest.cipher.keyId}${stored === 0 ? ', sans objets R2' : ''}`,
+        `${entry.id} — ${manifest.env}, ${rows} ligne(s), schéma ${manifest.schema.version ?? 'inconnu'}, clé ${manifest.cipher.keyId}${stored === 0 ? ', sans objets R2' : ''}${elsewhere > 0 ? `, ${elsewhere} objet(s) laissés dans le pool (backup pull)` : ''}`,
       );
     }
   }
@@ -519,6 +647,7 @@ function listBackups(args, reporter) {
       keyId: entry.manifest?.cipher?.keyId ?? null,
       rows: entry.manifest ? entry.manifest.tables.reduce((sum, table) => sum + table.rows, 0) : null,
       media: entry.manifest ? entry.manifest.r2.buckets.some((bucket) => bucket.stored) : null,
+      pooled: entry.broken ? null : pooledElsewhere(entry).length,
     })),
   });
   return 0;

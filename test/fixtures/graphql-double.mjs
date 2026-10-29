@@ -12,6 +12,7 @@
  *   status     number                 HTTP status to answer with (default 200)
  *   worker     [group]                workersInvocationsAdaptive groups
  *   d1         [group]                d1AnalyticsAdaptiveGroups groups
+ *   usage      { <dataset>: [group] } the account, as `fleet usage` asks for it
  *   errors     [{ message }]          a GraphQL-level refusal, sent with null data
  *   requests   [{ authorization, query, variables }]   appended on every call
  */
@@ -41,9 +42,13 @@ const server = createServer((request, response) => {
     state.requests = [...(state.requests ?? []), { path: request.url, authorization: request.headers.authorization ?? null, query: parsed.query ?? null, variables: parsed.variables ?? null }];
     writeFileSync(STATE, JSON.stringify(state, null, 2));
 
-    const account = parsed.query?.includes('workersInvocationsAdaptive')
-      ? { workersInvocationsAdaptive: state.worker ?? [] }
-      : { d1AnalyticsAdaptiveGroups: state.d1 ?? [] };
+    // `fleet usage` asks for several datasets at once, D1 storage among them;
+    // `monitor` for one each time.
+    const account = parsed.query?.includes('d1StorageAdaptiveGroups')
+      ? (state.usage ?? {})
+      : parsed.query?.includes('workersInvocationsAdaptive')
+        ? { workersInvocationsAdaptive: state.worker ?? [] }
+        : { d1AnalyticsAdaptiveGroups: state.d1 ?? [] };
     const document = state.errors
       ? { data: null, errors: state.errors }
       : { data: { viewer: { accounts: [account] } }, errors: null };

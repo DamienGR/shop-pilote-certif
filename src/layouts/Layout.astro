@@ -6,6 +6,8 @@ import { normalizeSearchQuery } from '../features/search/query';
 import { EMPTY_MENUS, visibleItems } from '../features/navigation/db';
 import { getEmailProvider } from '../features/email';
 import { buildShellModel } from '../features/storefront/shell';
+import { storefrontIndexable } from '../features/storefront/indexable';
+import { vaultReady } from '../features/secrets/store';
 import { LANG, LOCALE, t } from '../features/i18n';
 import StoreHeader from '#theme/Header.astro';
 import StoreFooter from '#theme/Footer.astro';
@@ -67,6 +69,9 @@ const desc = (description ?? t('shell.meta.description', { boutique: storeName }
 const origin = publicOrigin(Astro.url.origin, env.CANONICAL_ORIGIN);
 const canonical = canonicalOverride ?? new URL(Astro.url.pathname, origin).href;
 const ogImage = image ? new URL(image, origin).href : undefined;
+// Closed until it can take an order: a production is built in public, and a
+// half-entered catalogue indexed now is the one search results keep showing.
+const indexable = storefrontIndexable(Astro.locals.settings, vaultReady());
 
 // The header and footer are store-owned, so they receive a model rather than
 // request context. Built from values middleware already loaded — no extra D1
@@ -113,6 +118,7 @@ const shell = buildShellModel({
     <title>{pageTitle}</title>
     <meta name="description" content={desc} />
     <link rel="canonical" href={canonical} />
+    {!indexable && <meta name="robots" content="noindex" />}
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content={storeName} />
@@ -177,7 +183,7 @@ const shell = buildShellModel({
             type="button"
             data-cart-close
             aria-label={t('shell.cart.close')}
-            class="-mr-2 flex h-11 w-11 items-center justify-center rounded-md text-3xl leading-none text-faint transition-colors hover:bg-surface hover:text-brand"
+            class="-mr-2 flex h-11 w-11 items-center justify-center rounded-md text-3xl leading-none text-faint transition-colors hover:bg-surface hover:text-accent"
           >
             &times;
           </button>

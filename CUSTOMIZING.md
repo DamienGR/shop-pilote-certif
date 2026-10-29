@@ -290,6 +290,12 @@ in a Tailwind v4 `@theme` block, and become utilities automatically —
 `--color-brand` gives you `bg-brand`, `text-brand`, and so on. Structure is
 expressed with Tailwind utilities in your own markup.
 
+`brand` is a FILL — buttons, primary actions, the focus ring — and `accent` is
+TEXT: content-page links, hovers, the current page, the active sort. The core
+never sets text in `brand`, so a vivid brand that only reaches 3:1 on your
+paper stays a valid button colour; `accent` must clear 4.5:1 on `paper` and on
+`surface`. A theme whose brand already does may give both the same value.
+
 `src/styles/overrides.css` is a different, later layer: ordinary custom-property
 overrides applied AFTER your theme's tokens. Its normal state is empty. Use it
 for values you want to survive switching themes, or when adopting a design

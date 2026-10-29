@@ -238,6 +238,21 @@ describe('the resources of two shops in one account', () => {
     expect(new Set(world.state().kv.map(({ id }) => id)).size).toBe(2);
   });
 
+  // What separates two shops on one account once their names stop doing it
+  // (ADR 0019): each database says which repository it belongs to, and every
+  // command that finds a database by its name reads that first.
+  it('marks every database with its own shop and repository', () => {
+    const state = world.state();
+    for (const target of [world.pilot, world.canary]) {
+      for (const env of ENVS) {
+        render(target, env, state);
+        expect(target.query('SELECT repository, slug FROM _minshop_owner')).toEqual([
+          { repository: target.nameWithOwner, slug: target.slug },
+        ]);
+      }
+    }
+  });
+
   it('never lets two shops share a database, an id or a Worker', () => {
     const { databases, ids, workers } = inventory();
     expect(new Set(databases).size).toBe(databases.length);

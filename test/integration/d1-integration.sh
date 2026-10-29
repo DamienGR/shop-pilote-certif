@@ -835,6 +835,48 @@ node -e '
   if (!r.terms_version) throw new Error("the accepted checkout recorded no terms version");
   if (r.vat_rate_bps !== 2000) throw new Error(`expected the 20% rate in basis points, got ${r.vat_rate_bps}`);
 ' "$accepted_reservation"
+# The cart's own checkbox, through the in-app step. The acceptance given on the
+# cart rides the redirect to /checkout, which the demo rail submits by itself:
+# it used to refuse, one click after the shopper accepted, for want of the box.
+terms_jar="$state_dir/terms-cookies.txt"
+terms_cart_status="$(curl --max-time 30 --silent --output /dev/null --write-out '%{http_code}' \
+  --cookie-jar "$terms_jar" \
+  -H 'content-type: application/x-www-form-urlencoded' \
+  -H "origin: http://127.0.0.1:$test_port" \
+  -H 'x-partial: 1' \
+  --data "_action=add&product_id=$sample_id" \
+  "http://127.0.0.1:$test_port/api/cart")"
+if [[ "$terms_cart_status" != "204" ]]; then
+  echo "D1 integration failed: add-to-cart for the terms hop returned HTTP $terms_cart_status" >&2
+  exit 1
+fi
+terms_hop="$(curl --max-time 30 --silent --output /dev/null --write-out '%{http_code} %{redirect_url}' \
+  --cookie "$terms_jar" \
+  -H 'content-type: application/x-www-form-urlencoded' \
+  -H "origin: http://127.0.0.1:$test_port" \
+  --data "source=cart&method=demo&accept_terms=on" \
+  "http://127.0.0.1:$test_port/api/checkout")"
+if [[ "$terms_hop" != "303 http://127.0.0.1:$test_port/checkout?method=demo&accept_terms=1" ]]; then
+  echo "D1 integration failed: the cart's terms acceptance did not ride to /checkout ($terms_hop)" >&2
+  exit 1
+fi
+terms_demo="$(curl --max-time 30 --silent --output /dev/null --write-out '%{http_code} %{redirect_url}' \
+  --cookie "$terms_jar" \
+  "http://127.0.0.1:$test_port/checkout?method=demo&accept_terms=1")"
+if [[ "$terms_demo" != "303 http://127.0.0.1:$test_port/pay/"* ]]; then
+  echo "D1 integration failed: /checkout refused a demo order the cart had accepted ($terms_demo)" >&2
+  exit 1
+fi
+# Without it, the same step still refuses: the query is a carried answer, not a
+# default.
+terms_unticked="$state_dir/terms-unticked.html"
+terms_unticked_status="$(curl --max-time 30 --silent --output "$terms_unticked" --write-out '%{http_code}' \
+  --cookie "$terms_jar" \
+  "http://127.0.0.1:$test_port/checkout?method=demo")"
+if [[ "$terms_unticked_status" != "200" ]] || ! grep -q 'Vous devez accepter les conditions générales de vente' "$terms_unticked"; then
+  echo "D1 integration failed: /checkout took a demo order without the terms (HTTP $terms_unticked_status)" >&2
+  exit 1
+fi
 npx wrangler d1 execute DB --local --persist-to "$state_dir" \
   --command "UPDATE pages SET published = 0 WHERE slug = 'conditions-generales-de-vente'" >/dev/null
 

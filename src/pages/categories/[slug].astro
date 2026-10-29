@@ -81,12 +81,12 @@ const shopHref = catalogPath(Astro.locals.settings?.homePage);
 
 <Layout title={category.name}>
   <nav class="mb-4 flex flex-wrap gap-x-2 text-xs uppercase tracking-widest text-faint">
-    <a href={shopHref} class="hover:text-brand">{t('shell.nav.store')}</a>
+    <a href={shopHref} class="hover:text-accent">{t('shell.nav.store')}</a>
     {
       trail.map((c) => (
         <span class="flex gap-x-2">
           <span aria-hidden="true">/</span>
-          <a href={`/categories/${c.slug}`} class="hover:text-brand">
+          <a href={`/categories/${c.slug}`} class="hover:text-accent">
             {c.name}
           </a>
         </span>
@@ -102,7 +102,7 @@ const shopHref = catalogPath(Astro.locals.settings?.homePage);
         {subcats.map((c) => (
           <a
             href={`/categories/${c.slug}`}
-            class="border-b border-transparent pb-0.5 hover:border-brand hover:text-brand"
+            class="border-b border-transparent pb-0.5 hover:border-accent hover:text-accent"
           >
             {c.name}
           </a>

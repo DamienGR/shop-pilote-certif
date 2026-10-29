@@ -64,9 +64,9 @@ export function extractJson(output, what) {
  * knows how to start wrangler, how big an answer may be, and how to find the
  * JSON inside the banner.
  */
-export function query(statements, { cwd, remote, what }) {
+export function query(statements, { cwd, remote, what, database = D1_BINDING }) {
   const result = wrangler(
-    ['d1', 'execute', D1_BINDING, targetFlag(remote), '--json', '--command', statements.join('\n')],
+    ['d1', 'execute', database, targetFlag(remote), '--json', '--command', statements.join('\n')],
     { cwd, maxBuffer: MAX_BUFFER },
   );
   const documents = extractJson(result.stdout, what);
@@ -167,13 +167,13 @@ export function readTables(tables, { cwd, remote, counts }) {
  * leaving copies of that around a shared machine is the habit that eventually
  * leaves something worse.
  */
-export function applyScript(statements, { cwd, remote }) {
+export function applyScript(statements, { cwd, remote, database = D1_BINDING }) {
   if (statements.length === 0) return { statements: 0 };
   const directory = mkdtempSync(join(tmpdir(), 'shopctl-restore-'));
   const file = join(directory, 'restore.sql');
   try {
     writeFileSync(file, `${statements.join('\n')}\n`, 'utf8');
-    wrangler(['d1', 'execute', D1_BINDING, targetFlag(remote), '--file', file, '--yes'], { cwd, maxBuffer: MAX_BUFFER });
+    wrangler(['d1', 'execute', database, targetFlag(remote), '--file', file, '--yes'], { cwd, maxBuffer: MAX_BUFFER });
     return { statements: statements.length };
   } finally {
     rmSync(directory, { recursive: true, force: true });

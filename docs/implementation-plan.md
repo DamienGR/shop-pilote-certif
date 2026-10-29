@@ -2450,19 +2450,22 @@ humaines — est dans le [plan de certification](certification/plan.md).
 
 #### Livrables
 
-- [ ] rapport de tests ;
-- [ ] rapport de sécurité ;
-- [ ] rapport de performance ;
-- [ ] preuve de restauration ;
-- [ ] validation TVA/facturation ;
-- [ ] checklist de lancement ;
-- [ ] documentation de support ;
-- [ ] décision go/no-go.
+- [x] rapport de tests ;
+- [x] rapport de sécurité ;
+- [x] rapport de performance ;
+- [x] preuve de restauration ;
+- [ ] validation TVA/facturation — sous dérogation, reportée à la première
+  boutique réelle, qui ne vend pas sans elle ;
+- [x] checklist de lancement ;
+- [x] documentation de support ;
+- [x] décision go/no-go — **go sous conditions**, le 2026-10-27
+  ([dossier de décision](certification/dossier-de-decision.md), section 6).
 
 #### Critère de sortie
 
-- [ ] Tous les critères de la section 8 sont satisfaits ou font l'objet d'une
-  dérogation écrite, datée et accompagnée d'une mesure compensatoire.
+- [x] Tous les critères de la section 8 sont satisfaits ou font l'objet d'une
+  dérogation écrite, datée et accompagnée d'une mesure compensatoire — les
+  dérogations acceptées par Damien le 2026-10-27 (dossier, section 3).
 
 ## 7. Organisation de la CI
 
@@ -2846,57 +2849,102 @@ les tests d'exploitation et de restauration.
 
 ## 12. Documentation obligatoire avant commercialisation
 
-- [ ] architecture et ADR ;
-- [ ] guide de création d'une boutique ;
-- [ ] guide d'import de catalogue ;
-- [ ] guide de personnalisation du thème ;
-- [ ] procédure Stripe et Resend ;
-- [ ] procédure de déploiement ;
-- [ ] procédure de sauvegarde et restauration ;
-- [ ] procédure de mise à niveau du socle ;
-- [ ] procédure d'incident et de violation de données ;
-- [ ] procédure de remboursement ;
-- [ ] procédure de départ d'un client ;
-- [ ] matrice des responsabilités agence/marchand ;
-- [ ] liste des sous-traitants techniques ;
-- [ ] modèle de recette et de procès-verbal de livraison.
+- [x] architecture et ADR ;
+- [x] guide de création d'une boutique ;
+- [x] guide d'import de catalogue ;
+- [x] guide de personnalisation du thème ;
+- [x] procédure Stripe et Resend ;
+- [x] procédure de déploiement ;
+- [x] procédure de sauvegarde et restauration ;
+- [x] procédure de mise à niveau du socle ;
+- [x] procédure d'incident et de violation de données ;
+- [x] procédure de remboursement ;
+- [x] procédure de départ d'un client ;
+- [x] matrice des responsabilités agence/marchand ;
+- [x] liste des sous-traitants techniques ;
+- [x] modèle de recette et de procès-verbal de livraison.
 
 ## 13. Après le pilote
 
-Pistes notées pendant le pilote et reportées après le MVP. Aucune n'est
-engagée : chacune demande sa propre décision, et un ADR quand elle en contredit
-un.
+Pistes notées pendant le pilote et reportées après le MVP. Chacune demande sa
+propre décision, et un ADR quand elle en contredit un ; les 13.1 et 13.2 sont
+décidées et engagées.
 
 ### 13.1 Un compte Cloudflare payant mutualisé
 
-Notée le 2026-10-15, pendant la décision CPU de l'étape 6 (jalon 10). Si le plan
-Workers Free ne tient pas ses 10 ms de CPU par requête, passer chaque
-commerçant au plan Workers Paid sur son propre compte (ADR 0002) multiplie les
-abonnements. La piste : un compte de l'agence en Workers Paid qui héberge
-plusieurs boutiques.
+Notée le 2026-10-15, pendant la décision CPU de l'étape 6 (jalon 10), et
+décidée le 2026-10-28 : **un compte Cloudflare de l'agence, en Workers Paid,
+héberge toutes les boutiques**
+([ADR 0019](architecture/decisions/0019-compte-cloudflare-mutualise.md), qui
+remplace l'ADR 0002 pour Cloudflare et la frontière de comptes de l'ADR 0015).
+Workers Paid se facture au compte : un abonnement de 5 $ par mois porte le parc,
+au lieu d'un par commerçant, et les limites du plan gratuit (10 ms de CPU par
+requête, refus quotidien de D1) ne s'appliquent plus à aucune boutique.
 
-- Workers Paid se facture **par compte** (5 $ par mois au minimum, 10 millions
-  de requêtes et 30 millions de ms de CPU inclus), pas par Worker. La limite de
-  10 ms est par requête : regrouper des boutiques dans un même Worker n'y
-  change rien.
-- Chaque boutique garde son Worker, sa D1 et ses buckets : l'ADR 0001 tient, et
-  le code est prêt (la clé du limiteur de débit est préfixée par l'hôte,
-  `src/features/auth/rateLimit.ts`).
-- Le plafond est le nombre de crons : 250 par compte payant, et chaque
-  environnement porte celui de `wrangler.template.jsonc`. Environ 250 boutiques
-  si le staging disparaît à la mise en ligne, 125 s'il reste. Au-delà de
-  500 Workers par compte, Workers for Platforms (25 $ par mois). Au plan
-  gratuit, 5 crons : le compte de l'agence ne construit pas plus de cinq
-  stagings à la fois, quelle que soit la décision.
-- À trancher avant : un ADR qui restreint l'ADR 0002 à Stripe, Resend et au
-  nom de domaine, et simplifie l'ADR 0015 ; la sortie d'un client devient une
-  migration (sauvegarde puis restauration sur son compte, ADR 0005), et
-  `docs/operations/sortie-client.md` est à réécrire ; le domaine du commerçant
-  passe sur le compte de l'agence ou par Cloudflare for SaaS (100 noms
-  gratuits, puis 0,10 $ par mois chacun) ; un incident sur le compte touche
-  tout le parc, et la documentation ne montre pas de jeton D1 limité à une
-  seule base.
+Chaque boutique garde son Worker, sa base D1, ses buckets et ses secrets :
+l'ADR 0001 tient. Stripe, Resend et le nom de domaine restent au nom du
+commerçant. Le plafond d'un compte est de 250 crons, un par environnement : on
+vise deux cents boutiques par compte, puis un second compte sur le même modèle.
 
-Sources relevées le 2026-10-15 sur developers.cloudflare.com : tarifs et
-limites de Workers, limites de D1, rôles et permissions de Workers, offres de
-Cloudflare for SaaS.
+Engagée en huit lots, dans cet ordre :
+
+1. la décision écrite : l'ADR 0019, les statuts des ADR 0002 et 0015 ;
+2. la garde d'isolement, livrée en v0.3.32 : un marqueur de propriétaire dans
+   chaque base (dépôt et slug), que `provision` pose et que toute commande qui
+   trouve la base par son nom relit avant d'y toucher, et `fleet verify` qui
+   refuse deux boutiques revendiquant un même nom de ressource ou d'hôte ;
+3. les domaines par Cloudflare for SaaS : un CNAME chez le commerçant, une route
+   par nom d'hôte vers le Worker de sa boutique (`cloudflare.saasZone`, code
+   livré en v0.3.32), après un essai réel sur le compte, vert le 2026-10-28 ;
+4. le dépôt de flotte : les jetons du compte, Deploy et Nightly pour tout le
+   parc ; plus aucun jeton Cloudflare dans le dépôt d'une boutique (`shopctl
+   fleet init`, `fleet repo` et `repo --fleet`, livrés en v0.3.32) ;
+5. les sauvegardes aux médias dédupliqués : sans elles, chaque archive recopie
+   toutes les images, ce que ni la facture R2 ni la limite d'API du compte
+   (1 200 requêtes par 5 minutes) ne tiennent à l'échelle du parc (pool de
+   médias scellés dans le bucket `-backups`, archives au format 2, livrés en
+   v0.3.32) ;
+6. la documentation d'exploitation : la sortie d'un client devient une
+   migration, Cloudflare devient un sous-traitant ultérieur de l'agence
+   (`docs/operations/`, avec la mise en ligne, les responsabilités et les
+   runbooks de fuite de secret et de violation de données, en v0.3.32) ;
+7. la supervision du compte : la consommation du mois contre les volumes inclus,
+   et la facture projetée (`shopctl fleet usage`, lancé par le Nightly de la
+   flotte, en v0.3.32) ; pour un compte qui démarre en Workers Free, le jour le
+   plus chargé contre les quotas du compte et ses cinq crons (`--plan free`) ;
+8. la migration du pilote de son compte client vers le compte mutualisé, qui
+   répète la sortie d'un client dans l'autre sens.
+
+L'essai du lot 3 et le lot 8 touchent de vrais comptes : Damien a donné son
+feu vert le 2026-10-28. L'essai s'est joué le soir même par
+`scripts/saas-trial.mjs`, selon sa
+[fiche](certification/compte-mutualise-essai-saas.md) : **vert** à 22 h 56 UTC,
+chaque nom d'hôte mène à son Worker en HTTPS et rien d'autre n'y mène. La zone
+SaaS est dg-tech.dev. Deux écarts à la fiche (§4) : la double authentification
+du compte mutualisé est une application, et une clé matérielle est à poser
+avant le lot 8 ; dg-tech.dev, choisi par Damien, porte aussi le site et les
+e-mails de l'agence. Le lot 8 a sa
+[fiche](certification/compte-mutualise-migration-pilote.md), répétée en
+doublure le 2026-10-28 : une heure et demie, cinq minutes de coupure, B détruit
+après une nuit verte de la flotte (`DamienGR/minshop-fleet`) ; les défauts
+trouvés sont corrigés en v0.3.33.
+
+Sources relevées le 2026-10-15 puis le 2026-10-28 sur developers.cloudflare.com :
+tarifs et limites de Workers, D1, R2 et KV, tarifs d'Observability au
+2026-12-01, rôles par Worker et permissions des jetons, limite de l'API,
+offres de Cloudflare for SaaS et de Turnstile.
+
+### 13.2 Une certification courte par boutique
+
+Notée et décidée le 2026-10-27, après la décision du jalon 10. La campagne du
+pilote a pris trois semaines parce qu'elle certifiait le socle ; une boutique
+de quelques heures, vendue quelques centaines d'euros, ne peut pas la
+rejouer. Engagée : une boutique hérite de la certification du socle tant
+qu'elle porte un tag publié au moins égal à `v0.3.28` sans diverger d'un
+fichier du socle, `shopctl certify --env production` juge en lecture seule ce
+qui lui est propre, et un fichier d'attestations consigne la recette du
+commerçant ([parcours court](certification/par-boutique.md)). La preview sur
+le compte de l'agence devient facultative : la production se construit
+directement sur le compte du client, fermée jusqu'à l'ouverture
+([ADR 0015](architecture/decisions/0015-cycle-de-vie-d-une-boutique.md),
+amendé le même jour).

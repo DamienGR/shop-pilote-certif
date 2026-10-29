@@ -17,6 +17,43 @@ const actions = readdirSync(actionsDir).map((name) => ({
   text: readFileSync(new URL(`${name}/action.yml`, actionsDir), 'utf8'),
 }));
 
+/** The fleet repository's workflows (ADR 0019), rendered by `shopctl fleet init`. */
+const fleetDir = new URL('../../shopctl/templates/fleet/', import.meta.url);
+const fleetTemplates = readdirSync(fleetDir)
+  .filter((file) => file.endsWith('.yml'))
+  .map((file) => ({ file: `fleet/${file}`, text: readFileSync(new URL(file, fleetDir), 'utf8') }));
+
+/**
+ * The plain one-line values YAML refuses: a `: ` or a ` #` inside a value that
+ * is neither quoted nor a block scalar. GitHub then shows the workflow by its
+ * path, with no job, and runs nothing — the Nightly of a pull request of the
+ * shared account (lot 4) read that way for three commits while `verify`
+ * stayed green, because nothing here parses YAML (and no parser is a
+ * dependency). Lines inside a block scalar (`run: |`) are shell, not YAML.
+ */
+function unparsablePlainValues(text) {
+  const found = [];
+  let block = null;
+  for (const [index, line] of text.split('\n').entries()) {
+    const indent = line.length - line.trimStart().length;
+    if (block !== null) {
+      if (line.trim() === '' || indent > block) continue;
+      block = null;
+    }
+    if (/^\s*#/.test(line)) continue;
+    const pair = line.match(/^\s*(?:- )?[\w.-]+: (.*)$/);
+    if (!pair) continue;
+    const value = pair[1];
+    if (/^[|>][-+]?\s*$/.test(value)) {
+      block = indent;
+      continue;
+    }
+    if (/^["'[{]/.test(value)) continue;
+    if (/: /.test(value) || / #/.test(value) || /:$/.test(value)) found.push(`${index + 1}: ${line.trim()}`);
+  }
+  return found;
+}
+
 /**
  * The first major of each action that runs on Node 24. GitHub forces Node 20
  * actions onto 24 and warns on every run until they move (the nightly of
@@ -28,6 +65,16 @@ const NODE_24 = { checkout: 6, 'setup-node': 6, 'upload-artifact': 6 };
 describe('the workflows', () => {
   it('finds the workflows it is meant to be reading', () => {
     expect(workflows.map((w) => w.file)).toEqual(expect.arrayContaining(['deploy.yml', 'nightly.yml', 'verify.yml']));
+    expect(fleetTemplates.map((w) => w.file)).toEqual(expect.arrayContaining(['fleet/deploy.yml', 'fleet/nightly.yml']));
+  });
+
+  it('writes no one-line value YAML would read as a second mapping', () => {
+    const files = [...workflows, ...actions, ...fleetTemplates];
+    const found = files.flatMap(({ file, text }) => unparsablePlainValues(text).map((line) => `${file}:${line}`));
+    expect(found).toEqual([]);
+    // The check itself, on the line that broke the Nightly.
+    expect(unparsablePlainValues('      - name: x\n        run: echo "::notice::a (b) : c"\n')).toHaveLength(1);
+    expect(unparsablePlainValues('        run: |\n          echo "a : b"\n        if: ${{ a }}\n')).toEqual([]);
   });
 
   // GitHub evaluates a job's name only when the job runs. A skipped one shows

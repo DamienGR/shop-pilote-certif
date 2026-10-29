@@ -624,10 +624,13 @@ describe('published JSON Schema', () => {
     // `productionAccountId` and the two Access values are learned too: the
     // client's account exists only once the client has created it (ADR 0015),
     // and an AUD only once an Access application has been put in front of the
-    // preview.
+    // preview. `saasZone` is a hosting choice, not a fact to learn: a shop on
+    // its merchant's own account, or inside the agency's zone, has none to
+    // declare (ADR 0019).
     expect(optional).toEqual([
       'cloudflare.accountId',
       'cloudflare.productionAccountId',
+      'cloudflare.saasZone',
       'cloudflare.imagesDomain',
       'cloudflare.stagingDomain',
       'cloudflare.stagingAccessTeam',

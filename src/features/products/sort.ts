@@ -1,3 +1,5 @@
+import { t } from '../i18n';
+
 // Whitelisted sort columns. The query param `sort` maps to a fixed column name
 // here, so user input is never interpolated into SQL.
 const COLUMNS: Record<string, string> = {
@@ -34,9 +36,9 @@ export function orderByClause(
  * already-active field toggles it (the arrow flips), so a field never appears twice.
  */
 export const STORE_SORTS: { sort: string; dir: 'asc' | 'desc'; label: string }[] = [
-  { sort: 'newest', dir: 'desc', label: 'Newest' },
-  { sort: 'price', dir: 'asc', label: 'Price' },
-  { sort: 'name', dir: 'asc', label: 'Name' },
+  { sort: 'newest', dir: 'desc', label: t('catalog.sort.newest') },
+  { sort: 'price', dir: 'asc', label: t('catalog.sort.price') },
+  { sort: 'name', dir: 'asc', label: t('catalog.sort.name') },
 ];
 
 export type StoreSort = 'newest' | 'price' | 'name';

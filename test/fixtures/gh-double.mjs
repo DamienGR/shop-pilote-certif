@@ -22,8 +22,13 @@
  *   config          { git_protocol }        what `gh config get` answers
  *   hosts           { host: { git_protocol } }  what `gh config get --host` answers
  *                                           first, as `gh auth login` writes it
- *   repos           { "owner/name": { visibility, environments, secrets, pulls } }
+ *   repos           { "owner/name": { visibility, environments, secrets, variables, files, pulls, runs } }
  *                   an environment: { secrets, reviewers, branchPolicy, branches }
+ *                   `secrets` at the top: the repository's own, outside any environment
+ *                   `variables`: { NAME: value }, the repository's Actions variables
+ *                   `files`: { path: text }, the default branch's contents
+ *                   a run: { databaseId, workflow, createdAt, status, conclusion, headSha, jobs }
+ *                   a job: { name, status, conclusion, completedAt, steps: [{ name, conclusion }] }
  *   users           { login: id }
  *   refuseReviewers boolean                 the free-plan private-repo refusal
  *   calls           [{ argv, stdin }]       appended to on every invocation
@@ -154,6 +159,24 @@ if (argv[0] === 'api') {
     }
   }
 
+  // One environment, read: the shape GitHub gives it, protection rules and
+  // branch policy included, from what the PUT above stored.
+  const environmentGet = path?.match(/^repos\/([^/]+\/[^/]+)\/environments\/([^/]+)$/);
+  if (environmentGet && method === 'GET') {
+    const [, name, environment] = environmentGet;
+    const target = state.repos[name]?.environments?.[environment];
+    if (!target) fail('gh: Not Found (HTTP 404)');
+    const reviewers = Array.from({ length: target.reviewers ?? 0 }, (_, index) => ({ type: 'User', reviewer: { id: index + 1 } }));
+    done(JSON.stringify({
+      name: environment,
+      protection_rules: [
+        ...(reviewers.length > 0 ? [{ type: 'required_reviewers', reviewers }] : []),
+        ...(target.branchPolicy ? [{ type: 'branch_policy' }] : []),
+      ],
+      deployment_branch_policy: target.branchPolicy ?? null,
+    }));
+  }
+
   const environmentPut = path?.match(/^repos\/([^/]+\/[^/]+)\/environments\/(.+)$/);
   if (environmentPut && method === 'PUT') {
     const [, name, environment] = environmentPut;
@@ -179,6 +202,24 @@ if (argv[0] === 'api') {
     done(JSON.stringify({ name: environment }));
   }
 
+  // A repository variable, read as the API gives it.
+  const variable = path?.match(/^repos\/([^/]+\/[^/]+)\/actions\/variables\/([^/]+)$/);
+  if (variable && method === 'GET') {
+    const [, name, key] = variable;
+    const value = state.repos[name]?.variables?.[key];
+    if (value === undefined) fail('gh: Not Found (HTTP 404)');
+    done(JSON.stringify({ name: key, value }));
+  }
+
+  // A file of the default branch, base64 as the contents API sends it.
+  const contents = path?.match(/^repos\/([^/]+\/[^/]+)\/contents\/(.+)$/);
+  if (contents && method === 'GET') {
+    const [, name, file] = contents;
+    const text = state.repos[name]?.files?.[file];
+    if (text === undefined) fail('gh: Not Found (HTTP 404)');
+    done(JSON.stringify({ path: file, encoding: 'base64', content: Buffer.from(text).toString('base64') }));
+  }
+
   fail(`gh-double: unhandled api call "${argv.join(' ')}"`, 2);
 }
 
@@ -186,7 +227,8 @@ if (argv[0] === 'secret' && argv[1] === 'list') {
   const repo = state.repos[flag('--repo')];
   const environment = flag('--env');
   if (!repo) fail('gh: Not Found (HTTP 404)');
-  const secrets = repo.environments?.[environment]?.secrets ?? {};
+  // Without --env, the repository's own secrets, as the real gh lists them.
+  const secrets = environment ? repo.environments?.[environment]?.secrets ?? {} : repo.secrets ?? {};
   if (has('--json')) done(JSON.stringify(Object.keys(secrets).map((name) => ({ name }))));
   done(Object.keys(secrets).map((name) => `${name}\t2026-08-31`).join('\n'));
 }
@@ -196,13 +238,52 @@ if (argv[0] === 'secret' && argv[1] === 'set') {
   const repo = state.repos[flag('--repo')];
   const environment = flag('--env');
   if (!repo) fail('gh: Not Found (HTTP 404)');
-  if (!repo.environments?.[environment]) fail(`gh: environment ${environment} not found (HTTP 404)`);
   if (!stdin.trim()) fail('gh: a value is required');
+  // Without --env, a secret of the repository itself.
+  if (!environment) {
+    repo.secrets = repo.secrets ?? {};
+    repo.secrets[name] = stdin.trim();
+    done(`✓ Set Actions secret ${name} for ${flag('--repo')}`);
+  }
+  if (!repo.environments?.[environment]) fail(`gh: environment ${environment} not found (HTTP 404)`);
   // Stored so a test can assert WHAT was placed; the real gh encrypts it as a
   // libsodium sealed box, which is precisely the step shopctl cannot do itself
   // and the reason this command is wrapped rather than reimplemented.
   repo.environments[environment].secrets[name] = stdin.trim();
   done(`✓ Set Actions secret ${name} for ${flag('--repo')}`);
+}
+
+if (argv[0] === 'variable' && argv[1] === 'set') {
+  const name = argv[2];
+  const repo = state.repos[flag('--repo')];
+  if (!repo) fail('gh: Not Found (HTTP 404)');
+  const body = flag('--body');
+  if (body === null) fail('gh: a value is required');
+  repo.variables = repo.variables ?? {};
+  repo.variables[name] = body;
+  done(`✓ Created variable ${name} for ${flag('--repo')}`);
+}
+
+/**
+ * Workflow runs, and the jobs of one: what `certify` reads of the Deploy and
+ * Nightly workflows. Listed newest first by the caller, so they are stored
+ * here in any order — the real list's order is not a promise either.
+ */
+if (argv[0] === 'run' && argv[1] === 'list') {
+  const repo = state.repos[flag('--repo')];
+  if (!repo) fail('gh: Not Found (HTTP 404)');
+  const workflow = flag('--workflow');
+  const limit = Number(flag('--limit') ?? 20);
+  const runs = (repo.runs ?? []).filter((run) => !workflow || run.workflow === workflow).slice(0, limit);
+  done(JSON.stringify(runs.map(({ jobs: _jobs, workflow: _workflow, ...run }) => run)));
+}
+
+if (argv[0] === 'run' && argv[1] === 'view') {
+  const repo = state.repos[flag('--repo')];
+  if (!repo) fail('gh: Not Found (HTTP 404)');
+  const run = (repo.runs ?? []).find((entry) => String(entry.databaseId) === argv[2]);
+  if (!run) fail(`could not find any workflow run with ID ${argv[2]}`);
+  done(JSON.stringify({ jobs: run.jobs ?? [] }));
 }
 
 /**

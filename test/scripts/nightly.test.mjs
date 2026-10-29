@@ -63,18 +63,48 @@ describe('the nightly workflow', () => {
   });
 
   // Destroyed at the launch (ADR 0015), staging would turn the run red every
-  // night. A repository variable retires it, and the run says so.
-  it('retires the staging checks once staging is destroyed, and says so', () => {
-    const staging = workflow.slice(workflow.indexOf('  staging:'), workflow.indexOf('production-backup:'));
-    expect(staging).toMatch(/if: \$\{\{ needs\.detect\.outputs\.shop != '' && vars\.STAGING_RETIRED == '' && /);
-    const detect = workflow.slice(workflow.indexOf('  detect:'), workflow.indexOf('  staging:'));
+  // night. A repository variable retires it, and the run says so. A shop built
+  // straight on its production never had one (ADR 0015, amended 2026-10-27):
+  // the staging half runs only for a staging the shop DECLARES.
+  it('runs the staging checks only for a declared staging that is still there, and says why not', () => {
+    const staging = workflow.slice(workflow.indexOf('\n  staging:\n'), workflow.indexOf('production-backup:'));
+    expect(staging).toMatch(/if: \$\{\{ needs\.detect\.outputs\.staging == 'true' && /);
+    const detect = workflow.slice(workflow.indexOf('  detect:'), workflow.indexOf('\n  staging:\n'));
+    expect(detect).toMatch(/staging: \$\{\{ steps\.shop\.outputs\.staging \}\}/);
     expect(detect).toMatch(/STAGING_RETIRED: \$\{\{ vars\.STAGING_RETIRED \}\}/);
+    expect(detect).toMatch(/STAGING_URL: \$\{\{ vars\.STAGING_URL \}\}/);
+    expect(detect).toMatch(/manifest\.cloudflare\.stagingDomain/);
     expect(detect).toMatch(/::notice::Staging détruit/);
+    expect(detect).toMatch(/::notice::Aucun staging déclaré/);
+    // Retired wins over declared: the manifest of a launched shop still names
+    // the preview's hostname.
+    expect(detect.indexOf('STAGING_RETIRED" ]')).toBeLessThan(detect.indexOf('staging=true'));
+  });
+
+  // On the shared account (ADR 0019) the shop's repository holds no Cloudflare
+  // token: the fleet's Nightly backs production up and watches it, and every
+  // step here that needs a token stands aside, said once.
+  it('leaves the account to the fleet when MINSHOP_FLEET names one', () => {
+    for (const job of ['production-backup', 'production-watch']) {
+      const body = workflow.slice(workflow.indexOf(`  ${job}:`));
+      expect(body.match(/^ {4}if: (.*)$/m)[1], job).toContain("vars.MINSHOP_FLEET == ''");
+    }
+    const staging = workflow.slice(workflow.indexOf('\n  staging:\n'), workflow.indexOf('production-backup:'));
+    const step = (name) => staging.slice(staging.indexOf(`- name: ${name}`)).split('\n      - name:')[0];
+    expect(step('Back up staging')).toMatch(/if: \$\{\{ vars\.MINSHOP_FLEET == '' \}\}/);
+    expect(step('Error rate and quotas')).toMatch(/vars\.MINSHOP_FLEET == ''/);
+    // The restore follows the backup's outcome, skipped with it.
+    expect(step('Restore it into a throwaway database')).toMatch(/steps\.backup\.outcome == 'success'/);
+    expect(step('Leave the account to the fleet')).toMatch(/if: \$\{\{ vars\.MINSHOP_FLEET != '' \}\}/);
+    // The remote gates need no Cloudflare token, and keep running.
+    expect(step('Remote security gate')).not.toMatch(/MINSHOP_FLEET/);
   });
 
   it('runs the operator’s own commands rather than its own wrangler calls', () => {
     expect(workflow).toMatch(/shopctl\.mjs backup --env staging --upload/);
-    expect(workflow).toMatch(/shopctl\.mjs restore --env staging --from "\$ARCHIVE" --local/);
+    // The pull before the restore: an uploaded archive leaves in the pool the
+    // media it did not re-read, and the drill restores those too.
+    expect(workflow).toMatch(/shopctl\.mjs backup pull "\$ARCHIVE" --env staging --json \| tee pull\.json\n\s+node shopctl\/bin\/shopctl\.mjs restore --env staging --from "\$ARCHIVE" --local/);
     expect(workflow).toMatch(/shopctl\.mjs monitor --env staging/);
     expect(workflow).not.toMatch(/wrangler (deploy|d1|r2|secret)/);
   });
@@ -82,6 +112,7 @@ describe('the nightly workflow', () => {
   it('reads each command’s exit status and not the pipe’s', () => {
     const piped = runs.filter((body) => body.includes('| tee'));
     expect(piped).toHaveLength(6);
+    expect(runs.filter((body) => (body.match(/\| tee/g) ?? []).length > 1)).toHaveLength(1);
     for (const body of piped) expect(body).toContain('set -euo pipefail');
   });
 

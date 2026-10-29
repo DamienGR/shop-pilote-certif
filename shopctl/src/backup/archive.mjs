@@ -7,7 +7,7 @@
  *
  *   <dépôt>/<id>/manifest.json          en clair, lisible sans la clé
  *   <dépôt>/<id>/data.bin               le dump D1, compressé puis chiffré
- *   <dépôt>/<id>/objects/<empreinte>.bin  un objet R2, chiffré (option --with-media)
+ *   <dépôt>/<id>/objects/<empreinte>.bin  un objet R2, chiffré (sauf --no-media)
  *
  * ADR 0005 asks for a backup that is verifiable WITHOUT being restored, and one
  * that stays readable independently of Cloudflare. Both fall out of that
@@ -36,8 +36,13 @@ import { canonical, digest } from './dump.mjs';
 import { inputError, verificationError } from '../errors.mjs';
 
 /** The archive layout's own version. A reader that meets a higher one stops
- *  rather than guessing at a field it does not know. */
-export const ARCHIVE_FORMAT = 1;
+ *  rather than guessing at a field it does not know.
+ *
+ *  2 (socle v0.3.32, ADR 0019): an object is sealed for its bucket and key, no
+ *  longer for the archive, so that one sealed copy in the backups bucket's
+ *  media pool can serve every archive that references it (`pool.mjs`); an
+ *  inventory entry names that copy as `pool`. Format 1 archives still open. */
+export const ARCHIVE_FORMAT = 2;
 
 export const MANIFEST_FILE = 'manifest.json';
 export const DATA_FILE = 'data.bin';
@@ -55,11 +60,18 @@ export const DEFAULT_REPOSITORY = 'backups';
 export const DEFAULT_KEEP = 30;
 export const DEFAULT_KEEP_DAYS = 90;
 
+/** What every backup id of a shop's environment starts with — and so the
+ *  prefix the backups bucket's retention rule expires, which leaves the media
+ *  pool to its own rule (provision.mjs). */
+export function archivePrefix(slug, env) {
+  return `${slug}-${env}-`;
+}
+
 /** A backup's name: the shop, the environment, and the instant. Sorts
  *  chronologically as text, which is what makes `list` and `prune` free. */
 export function backupId(slug, env, at = new Date()) {
   const stamp = at.toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
-  return `${slug}-${env}-${stamp}`;
+  return `${archivePrefix(slug, env)}${stamp}`;
 }
 
 /** An id a path can be built from. Ids are generated here, but one also arrives
@@ -100,6 +112,36 @@ export function authenticatedHeader(manifest) {
  *  was called, and neither belongs in a path this CLI builds. */
 export function objectFile(key) {
   return `${OBJECTS_DIR}/${createHash('sha256').update(key, 'utf8').digest('hex').slice(0, 32)}.bin`;
+}
+
+/**
+ * What an object's seal is bound to: the GCM additional data.
+ *
+ * Format 1 bound it to the archive, so a copy could not be moved to another
+ * one — and could not be SHARED with another one either. Format 2 binds it to
+ * the bucket it was read from and its key: a copy still cannot pass for another
+ * object or another shop's (the bucket's name carries the slug and the
+ * environment), and an R2 key never changes content (random or content-hash
+ * keys, deliverables under a fresh UUID), so the same sealed copy is the right
+ * answer for every archive that names that key.
+ */
+export function objectContext(manifest, bucket, key) {
+  return Number(manifest.format) >= 2 ? `object:${bucket}:${key}` : `${manifest.id}:${bucket}:${key}`;
+}
+
+/** Every object an archive carries the bytes of, with the bucket it was read
+ *  from: what a restore writes back and what a pull fetches. */
+export function storedObjects(manifest) {
+  return (manifest.r2?.buckets ?? []).flatMap((bucket) =>
+    bucket.inventory.filter((object) => object.file).map((object) => ({ ...object, source: bucket.name, binding: bucket.binding })),
+  );
+}
+
+/** The objects whose bytes are not in this directory but in the backups
+ *  bucket's media pool: an archive taken with `--upload` does not re-read what
+ *  the pool already holds, and `backup pull` brings those back. */
+export function pooledElsewhere(entry) {
+  return storedObjects(entry.manifest).filter((object) => object.pool && !existsSync(join(entry.path, object.file)));
 }
 
 export function repositoryPath(root, out) {
@@ -199,15 +241,25 @@ export function verifyStructure(entry) {
   const found = digest(bytes);
   checks.push({ name: 'empreinte du corps', ok: found === manifest.data.digest, detail: found === manifest.data.digest ? found : `${found} ≠ ${manifest.data.digest}` });
 
-  const stored = (manifest.r2?.buckets ?? []).flatMap((bucket) => bucket.inventory.filter((object) => object.file));
-  for (const object of stored) {
+  let pooled = 0;
+  for (const object of storedObjects(manifest)) {
     const file = join(path, object.file);
     if (!existsSync(file)) {
-      checks.push({ name: `objet ${object.key}`, ok: false, detail: 'absent de l\'archive' });
+      // Left in the pool by an upload that did not re-read it: not corruption,
+      // and not checked here either. The one check says which, and how many.
+      if (object.pool) pooled += 1;
+      else checks.push({ name: `objet ${object.key}`, ok: false, detail: 'absent de l\'archive' });
       continue;
     }
     const objectDigest = digest(readFileSync(file));
     checks.push({ name: `objet ${object.key}`, ok: objectDigest === object.digest, detail: objectDigest === object.digest ? 'intact' : 'empreinte différente' });
+  }
+  if (pooled > 0) {
+    checks.push({
+      name: 'objets du bucket de sauvegarde',
+      ok: true,
+      detail: `${pooled} objet(s) restés dans le pool du bucket -backups, non relus ici ; \`backup pull\` les rapatrie et les contrôle`,
+    });
   }
   return checks;
 }
@@ -247,16 +299,13 @@ export function planPrune(entries, { keep = null, keepDays = null, now = new Dat
 }
 
 /**
- * The files of an archive, in the order they are copied to a remote store.
- *
- * The manifest LAST, on the way up as on disk: a copy interrupted half-way
- * leaves objects with no manifest, which every reader already treats as an
- * incomplete archive, rather than a manifest promising a body that never
- * arrived.
+ * Where an object's sealed bytes live in the backups bucket: the pool for a
+ * format 2 archive that was uploaded with it, under the archive's own prefix
+ * otherwise (format 1, or a bucket whose rules do not let the pool outlive
+ * the archives — `pool.mjs`).
  */
-export function archiveFiles(manifest) {
-  const objects = (manifest.r2?.buckets ?? []).flatMap((bucket) => bucket.inventory.map((object) => object.file).filter(Boolean));
-  return [DATA_FILE, ...objects, MANIFEST_FILE];
+export function remoteObjectPath(id, object) {
+  return object.pool ?? `${id}/${object.file}`;
 }
 
 export function removeArchive(path) {

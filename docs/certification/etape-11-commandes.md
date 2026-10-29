@@ -293,6 +293,10 @@ Dans le [dossier de décision](dossier-de-decision.md) :
   dépôt ;
 - remplir la décision de la section 6.
 
+Passée le 2026-10-27 sans exemplaire signé : Damien a accepté les
+dérogations et décidé par écrit, dans la session de l'agent. Le critère de
+sortie demande une dérogation écrite et datée, et le dossier la porte.
+
 ## 7. Les preuves
 
 ```sh

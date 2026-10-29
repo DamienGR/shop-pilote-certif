@@ -845,6 +845,18 @@ describe('the deployment workflow', () => {
     expect(workflow).toMatch(/environment:\n\s+name: \$\{\{ inputs\.environment \}\}/);
   });
 
+  // A shop on the shared account (ADR 0019) is deployed by its fleet's
+  // repository: here it is refused by name, before any job asks for a token.
+  it('refuses a shop the fleet deploys, by name', () => {
+    const fleet = workflow.slice(workflow.indexOf('\n  fleet:\n'), workflow.indexOf('\n  verify:\n'));
+    expect(fleet).toMatch(/if: \$\{\{ vars\.MINSHOP_FLEET != '' \}\}/);
+    expect(fleet).toMatch(/exit 1/);
+    for (const job of ['verify', 'deploy']) {
+      const body = workflow.slice(workflow.indexOf(`\n  ${job}:\n`));
+      expect(body.match(/^ {4}if: (.*)$/m)[1], job).toContain("vars.MINSHOP_FLEET == ''");
+    }
+  });
+
   // A second implementation of plan §5.5 living in YAML is the one nobody runs
   // by hand and therefore nobody notices drifting.
   it('runs the operator’s own commands rather than its own wrangler calls', () => {

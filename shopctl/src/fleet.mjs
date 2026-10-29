@@ -32,13 +32,37 @@ export const FLEET_FILE = 'fleet.json';
  *  "this registry is newer than me" instead of misreading it. */
 export const FLEET_SCHEMA_VERSION = 1;
 
+/**
+ * The oldest core a shop on the shared account may run (ADR 0019): the first
+ * that marks each database with its shop and reads the mark before touching
+ * it. An older shopctl finds a database by its name alone. The fleet's
+ * workflows refuse to deploy or back up a shop below it.
+ */
+export const FLEET_MINIMUM_CORE = '0.3.32';
+
+/** `owner/repo` on GitHub: what the fleet's workflows check a shop out from. */
+const REPOSITORY = /^[A-Za-z0-9-]+\/[A-Za-z0-9._-]+$/;
+
+/** The repository variable that tells a shop's own workflows a fleet deploys
+ *  it, and which: `shopctl repo --fleet` sets it. */
+export const FLEET_VARIABLE = 'MINSHOP_FLEET';
+
+/** `--fleet <owner/repo>`, as typed: a repository name, nothing else. */
+export function fleetRepositoryName(value) {
+  const text = String(value ?? '').trim();
+  if (!REPOSITORY.test(text)) {
+    throw inputError(`--fleet « ${text || '(vide)'} » n'est pas un dépôt GitHub.`, 'Attendu : propriétaire/dépôt, le dépôt de flotte (par exemple agence/minshop-fleet).');
+  }
+  return text;
+}
+
 /** An example, printed by the error that says the file is missing. Shown rather
  *  than described: the first registry an agency writes is a copy of this. */
 export const FLEET_EXAMPLE = `{
   "schemaVersion": ${FLEET_SCHEMA_VERSION},
   "core": { "repository": "git@github.com:agence/socle.git" },
   "shops": [
-    { "slug": "premiere-boutique", "path": "shop-premiere-boutique" },
+    { "slug": "premiere-boutique", "path": "shop-premiere-boutique", "repository": "agence/shop-premiere-boutique" },
     { "slug": "seconde-boutique", "path": "shop-seconde-boutique" }
   ]
 }`;
@@ -57,18 +81,25 @@ export function findRegistry(cwd = process.cwd(), explicit = undefined) {
     if (!existsSync(path)) throw inputError(`aucun registre de flotte à ${path}.`);
     return path;
   }
+  const found = nearestRegistry(cwd);
+  if (found) return found;
+  throw preconditionError(
+    `aucun ${FLEET_FILE} trouvé depuis ${cwd}.`,
+    `Le registre de flotte est déclaré, jamais deviné : une boutique que personne n'a inscrite n'est pas dans la flotte. Écrivez ${FLEET_FILE} à côté des boutiques, ou passez --registry :\n\n${FLEET_EXAMPLE}`,
+  );
+}
+
+/** `fleet.json` walking up from `cwd`, or null: for a command that asks the
+ *  fleet a question when there is one, and has nothing to ask otherwise. */
+export function nearestRegistry(cwd = process.cwd()) {
   let directory = resolve(cwd);
   for (;;) {
     const candidate = resolve(directory, FLEET_FILE);
     if (existsSync(candidate)) return candidate;
     const parent = dirname(directory);
-    if (parent === directory) break;
+    if (parent === directory) return null;
     directory = parent;
   }
-  throw preconditionError(
-    `aucun ${FLEET_FILE} trouvé depuis ${cwd}.`,
-    `Le registre de flotte est déclaré, jamais deviné : une boutique que personne n'a inscrite n'est pas dans la flotte. Écrivez ${FLEET_FILE} à côté des boutiques, ou passez --registry :\n\n${FLEET_EXAMPLE}`,
-  );
 }
 
 /**
@@ -79,7 +110,7 @@ export function findRegistry(cwd = process.cwd(), explicit = undefined) {
  * from the workspace or from inside one of its shops.
  *
  * @returns {{ file: string, root: string, schemaVersion: number, core: { repository: string|null },
- *            shops: Array<{ slug: string, path: string, root: string, exists: boolean, isShop: boolean }> }}
+ *            shops: Array<{ slug: string, path: string, repository: string|null, root: string, exists: boolean, isShop: boolean }> }}
  */
 export function readRegistry(file) {
   let document;
@@ -106,6 +137,7 @@ export function readRegistry(file) {
 
   const root = dirname(file);
   const seen = new Map();
+  const repositories = new Map();
   const shops = document.shops.map((entry, index) => {
     if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {
       throw inputError(`${file}: shops[${index}] doit être un objet { "slug", "path" }.`);
@@ -117,10 +149,24 @@ export function readRegistry(file) {
     // the second report would describe a tree the first one had already moved.
     if (seen.has(slug)) throw inputError(`${file}: la boutique « ${slug} » est déclarée deux fois.`);
     seen.set(slug, index);
+    // Optional: the shop's GitHub repository, for the fleet's own workflows
+    // (ADR 0019). Checked here because it becomes a checkout target and a
+    // line of $GITHUB_OUTPUT, where anything but `owner/repo` has no business.
+    const repository = entry.repository === undefined || entry.repository === null ? null : String(entry.repository).trim();
+    if (repository !== null && !REPOSITORY.test(repository)) {
+      throw inputError(`${file}: shops[${index}].repository « ${repository} » n'est pas un dépôt GitHub (propriétaire/dépôt).`);
+    }
+    // One repository is one shop: the owner marker records it, and a second
+    // slug on it would deploy that repository's manifest under a name it does
+    // not carry.
+    const twin = repository && repositories.get(repository.toLowerCase());
+    if (twin) throw inputError(`${file}: « ${twin} » et « ${slug} » déclarent le même dépôt, ${repository}.`);
+    if (repository) repositories.set(repository.toLowerCase(), slug);
     const shopRoot = isAbsolute(path) ? path : resolve(root, path);
     return {
       slug,
       path,
+      repository,
       root: shopRoot,
       exists: existsSync(shopRoot),
       isShop: existsSync(resolve(shopRoot, 'client/client.yaml')),

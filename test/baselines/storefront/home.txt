@@ -15,6 +15,7 @@ cache-tag: catalog,shell
 <title>Ma boutique</title>
 <meta name="description" content="Découvrez la boutique Ma boutique.">
 <link rel="canonical" href="https://canonical.example/">
+<meta name="robots" content="noindex">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Ma boutique">
 <meta property="og:title" content="Ma boutique">
@@ -47,26 +48,26 @@ cache-tag: catalog,shell
 </form>
 <nav aria-label="Navigation principale" class="ml-auto flex min-w-0 shrink-0 items-center gap-4 text-xs uppercase tracking-widest text-muted sm:gap-6">
 <div class="hidden min-w-0 items-center gap-4 xl:flex xl:gap-6">
-<a href="/" title="Shop" class="min-w-0 truncate hover:text-brand">Shop</a>
-<a href="/categories/apparel" title="Apparel" class="min-w-0 truncate hover:text-brand">Apparel</a>
-<a href="/pages/about" title="About" class="min-w-0 truncate hover:text-brand">About</a>
-<a href="/products/sample-tee" title="Featured: Sample Tee" class="min-w-0 truncate hover:text-brand">Featured: Sample Tee</a>
+<a href="/" title="Shop" class="min-w-0 truncate hover:text-accent">Shop</a>
+<a href="/categories/apparel" title="Apparel" class="min-w-0 truncate hover:text-accent">Apparel</a>
+<a href="/pages/about" title="About" class="min-w-0 truncate hover:text-accent">About</a>
+<a href="/products/sample-tee" title="Featured: Sample Tee" class="min-w-0 truncate hover:text-accent">Featured: Sample Tee</a>
 </div>
 <details data-nav-disclosure class="relative order-last xl:hidden">
-<summary aria-label="Menu" class="flex cursor-pointer list-none items-center hover:text-brand">
+<summary aria-label="Menu" class="flex cursor-pointer list-none items-center hover:text-accent">
 <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
 <path d="M2 4.5h14M2 9h14M2 13.5h14">
 </path>
 </svg>
 </summary>
 <div class="absolute right-0 z-40 mt-3 flex min-w-44 max-w-[calc(100vw-2rem)] flex-col gap-3 border border-line bg-surface p-4 shadow-lg">
-<a href="/" class="hover:text-brand">Shop</a>
-<a href="/categories/apparel" class="hover:text-brand">Apparel</a>
-<a href="/pages/about" class="hover:text-brand">About</a>
-<a href="/products/sample-tee" class="hover:text-brand">Featured: Sample Tee</a>
+<a href="/" class="hover:text-accent">Shop</a>
+<a href="/categories/apparel" class="hover:text-accent">Apparel</a>
+<a href="/pages/about" class="hover:text-accent">About</a>
+<a href="/products/sample-tee" class="hover:text-accent">Featured: Sample Tee</a>
 </div>
 </details>
-<a href="/search" class="hover:text-brand sm:hidden">
+<a href="/search" class="hover:text-accent sm:hidden">
 <span class="inline-flex h-6 w-6 items-center justify-center" aria-hidden="true">
 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
 <circle cx="8.5" cy="8.5" r="5.5">
@@ -77,7 +78,7 @@ cache-tag: catalog,shell
 </span>
 <span class="sr-only">Rechercher</span>
 </a>
-<a href="/cart" data-cart-open class="inline-flex items-center hover:text-brand">
+<a href="/cart" data-cart-open class="inline-flex items-center hover:text-accent">
 <span class="hidden h-6 w-6 items-center justify-center max-sm:inline-flex" aria-hidden="true">
 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
 <path d="M4.5 6.5h11l-.9 10.5H5.4z">
@@ -99,14 +100,14 @@ cache-tag: catalog,shell
 <h1 class="mt-2 font-serif text-4xl tracking-tight sm:text-5xl">Tous les produits</h1>
 </div>
 <div class="mb-12 flex flex-wrap gap-x-6 gap-y-2 text-xs uppercase tracking-widest text-muted">
-<a href="/categories/apparel" class="border-b border-transparent pb-0.5 hover:border-brand hover:text-brand">Apparel</a>
-<a href="/categories/bientot" class="border-b border-transparent pb-0.5 hover:border-brand hover:text-brand">Bientôt</a>
+<a href="/categories/apparel" class="border-b border-transparent pb-0.5 hover:border-accent hover:text-accent">Apparel</a>
+<a href="/categories/bientot" class="border-b border-transparent pb-0.5 hover:border-accent hover:text-accent">Bientôt</a>
 </div>
 <div class="mb-8 flex flex-wrap items-baseline gap-x-5 gap-y-1 text-xs uppercase tracking-widest text-muted">
 <span>Trier</span>
-<a href="/?sort=newest&amp;dir=asc" aria-current="true" class="hover:text-brand text-brand">Newest ↓</a>
-<a href="/?sort=price&amp;dir=asc" class="hover:text-brand ">Price</a>
-<a href="/?sort=name&amp;dir=asc" class="hover:text-brand ">Name</a>
+<a href="/?sort=newest&amp;dir=asc" aria-current="true" class="hover:text-accent text-accent">Nouveautés ↓</a>
+<a href="/?sort=price&amp;dir=asc" class="hover:text-accent ">Prix</a>
+<a href="/?sort=name&amp;dir=asc" class="hover:text-accent ">Nom</a>
 </div>
 <ul class="grid grid-cols-2 gap-x-6 gap-y-12 lg:grid-cols-3">
 <li class="reveal group" style="animation-delay:0ms">
@@ -327,9 +328,9 @@ cache-tag: catalog,shell
 </li>
 </ul>
 <nav class="mt-14 flex items-center justify-center gap-1" aria-label="Pagination">
-<a href="/" aria-current="page" class="px-3 py-1.5 text-xs uppercase tracking-widest text-muted hover:text-brand font-medium text-brand">1</a>
-<a href="/?page=2" class="px-3 py-1.5 text-xs uppercase tracking-widest text-muted hover:text-brand ">2</a>
-<a href="/?page=2" class="px-3 py-1.5 text-xs uppercase tracking-widest text-muted hover:text-brand" rel="next">Suivant</a>
+<a href="/" aria-current="page" class="px-3 py-1.5 text-xs uppercase tracking-widest text-muted hover:text-accent font-medium text-accent">1</a>
+<a href="/?page=2" class="px-3 py-1.5 text-xs uppercase tracking-widest text-muted hover:text-accent ">2</a>
+<a href="/?page=2" class="px-3 py-1.5 text-xs uppercase tracking-widest text-muted hover:text-accent" rel="next">Suivant</a>
 </nav>
 </main>
 <footer class="border-t border-line">
@@ -343,7 +344,7 @@ cache-tag: catalog,shell
 <aside data-cart-panel class="absolute right-0 top-0 flex h-full w-full max-w-md translate-x-full flex-col bg-paper shadow-xl transition-transform duration-300">
 <div class="flex items-center justify-between border-b border-line px-6 py-5">
 <h2 class="font-serif text-2xl tracking-tight">Votre panier</h2>
-<button type="button" data-cart-close aria-label="Fermer le panier" class="-mr-2 flex h-11 w-11 items-center justify-center rounded-md text-3xl leading-none text-faint transition-colors hover:bg-surface hover:text-brand">&times;</button>
+<button type="button" data-cart-close aria-label="Fermer le panier" class="-mr-2 flex h-11 w-11 items-center justify-center rounded-md text-3xl leading-none text-faint transition-colors hover:bg-surface hover:text-accent">&times;</button>
 </div>
 <div data-cart-body class="flex-1 overflow-y-auto px-6 py-5">
 </div>

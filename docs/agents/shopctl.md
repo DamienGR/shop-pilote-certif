@@ -26,6 +26,7 @@ npm run shopctl -- destroy --env staging --confirm <slug>
 npm run shopctl -- privacy export --env production --email <adresse>
 npm run shopctl -- privacy anonymize --env production --email <adresse> --confirm <slug>
 npm run shopctl -- monitor --env production   # taux d'erreur, quotas du plan gratuit
+npm run shopctl -- certify --env production --write   # certification de la boutique, lecture seule
 npm run shopctl -- core status          # quelle version cette boutique porte
 npm run shopctl -- core upgrade --to v1.1.0 --open-pr
 npm run shopctl -- fleet status         # depuis l'espace de travail de l'agence
@@ -81,6 +82,97 @@ Access that is how a fresh shop is tried, on a public production it is an order
 form that takes no payment, from the first deploy until Stripe is configured.
 Once installed, the setting is the merchant's and a re-run leaves it alone.
 
+On the shared account of ADR 0019 a resource's name no longer proves whose it
+is: two shops that derive the same names find each other's database, and
+`provision` adopts a database by its name. So the database carries a MARKER
+(`shopctl/src/owner.mjs`): one row in `_minshop_owner`, the repository —
+`origin` as configured, `owner/repo` lowercased — and the slug. `provision`
+writes it as soon as the database exists, completes it once the tree has an
+`origin`, and claims an unmarked database (every one provisioned before the
+ADR, on its merchant's own account). Every other command that finds the
+database by name — `deploy`, `destroy`, `restore`, and through
+`openEnvironment()` `backup`, `privacy`, `admin` and `certify` — reads the
+marker before anything else and refuses one naming another repository or
+another slug, or naming a repository a tree with no `origin` cannot prove it
+is (exit 4); an unmarked database is a warning. The way out is `provision
+--claim <slug>`, the slug typed: a repository renamed or transferred is the
+case it exists for. The marker is never backed up, never restored and never
+exported, so an archive of one shop restored into another leaves the target's
+own. `fleet status` / `fleet verify` add the other half: two shops of the
+registry whose manifests claim one name — a `workerName`, a database, a
+hostname — fail both, since the registry's slug check cannot see two slugs
+deriving the same resources. `shopctl new` asks the same question before it
+clones, of the `fleet.json` found walking up from where it runs: a slug the
+registry lists (cloned here or not), or a name a registered manifest already
+derives, is refused (exit 3); an unreadable registry is a warning, left to
+`fleet verify`.
+
+No Cloudflare token can be limited to one shop's database, so on the shared
+account the tokens live in ONE repository, the fleet's — the directory of
+`fleet.json` — and no shop's repository holds any
+(`shopctl/src/commands/fleet-repository.mjs`). `fleet init` renders its
+workflows from `shopctl/templates/fleet/`: a Deploy that checks out the shop a
+registry entry's `repository` names and runs that shop's own `provision` and
+`deploy`, and a Nightly matrix (backups one shop at a time, for the account's
+API limit) of `backup`, `backup verify` and `monitor` at the account's plan. Both refuse a
+shop below `FLEET_MINIMUM_CORE` (`shopctl/src/fleet.mjs`), the first core that
+marks its database. `fleet repo` is `repo` for that repository: public by
+default (GitHub Free has environment secrets on a public repository only), the
+account read from the managed shops' manifests, which must agree. Its backup
+key comes from `SHOPCTL_BACKUP_KEY` or the fleet's own `.shopctl/backup.key`,
+which `fleet init` writes into the fleet's `.gitignore`; a key in the fleet's
+git index is refused (exit 4) before anything is created or pushed. `repo --fleet
+<owner/repo>` is the shop's half: the variable `MINSHOP_FLEET`, no environment,
+leftover Cloudflare secrets named with the `gh secret delete` that removes them
+— never deleted. The core's own `deploy.yml` refuses to run, and `nightly.yml`
+skips every step that needs a token, once that variable is set; `certify`
+judges such a shop from the fleet repository (its environments, its secrets,
+the shop's `fleet.json` line and matrix jobs) plus the absence of any token in
+the shop's own.
+
+`fleet usage` (`shopctl/src/commands/fleet-usage.mjs`) is the account's
+`monitor`: on Workers Paid every included volume is the ACCOUNT's, so no shop
+can be judged against one. One GraphQL request (`shopctl/src/analytics.mjs`,
+shared with `monitor`) reads the month so far — Workers requests and CPU, D1
+rows and storage, R2 operations by class and storage, KV operations — and
+`projectBill()` projects flows linearly and takes stocks as they stand, priced
+from `PAID_PLAN` (relevé du 2026-10-28; a price change is an edit there and in
+its test). SaaS hostnames have no dataset: one per production Worker invoked,
+an estimate on the safe side. It fails (6) past `--budget`, or when the
+account carries `ACCOUNT_LIMITS.target` (200) Workers — the day to open the
+next account, before the ceiling of 250 crons. A volume past what is included
+is reported, never failed: it is billed, not blocked. The fleet Nightly runs it
+once a night with the first shop's shopctl and `vars.MINSHOP_MONTHLY_BUDGET`.
+`--plan free` is an account starting with one or two very small shops: no bill,
+but the free plan's DAILY quotas are the account's, so it sums the shops of the
+busiest UTC day (`summariseFreeUsage`) and judges them at `monitor`'s 70 %
+(`FREE_PLAN`, `THRESHOLDS`), plus stopped invocations, D1 sizes and the five
+crons (`ACCOUNT_LIMITS.free`). The fleet Nightly takes the plan from
+`vars.MINSHOP_ACCOUNT_PLAN`, `paid` when unset, and passes it to `monitor` too.
+
+A production served through a Cloudflare for SaaS zone (`cloudflare.saasZone`,
+ADR 0019) has one resource wrangler does not cover: the merchant's domain as a
+custom hostname of that zone. `shopctl/src/saas.mjs` speaks to the Cloudflare
+API for it, with `CLOUDFLARE_API_TOKEN` (« Zone : Read » and « SSL and
+Certificates : Edit » on the zone) and never a `wrangler login` session.
+`provision` creates it — HTTP validation, TLS 1.2 at least — before the
+merchant's CNAME exists, and prints the one line to send them (`CNAME <domain>
+→ <fallback origin>`); `deploy` refuses a hostname that is missing, or still
+pending unless `--skip-smoke` (or `--url`) says the smoke test is not aimed at
+it — the first deploy of a shop whose domain switches at launch; `destroy`
+deletes it after the Worker, and refuses to start without the token rather than
+leave a hostname behind. The zone's fallback origin is set once, by hand: a
+proxied `AAAA 100::` record named in SSL/TLS → Custom Hostnames, which
+`provision` reads and warns about. Routing several hostnames of one zone to
+several Workers is what the real trial of the plan's lot 3 proved on
+2026-10-28, on the shared account; had it failed, the fallback was the
+merchant's zone on the shared account, with no `saasZone`. The trial is
+`scripts/saas-trial.mjs`, run by an operator against the real account (its sheet:
+`docs/certification/compte-mutualise-essai-saas.md`): it calls `saas.mjs` and
+the clone's wrangler with the route the manifest renders, so a change to
+either reaches it, and `test/scripts/saas-trial.test.mjs` rehearses it on the
+API double.
+
 `admin password` writes the administration's password hash into an
 environment's database: read from STDIN (typed twice without echo, or a file),
 hashed by the shop's own `src/features/auth/password.ts` in a child Node with
@@ -119,7 +211,10 @@ its local simulator, and the dashboard's Empty Bucket for the keys nobody
 printed (wrangler 4 lists no object: a nightly archive, an image uploaded
 through the admin). Destroying staging tells the operator to set the repository
 variable `STAGING_RETIRED`, which turns the Nightly's staging half off rather
-than leaving it red every night. It also removes the sessions KV namespace, which nothing
+than leaving it red every night. A shop built straight on its production (the
+default since ADR 0015's amendment of 2026-10-27) never had one: the Nightly
+runs its staging half only for a DECLARED staging — `stagingDomain`, or the
+repository variable `STAGING_URL`. It also removes the sessions KV namespace, which nothing
 in the tree names: the Astro adapter binds `SESSION` in the built
 configuration and wrangler provisions it at the first deploy as
 `<worker>-session`, so `destroy` looks it up on the account by that title.
@@ -205,7 +300,10 @@ Tests: `test/scripts/shopctl.test.mjs` (creation), `repo.test.mjs` (forge),
 `provision.test.mjs`, `deploy.test.mjs` and `destroy.test.mjs` (account,
 environment, deployment, teardown), `nightly.test.mjs` (the nightly workflow
 as text), `monitor.test.mjs` (the supervision,
-against `test/fixtures/graphql-double.mjs` in its own process), `backup.test.mjs` and `restore.test.mjs`
+against `test/fixtures/graphql-double.mjs` in its own process), `certify.test.mjs` (the
+short certification: every verdict pure, the masked settings read on the real
+migrations, the forge through the gh double, the public pages and PageSpeed
+Insights against a server in the test's own process), `backup.test.mjs` and `restore.test.mjs`
 (the archive and the round trip), `privacy.test.mjs` (the map, the erasure and
 the second buyer who must not be touched), run by `npm test` and `npm run verify`. The first builds a real core from this repository's index,
 tags it, and runs the real binary against it. The last two install
@@ -236,3 +334,30 @@ per isolate —, and treats an unreachable or
 refusing API as exit 5 — never as a quiet night. The endpoint follows
 `CLOUDFLARE_API_BASE_URL`, the variable wrangler honours, which is how the
 suite points it at its double.
+
+## Certifying one shop
+
+`shopctl certify --env production` is the short certification
+(`docs/certification/par-boutique.md`): the pilot's campaign certified the
+CORE, and a shop inherits it while it carries a published core tag at or above
+`CERTIFIED_FLOOR` (`shopctl/src/certify/judge.mjs`) and diverges from no core
+file it has not declared — never from payment, stock, auth, secrets or the
+schema (`SENSITIVE_CORE`). What is proper to the shop is read in seven groups,
+READ-ONLY on every account: `core status`'s state, the tree gates and
+`check:secrets --history`, `provision --dry-run --json` run in-process with a
+silent reporter, one `SELECT` on the production settings that masks secrets,
+the password hash and the alert recipient IN SQL (`SETTINGS_SQL`), the public
+pages, the remote security and browser gates (spawned asynchronously: a
+`spawnSync` would deadlock on an origin the same process serves), Lighthouse
+through the PageSpeed Insights API (`PAGESPEED_API_URL` overrides it like
+`CLOUDFLARE_API_BASE_URL` does for `monitor`), the forge through `gh`'s read
+commands, and `client/certification/attestations.yaml`, a closed schema read
+by the manifest's own YAML reader that refuses any `@`.
+
+Every verdict is a pure function in `judge.mjs`; the command only reads. A
+group that cannot be asked (gh absent, an account refused) is a `skip` with
+its reason, and the next group runs. Certified means no `fail`, no `todo`, no
+`skip`; otherwise exit 6, after the document. `--write` puts
+`client/certification/<date>/certify.{json,md}` in the shop's tree — committed,
+so every line goes through `redact()` and an address mask on the way out — and
+the attestations template when there is none.

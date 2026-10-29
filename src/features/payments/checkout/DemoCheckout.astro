@@ -1,5 +1,5 @@
 ---
-import { getConfig, formatPrice } from '../../../config';
+import { formatPrice } from '../../../config';
 import type { PendingPayment } from '../lightning/pending';
 import { t } from '../../i18n';
 
@@ -8,15 +8,16 @@ import { t } from '../../i18n';
 interface Props {
   pending: PendingPayment;
   declined?: string | null;
+  /** The effective name (Admin → Réglages first), resolved by the page. */
+  storeName: string;
 }
-const { pending, declined = null } = Astro.props;
+const { pending, declined = null, storeName } = Astro.props;
 
 const OUTCOMES: Record<string, string> = {
   approve: t('pay.demo.outcome.approve'),
   decline: t('pay.demo.outcome.decline'),
   insufficient: t('pay.demo.outcome.insufficient'),
 };
-const { storeName } = getConfig();
 const total = formatPrice(pending.amount_total_cents, pending.currency);
 const shipping = pending.shipping_cents
   ? formatPrice(pending.shipping_cents, pending.currency)
@@ -143,7 +144,7 @@ try {
     >
       {t('pay.demo.submit', { montant: total })}
     </button>
-    <a href="/cart" class="block text-center text-xs uppercase tracking-widest text-faint hover:text-brand">
+    <a href="/cart" class="block text-center text-xs uppercase tracking-widest text-faint hover:text-accent">
       {t('pay.demo.cancel')}
     </a>
   </form>

@@ -484,6 +484,53 @@ describe('shopctl new', () => {
     expect(treeFiles(work)).toEqual([]);
   });
 
+  // On the shared account two shops are told apart by their names alone (ADR
+  // 0019), and the registry beside the shops is the list of names already
+  // taken — including by a shop not cloned on this machine.
+  it('refuses a slug the fleet registry already lists, before cloning', () => {
+    const work = workspace();
+    const registry = { schemaVersion: 1, shops: [{ slug: 'atelier-x', path: 'shop-atelier-x' }] };
+    writeFileSync(join(work, 'fleet.json'), `${JSON.stringify(registry, null, 2)}\n`);
+    const result = shopctl(['new', 'atelier-x', '--from', core(), '--core', CORE_TAG, '--no-install'], work);
+
+    expect(result.status).toBe(EXIT_CODES.input);
+    expect(result.stderr).toMatch(/revendique les noms d'une boutique de la flotte : atelier-x/);
+    expect(result.stderr).toContain(join(work, 'fleet.json'));
+    expect(treeFiles(work)).toEqual(['fleet.json']);
+  });
+
+  // Not only the slug: a registered shop's manifest claims its domain and every
+  // name it derives, and the registry is found from a directory below it.
+  it('refuses a name a registered shop\'s manifest already claims', () => {
+    const work = workspace();
+    const domain = 'boutique-y.example';
+    const other = buildManifest({ slug: 'atelier-y', displayName: 'Atelier Y', domain, email: `commandes@${domain}`, theme: 'atelier-y', coreVersion: '0.1.0' });
+    mkdirSync(join(work, 'shop-atelier-y/client'), { recursive: true });
+    writeFileSync(join(work, 'shop-atelier-y/client/client.yaml'), renderManifest(other));
+    const registry = { schemaVersion: 1, shops: [{ slug: 'atelier-y', path: 'shop-atelier-y' }] };
+    writeFileSync(join(work, 'fleet.json'), `${JSON.stringify(registry, null, 2)}\n`);
+    mkdirSync(join(work, 'nouvelles'));
+
+    const result = shopctl(['new', 'atelier-z', '--domain', domain, '--from', core(), '--core', CORE_TAG, '--no-install'], join(work, 'nouvelles'));
+
+    expect(result.status).toBe(EXIT_CODES.input);
+    expect(result.stderr).toMatch(/boutique de la flotte : atelier-y/);
+    expect(treeFiles(join(work, 'nouvelles'))).toEqual([]);
+  });
+
+  // A registry that cannot be read is `fleet verify`'s to refuse: `new` says
+  // what was not compared and carries on — here to the next refusal, `--dir .`,
+  // which proves it went past the registry without cloning anything.
+  it('says an unreadable registry was not compared, and carries on', () => {
+    const work = workspace();
+    writeFileSync(join(work, 'fleet.json'), '{ "schemaVersion": 1, "shops": [] }\n');
+    const result = shopctl(['new', 'atelier-w', '--dir', '.', '--from', core(), '--core', CORE_TAG, '--no-install'], work);
+
+    expect(result.stdout + result.stderr).toMatch(/fleet\.json est illisible : le slug n'a pas été comparé à la flotte/);
+    expect(result.status).toBe(EXIT_CODES.precondition);
+    expect(result.stderr).toMatch(/--dir is the current directory/);
+  });
+
   // The reserved list can never be complete: the neutrality gate also trips on
   // ordinary English the core happens to use, and `clean-clone` — a word this
   // core writes into its own tooling — is deliberately NOT reserved so this

@@ -11,7 +11,7 @@ interface Props {
   class?: string;
 }
 
-const { href, class: className = 'hover:text-brand' } = Astro.props;
+const { href, class: className = 'hover:text-accent' } = Astro.props;
 ---
 
 <a href={href} class={className}>

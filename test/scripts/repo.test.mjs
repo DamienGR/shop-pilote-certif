@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 // .mjs like its neighbours: tsconfig pins `types` to the Cloudflare types, so
 // node builtins have no declarations in a .ts file here.
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -470,5 +470,67 @@ describe('shopctl repo', () => {
     expect(status).toBe(EXIT_CODES.ok);
     expect(report.missingTokens).toEqual(['production']);
     expect(target.github().repos[target.nameWithOwner].environments.production.secrets).toEqual({});
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The shared Cloudflare account (ADR 0019): no token can be limited to one
+// shop's database, so a shop's repository holds none, and names the fleet
+// repository that holds them.
+
+describe('shopctl repo --fleet', () => {
+  const FLEET = 'agence/minshop-fleet';
+
+  it('creates the repository and names the fleet, with no environment and no Cloudflare secret', () => {
+    const target = forgeShop();
+    const result = target.json(['repo', '--fleet', FLEET], TOKENS);
+    expect(result.status, result.stderr).toBe(EXIT_CODES.ok);
+    const repo = target.github().repos[target.nameWithOwner];
+    expect(repo.variables).toEqual({ MINSHOP_FLEET: FLEET });
+    expect(repo.environments).toEqual({});
+    expect(repo.secrets ?? {}).toEqual({});
+    expect(result.report).toMatchObject({ repository: { created: true }, fleet: { repository: FLEET, variable: 'MINSHOP_FLEET', leftovers: [] }, environments: [], secrets: [] });
+    // The exported token is said to be ignored, never placed, never printed.
+    expect(result.stderr).toMatch(/jetons Cloudflare sont exportés : ignorés/);
+    expect(`${result.stdout}${result.stderr}`).not.toContain(TOKENS.CLOUDFLARE_API_TOKEN);
+    expect(target.github().calls.some(({ argv }) => argv[0] === 'secret' && argv[1] === 'set')).toBe(false);
+  });
+
+  // A shop set up before the fleet: its tokens are named, with the command
+  // that removes each, and left in place — removing one is the operator's act,
+  // once the fleet deploys the shop.
+  it('names the Cloudflare secrets a shop set up before the fleet still holds, and deletes none', () => {
+    const target = forgeShop();
+    target.run(['repo'], TOKENS);
+    const { report, stderr } = target.json(['repo', '--fleet', FLEET]);
+    expect(report.fleet.leftovers).toEqual(expect.arrayContaining([
+      { env: 'staging', name: 'CLOUDFLARE_API_TOKEN' },
+      { env: 'production', name: 'CLOUDFLARE_ACCOUNT_ID' },
+    ]));
+    expect(stderr).toContain(`gh secret delete CLOUDFLARE_API_TOKEN --env production --repo ${target.nameWithOwner}`);
+    expect(Object.keys(target.github().repos[target.nameWithOwner].environments.production.secrets)).toContain('CLOUDFLARE_API_TOKEN');
+  });
+
+  // The fleet's workflows find the shop in fleet.json, by its slug, with this
+  // repository: the nearest registry is asked whether it says so.
+  it('says whether the nearest fleet.json lists the shop with this repository', () => {
+    const target = forgeShop();
+    const registry = (repository) =>
+      writeFileSync(join(target.root, 'fleet.json'), `${JSON.stringify({ schemaVersion: 1, shops: [{ slug: target.slug, path: '.', ...(repository ? { repository } : {}) }] })}\n`);
+    registry(null);
+    const unlisted = target.run(['repo', '--fleet', FLEET]);
+    expect(`${unlisted.stdout}${unlisted.stderr}`).toMatch(/n'a pas de "repository"/);
+    registry(target.nameWithOwner);
+    const listed = target.json(['repo', '--fleet', FLEET]);
+    expect(listed.report.fleet.registered).toBe(target.nameWithOwner);
+    expect(listed.stderr).not.toMatch(/Inscrivez-la/);
+  });
+
+  it('refuses a --fleet that is not owner/repo, before touching GitHub', () => {
+    const target = forgeShop();
+    const result = target.run(['repo', '--fleet', 'pas un dépôt']);
+    expect(result.status).toBe(EXIT_CODES.input);
+    expect(result.stderr).toMatch(/n'est pas un dépôt GitHub/);
+    expect(target.github().repos).toEqual({});
   });
 });

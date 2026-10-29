@@ -81,7 +81,7 @@ const { model } = Astro.props;
       {/* Search input is desktop-only; give mobile a link to the search page.
           Below sm the controls are icons: spelled out, they cut the store name
           on a phone (certification, étape 9). */}
-      <StoreSearchLink href={model.search.action} class="hover:text-brand sm:hidden" />
+      <StoreSearchLink href={model.search.action} class="hover:text-accent sm:hidden" />
       {model.cart.enabled && <StoreCartControl href={model.cart.href} iconBelow="sm" />}
       {model.account.enabled && <StoreAccountControl href={model.account.href} iconBelow="sm" />}
     </nav>

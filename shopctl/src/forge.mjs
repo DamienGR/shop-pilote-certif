@@ -249,16 +249,7 @@ export function putEnvironment(nameWithOwner, name, { cwd, reviewers = [], branc
  */
 export function restrictEnvironment(nameWithOwner, name, branches, { cwd } = {}) {
   const path = `repos/${nameWithOwner}/environments/${name}/deployment-branch-policies`;
-  const listed = gh(['api', path], { cwd, allowFailure: true });
-  let present = [];
-  if (listed.status === 0) {
-    try {
-      const document = JSON.parse(listed.stdout.slice(listed.stdout.search(/[[{]/)));
-      present = (document.branch_policies ?? []).map((entry) => entry.name);
-    } catch {
-      present = [];
-    }
-  }
+  const present = branchPolicies(nameWithOwner, name, { cwd });
   const added = branches.filter((branch) => !present.includes(branch));
   for (const branch of added) {
     gh(['api', '--method', 'POST', path, '--input', '-'], { cwd, input: JSON.stringify({ name: branch, type: 'branch' }) });
@@ -266,30 +257,88 @@ export function restrictEnvironment(nameWithOwner, name, branches, { cwd } = {})
   return { branches, added };
 }
 
+/** Branches an environment is limited to, by name; empty when it is not
+ *  limited, or does not exist. */
+export function branchPolicies(nameWithOwner, name, { cwd } = {}) {
+  const listed = gh(['api', `repos/${nameWithOwner}/environments/${name}/deployment-branch-policies`], { cwd, allowFailure: true });
+  if (listed.status !== 0) return [];
+  return (parseDocument(listed.stdout)?.branch_policies ?? []).map((entry) => entry.name);
+}
+
 /** Secrets an environment already holds, by name. Never their values —
  *  GitHub does not return them, which is why an existing secret is overwritten
  *  rather than compared. */
 export function environmentSecrets(nameWithOwner, name, { cwd } = {}) {
-  const asJson = gh(['secret', 'list', '--env', name, '--repo', nameWithOwner, '--json', 'name'], {
-    cwd,
-    allowFailure: true,
-  });
+  return secretNames(['--env', name, '--repo', nameWithOwner], { cwd });
+}
+
+/** Secrets of the repository itself, outside any environment, by name. */
+export function repositorySecrets(nameWithOwner, { cwd } = {}) {
+  return secretNames(['--repo', nameWithOwner], { cwd });
+}
+
+function secretNames(scope, { cwd }) {
+  const asJson = gh(['secret', 'list', ...scope, '--json', 'name'], { cwd, allowFailure: true });
   if (asJson.status === 0) {
-    try {
-      const document = JSON.parse(asJson.stdout.slice(asJson.stdout.search(/[[{]/)));
-      return (Array.isArray(document) ? document : []).map((entry) => entry.name).filter(Boolean);
-    } catch {
-      // Fall through to the tabular reading below.
-    }
+    const document = parseDocument(asJson.stdout);
+    if (document) return (Array.isArray(document) ? document : []).map((entry) => entry.name).filter(Boolean);
+    // Otherwise fall through to the tabular reading below.
   }
   // Older `gh` has no --json on this command. Its plain output is one secret
   // per line, name first; reading the first column is what survives both.
-  const plain = gh(['secret', 'list', '--env', name, '--repo', nameWithOwner], { cwd, allowFailure: true });
+  const plain = gh(['secret', 'list', ...scope], { cwd, allowFailure: true });
   if (plain.status !== 0) return [];
   return plain.stdout
     .split('\n')
     .map((line) => line.trim().split(/\s+/)[0])
     .filter((entry) => /^[A-Z][A-Z0-9_]*$/.test(entry));
+}
+
+/**
+ * One environment's protection, as `certify` reads it: how many required
+ * reviewers, and whether its branches are limited. Null when it does not
+ * exist — or when gh cannot say, which the caller cannot tell apart and need
+ * not: either way nothing proves the environment is there.
+ */
+export function environmentProtection(nameWithOwner, name, { cwd } = {}) {
+  const result = gh(['api', `repos/${nameWithOwner}/environments/${name}`], { cwd, allowFailure: true });
+  if (result.status !== 0) return null;
+  const document = parseDocument(result.stdout);
+  if (!document) return null;
+  const reviewers = (document.protection_rules ?? [])
+    .filter((rule) => rule.type === 'required_reviewers')
+    .reduce((count, rule) => count + (rule.reviewers ?? []).length, 0);
+  return { name, reviewers, customBranches: document.deployment_branch_policy?.custom_branch_policies === true };
+}
+
+/** The latest runs of one workflow, newest first, or null when gh cannot list them. */
+export function workflowRuns(nameWithOwner, workflow, { cwd, limit = 20 } = {}) {
+  const result = gh(
+    ['run', 'list', '--repo', nameWithOwner, '--workflow', workflow, '--limit', String(limit), '--json', 'databaseId,createdAt,status,conclusion,headSha,headBranch,event'],
+    { cwd, allowFailure: true },
+  );
+  if (result.status !== 0) return null;
+  const document = parseDocument(result.stdout);
+  return Array.isArray(document) ? [...document].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))) : null;
+}
+
+/** The jobs of one run, with their steps, or null when gh cannot say. */
+export function runJobs(nameWithOwner, runId, { cwd } = {}) {
+  const result = gh(['run', 'view', String(runId), '--repo', nameWithOwner, '--json', 'jobs'], { cwd, allowFailure: true });
+  if (result.status !== 0) return null;
+  const jobs = parseDocument(result.stdout)?.jobs;
+  return Array.isArray(jobs) ? jobs : null;
+}
+
+/** gh prints its document alone, but a warning above it is not unheard of. */
+function parseDocument(text) {
+  const start = String(text).search(/[[{]/);
+  if (start === -1) return null;
+  try {
+    return JSON.parse(text.slice(start));
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -302,6 +351,38 @@ export function environmentSecrets(nameWithOwner, name, { cwd } = {}) {
 export function setEnvironmentSecret(nameWithOwner, environment, name, value, { cwd } = {}) {
   gh(['secret', 'set', name, '--env', environment, '--repo', nameWithOwner], { cwd, input: `${value}` });
   return { name, environment };
+}
+
+/** One secret of the repository itself, outside any environment: over
+ *  standard input, like an environment's. */
+export function setRepositorySecret(nameWithOwner, name, value, { cwd } = {}) {
+  gh(['secret', 'set', name, '--repo', nameWithOwner], { cwd, input: `${value}` });
+  return { name };
+}
+
+/** One repository variable. Not a secret: a variable is printed in clear in
+ *  every log that reads it, which is what makes it the right place for a
+ *  repository's NAME and the wrong one for anything else. */
+export function setRepositoryVariable(nameWithOwner, name, value, { cwd } = {}) {
+  gh(['variable', 'set', name, '--body', String(value), '--repo', nameWithOwner], { cwd });
+  return { name, value };
+}
+
+/** A repository variable's value, or null when it is not set. */
+export function repositoryVariable(nameWithOwner, name, { cwd } = {}) {
+  const result = gh(['api', `repos/${nameWithOwner}/actions/variables/${name}`], { cwd, allowFailure: true });
+  if (result.status !== 0) return null;
+  const value = parseDocument(result.stdout)?.value;
+  return typeof value === 'string' && value !== '' ? value : null;
+}
+
+/** One file of a repository's default branch, as text, or null. */
+export function repositoryFile(nameWithOwner, path, { cwd } = {}) {
+  const result = gh(['api', `repos/${nameWithOwner}/contents/${path}`], { cwd, allowFailure: true });
+  if (result.status !== 0) return null;
+  const document = parseDocument(result.stdout);
+  if (typeof document?.content !== 'string') return null;
+  return Buffer.from(document.content, document.encoding === 'base64' ? 'base64' : 'utf8').toString('utf8');
 }
 
 /** The numeric id of a GitHub login, for the reviewers list. */

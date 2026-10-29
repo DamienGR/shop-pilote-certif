@@ -13,6 +13,7 @@ suffit pas : l'historique, les forks et les caches l'ont gardé.
 | Secret | Où il vit | Qui le révoque | Effet de la rotation |
 |---|---|---|---|
 | Jeton API Cloudflare | secret d'environnement GitHub `CLOUDFLARE_API_TOKEN` | propriétaire du compte Cloudflare | aucun sur la boutique |
+| Jeton API du compte mutualisé | environnements `staging`, `production`, `backup` et secret `MONITOR_CLOUDFLARE_API_TOKEN` du **dépôt de flotte** ; poste d'un opérateur | l'agence, administratrice du compte | aucun sur les boutiques ; **l'exposition porte sur toutes** |
 | Clé Stripe (`stripe_secret_key`) | coffre chiffré en D1 | commerçant (tableau de bord Stripe) | aucun si la nouvelle est saisie aussitôt |
 | Secret de webhook Stripe | coffre chiffré | commerçant (endpoint Stripe → « Roll secret ») | les webhooks échouent tant que le nouveau n'est pas saisi |
 | Clé Resend | coffre chiffré | commerçant | les e-mails échouent tant que la nouvelle n'est pas saisie |
@@ -27,6 +28,15 @@ suffit pas : l'historique, les forks et les caches l'ont gardé.
 - **Jeton Cloudflare** : le révoquer dans le tableau de bord, en créer un
   nouveau de même portée, puis `CLOUDFLARE_API_TOKEN_<ENV>=… npm run shopctl --
   repo` réécrit les secrets GitHub (la commande les réécrit toujours).
+- **Jeton du compte mutualisé** (ADR 0019) : aucun jeton ne se limite à une
+  boutique, donc celui-ci atteint la base et les buckets de toutes. Le
+  révoquer, en créer un de même portée, et depuis l'espace de travail de la
+  flotte, le nouveau exporté sans écho sous son nom
+  (`CLOUDFLARE_API_TOKEN_PRODUCTION`, `_STAGING`, `_BACKUP` ou `_MONITOR`) :
+  `npm run shopctl -- fleet repo`, qui réécrit les jetons et garde la clé de
+  sauvegarde. Un jeton trouvé dans le dépôt d'une boutique est une erreur de
+  plus : `shopctl repo --fleet` le nomme, et il se supprime
+  (`gh secret delete … --repo …`) après sa révocation.
 - **Clés du coffre** (Stripe, Resend, Turnstile) : générer la nouvelle chez le
   fournisseur, la saisir dans Admin → Réglages, puis révoquer l'ancienne. Pour
   Stripe, préférer une clé restreinte et utiliser l'expiration différée que
@@ -53,19 +63,25 @@ antérieure ramène l'ancien secret
   la mettre à la place de l'ancienne, supprimer le secret GitHub
   `SHOPCTL_BACKUP_KEY` puis relancer `shopctl repo` (le secret n'est posé que
   s'il est absent). Les archives existantes restent fermées par l'ancienne :
-  la garder le temps que la rétention (90 jours) les emporte, ou les supprimer
-  si l'ancienne clé est réputée connue d'un tiers.
+  la garder le temps que la rétention les emporte (90 jours pour les archives,
+  180 pour les médias du pool `pool/` du bucket `-backups`, qui recommence
+  sous la nouvelle clé), ou les supprimer si l'ancienne clé est réputée connue
+  d'un tiers.
 
 ## 3. Mesurer l'exposition
 
-- Cloudflare : journal d'audit du compte, sur la période d'exposition ;
+- Cloudflare : journal d'audit du compte, sur la période d'exposition ; sur le
+  compte mutualisé, il couvre toutes les boutiques, et la mesure se fait
+  boutique par boutique (bases et buckets nommés dans les requêtes) ;
 - Stripe : journal des requêtes API et des événements ;
 - GitHub : journal d'audit de l'organisation, alertes de scan de secrets ;
 - dépôt : `npm run check:secrets` sur l'arbre, et une recherche dans
   l'historique.
 
 Si une donnée personnelle a pu être lue (base, archive et clé, coffre et
-`SECRETS_KEK`), c'est aussi une [violation de données](violation-de-donnees.md).
+`SECRETS_KEK`), c'est aussi une [violation de données](violation-de-donnees.md) —
+sur le compte mutualisé, pour chaque boutique que le jeton pouvait atteindre,
+sauf à prouver par le journal d'audit qu'il ne l'a pas fait.
 
 ## 4. Après
 
