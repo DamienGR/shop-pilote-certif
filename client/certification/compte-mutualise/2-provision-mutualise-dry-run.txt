@@ -1,0 +1,42 @@
+$ npm run shopctl -- provision --env production --dry-run
+npm notice run minshop@0.3.33 shopctl
+npm notice run node shopctl/bin/shopctl.mjs provision --env production --dry-run
+
+Compte Cloudflare
+✓ <email>'s Account (305a2bac9fb247fb3d5bc9ff46a4635b) — attendu par le manifeste (cloudflare.accountId)
+
+Ressources de pilote-certif en production (simulation)
+✓ base D1 minshop-pilote-certif-production-db — à créer (juridiction eu)
+· minshop-pilote-certif-production-db serait marquée pour pilote-certif (damiengr/shop-pilote-certif)
+✓ bucket images minshop-pilote-certif-production-images — à créer (juridiction eu)
+✓ bucket fichiers minshop-pilote-certif-production-files — à créer (juridiction eu)
+✓ bucket sauvegardes minshop-pilote-certif-production-backups — à créer (juridiction eu)
+
+Juridiction
+· minshop-pilote-certif-production-db — juridiction eu demandée à la création (simulation : rien à relire).
+· minshop-pilote-certif-production-images — juridiction eu demandée à la création (simulation : rien à relire).
+· minshop-pilote-certif-production-files — juridiction eu demandée à la création (simulation : rien à relire).
+· minshop-pilote-certif-production-backups — juridiction eu demandée à la création (simulation : rien à relire).
+
+Exposition publique
+· minshop-pilote-certif-production-files — créé privé ; l'exposition sera relue au prochain passage.
+· minshop-pilote-certif-production-backups — créé privé ; l'exposition sera relue au prochain passage.
+· cloudflare.imagesDomain annonce images-certif-minshop.dg-tech.dev : attachez-le à minshop-pilote-certif-production-images avant le déploiement.
+    Tableau de bord → R2 → minshop-pilote-certif-production-images → Settings → Custom Domains. `shopctl deploy --env production` refuse tant qu'il n'y est pas.
+
+Conservation des sauvegardes
+· minshop-pilote-certif-production-backups — archives (pilote-certif-production-) expirées après 90 jours
+· minshop-pilote-certif-production-backups — médias du pool (pool/) expirées après 180 jours
+
+Nom d'hôte du commerçant — certif-minshop.miijot.fr par la zone dg-tech.dev
+✓ origine de repli de dg-tech.dev : fallback.dg-tech.dev
+· certif-minshop.miijot.fr serait créé comme nom d'hôte personnalisé de dg-tech.dev
+    Dans le DNS du commerçant (chez son registrar, ou en DNS seul si sa zone est chez Cloudflare) : CNAME certif-minshop.miijot.fr → fallback.dg-tech.dev. La validation et le certificat suivent seuls (validation HTTP).
+
+Simulation : rien n'a été écrit
+· wrangler.jsonc serait rendu pour minshop-pilote-certif-production
+· les migrations seraient appliquées à la base distante
+· la démonstration de paiement serait coupée, si la boutique n'est pas encore installée
+· les secrets internes manquants seraient posés : AUTH_SECRET, SECRETS_KEK
+
+Simulation terminée. Relancez sans --dry-run pour appliquer.

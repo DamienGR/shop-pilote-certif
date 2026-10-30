@@ -1,0 +1,36 @@
+$ npm run shopctl -- provision --env production --dry-run
+npm notice run minshop@0.3.33 shopctl
+npm notice run node shopctl/bin/shopctl.mjs provision --env production --dry-run
+
+Compte Cloudflare
+✓ Miijot (b8505b293a291d9d82edf5417b02084d) — attendu par le manifeste (cloudflare.productionAccountId)
+
+Ressources de pilote-certif en production (simulation)
+✓ base D1 minshop-pilote-certif-production-db — déjà présent (e4996e2f-b035-4e9a-a331-452fd74f7cdd)
+· minshop-pilote-certif-production-db serait marquée pour pilote-certif (damiengr/shop-pilote-certif)
+✓ bucket images minshop-pilote-certif-production-images — déjà présent (eu)
+✓ bucket fichiers minshop-pilote-certif-production-files — déjà présent (eu)
+✓ bucket sauvegardes minshop-pilote-certif-production-backups — déjà présent (eu)
+
+Juridiction
+✓ minshop-pilote-certif-production-db — juridiction eu
+✓ minshop-pilote-certif-production-images — visible en juridiction eu, absent de la juridiction par défaut
+✓ minshop-pilote-certif-production-files — visible en juridiction eu, absent de la juridiction par défaut
+✓ minshop-pilote-certif-production-backups — visible en juridiction eu, absent de la juridiction par défaut
+
+Exposition publique
+✓ minshop-pilote-certif-production-files — privé : ni URL r2.dev, ni domaine attaché
+✓ minshop-pilote-certif-production-backups — privé : ni URL r2.dev, ni domaine attaché
+✓ minshop-pilote-certif-production-images — domaine d'images : images-certif-minshop.miijot.fr
+
+Conservation des sauvegardes
+· minshop-pilote-certif-production-backups — archives (pilote-certif-production-) expirées après 90 jours (règle à remplacer)
+· minshop-pilote-certif-production-backups — médias du pool (pool/) expirées après 180 jours
+
+Simulation : rien n'a été écrit
+· wrangler.jsonc serait rendu pour minshop-pilote-certif-production
+· les migrations seraient appliquées à la base distante
+· la démonstration de paiement serait coupée, si la boutique n'est pas encore installée
+· les secrets internes manquants seraient posés : AUTH_SECRET, SECRETS_KEK
+
+Simulation terminée. Relancez sans --dry-run pour appliquer.

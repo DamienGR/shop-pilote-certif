@@ -1,0 +1,29 @@
+Premier passage de provision sur le compte mutualisé, 2026-10-29 vers 17:45 UTC : échec.
+
+Cause : wrangler.jsonc de l'arbre était encore le rendu de production de B, écrit par
+`backup --env production --upload` du §1 (17:29 UTC) : database_name
+minshop-pilote-certif-production-db, database_id e4996e2f-… (la base de B). La base neuve du compte
+mutualisé porte le même nom ; `wrangler d1 execute <nom>` résout le nom par la configuration avant
+l'API, et vise donc l'identifiant de B, introuvable sur le compte mutualisé (code 7404). Le rendu de
+wrangler.jsonc pour le compte mutualisé ne vient qu'après, dans la section « Configuration et
+migrations ». La ligne « marquée pour » est écrite AVANT l'écriture du marqueur : elle a menti.
+
+État laissé : sur le compte mutualisé, la base 6c90c0f2-7b0a-49de-8eb4-e246d95021d7 créée, vide, sans
+marqueur ; ni bucket, ni règle, ni nom d'hôte. B intact (le jeton ne voit que le compte mutualisé).
+
+La doublure du 2026-10-28 ne l'a pas vu : son wrangler de doublure résolvait un nom de base par le
+compte, sans lire l'identifiant de la configuration (vérifié le 2026-10-30, corrigé avec le défaut en
+v0.3.34).
+
+$ npm run shopctl -- provision --env production
+npm notice run minshop@0.3.33 shopctl
+npm notice run node shopctl/bin/shopctl.mjs provision --env production
+
+Compte Cloudflare
+✓ <email>'s Account (305a2bac9fb247fb3d5bc9ff46a4635b) — attendu par le manifeste (cloudflare.accountId)
+
+Ressources de pilote-certif en production
+✓ base D1 minshop-pilote-certif-production-db — créé (juridiction eu, 6c90c0f2-7b0a-49de-8eb4-e246d95021d7)
+✓ minshop-pilote-certif-production-db — marquée pour pilote-certif (damiengr/shop-pilote-certif)
+shopctl: ~/shop-pilote-certif/node_modules/.bin/wrangler d1 execute minshop-pilote-certif-production-db --remote --file /tmp/shopctl-restore-9dFCCu/restore.sql --yes exited with status 1.
+The database e4996e2f-b035-4e9a-a331-452fd74f7cdd could not be found [code: 7404]

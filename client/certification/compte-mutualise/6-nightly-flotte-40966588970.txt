@@ -1,0 +1,51 @@
+Nightly de la flotte, lancé à la main par Damien : run 40966588970 (DamienGR/minshop-fleet),
+2026-10-29T22:32:04Z → 22:33:16Z, succès. Deploy de la flotte juste avant : run 40964138461, succès (10 min 10).
+Journaux lus par l'agent (gh api …/jobs/<id>/logs), extraits :
+
+Read fleet.json : succès (job 123772542608)
+
+Production backup (pilote-certif), job 123772607536
+Clé
+✓ SHOPCTL_BACKUP_KEY — clé a08808754f049baf
+Compte Cloudflare
+✓ <email>'s Account (***)
+✓ minshop-pilote-certif-production-db — marquée pour pilote-certif (damiengr/shop-pilote-certif)
+✓ wrangler.jsonc rendu pour minshop-pilote-certif-production
+Médias déjà sauvegardés — minshop-pilote-certif-production-backups
+✓ 8 objet(s) réutilisables (copies de moins de 83 jours)
+Schéma
+✓ 26 table(s), schéma 0046_legal_pages_title_once.sql (47 migration(s) appliquée(s))
+✓ index non sauvegardés, reconstruits à la restauration : products_fts
+Données
+✓ 105 ligne(s) lues
+Objets R2
+✓ 8 image(s), 0 fichier(s) privé(s)
+✓ 0 objet(s) emportés, 8 déjà dans minshop-pilote-certif-production-backups (ni relus ni recopiés)
+Sauvegarde
+✓ pilote-certif-production-20261029T223304Z — 12384 octet(s) chiffrés
+✓ pilote-certif-production-20261029T223304Z copiée dans minshop-pilote-certif-production-backups : 0 objet(s) écrit(s), 8 déjà dans le pool
+backup verify :
+✓ ouverture — authentifiée par le manifeste en clair
+Archive complète et cohérente.
+
+Production error rate and quotas (pilote-certif), job 123772607452
+Analytique de minshop-pilote-certif-production — 24 dernières heures (plan gratuit)
+✓ taux d'erreur — 0 erreur(s) sur 569 requêtes (0.00 %, seuil 1.00 %)
+✓ requêtes Workers (plan gratuit) — 569 sur 100000 par jour (0.57 %, seuil 70 %)
+✓ lignes D1 lues (plan gratuit) — 45551 sur 5000000 par jour (0.91 %, seuil 70 %)
+✓ lignes D1 écrites (plan gratuit) — 965 sur 100000 par jour (0.97 %, seuil 70 %)
+✓ invocations arrêtées (plan gratuit) — 0 invocation(s) arrêtée(s) par Cloudflare pour ressources dépassées (erreur 1102) en 24 h
+· CPU p99 — 55.81 ms par requête ; le plan gratuit en accorde 10 et tolère un dépassement occasionnel par isolat — les invocations arrêtées sont le signal
+
+Shared account usage, job 123772607416
+Compte *** — Workers Free, quotas du compte, jour UTC le plus chargé depuis le 2026-10-28
+✓ requêtes Workers du compte — 1 784 sur 100 000 par jour (1,78 %, seuil 70 %)
+✓ lignes D1 lues du compte — 45 547 sur 5 000 000 par jour (0,91 %, seuil 70 %)
+✓ lignes D1 écrites du compte — 965 sur 100 000 par jour (0,97 %, seuil 70 %)
+✓ invocations arrêtées — 0 invocation(s) arrêtée(s) par Cloudflare pour ressources dépassées (erreur 1102), 10 ms de CPU par requête au plan gratuit
+✓ base D1 la plus grosse — 0,47 sur 500 Mo (0,09 %, seuil 70 %)
+✓ stockage D1 du compte — 0,47 sur 5 000 Mo (0,01 %, seuil 70 %)
+✓ Workers du compte — 2 Worker(s) invoqué(s) depuis hier, un cron chacun : 5 visés par compte, 5 au plus
+
+Note : « 2 Worker(s) invoqué(s) depuis hier » compte le 2026-10-28, jour de l'essai SaaS (ses Workers,
+détruits depuis, ont été invoqués ce jour-là) ; à relire dans le Nightly programmé.

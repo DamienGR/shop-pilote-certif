@@ -1,0 +1,35 @@
+$ npm run shopctl -- restore --env production --from pilote-certif-production-20261029T172928Z --allow-production --confirm pilote-certif
+npm notice run minshop@0.3.33 shopctl
+npm notice run node shopctl/bin/shopctl.mjs restore --env production --from pilote-certif-production-20261029T172928Z --allow-production --confirm pilote-certif
+
+Sauvegarde pilote-certif-production-20261029T172928Z
+✓ pilote-certif — production, 2026-10-29T17:29:28.183Z, socle 0.3.33
+✓ corps ouvert — 26 table(s), 106 ligne(s)
+
+Compte Cloudflare
+✓ <email>'s Account (305a2bac9fb247fb3d5bc9ff46a4635b)
+! l'archive vient du compte Miijot (b8505b293a291d9d82edf5417b02084d).
+    Restauration inter-comptes : c'est ce que permet une sauvegarde applicative, et c'est aussi à quoi ressemble une erreur de compte.
+✓ minshop-pilote-certif-production-db — marquée pour pilote-certif (damiengr/shop-pilote-certif)
+✓ minshop-pilote-certif-production-db (6c90c0f2-7b0a-49de-8eb4-e246d95021d7) — wrangler.jsonc rendu
+
+Schéma
+✓ migrations de l'arbre appliquées à minshop-pilote-certif-production-db
+✓ schéma cible 0046_legal_pages_title_once.sql — les 26 table(s) de l'archive existent
+✓ cible vierge — aucune ligne que la boutique aurait écrite
+
+Restauration
+✓ 44 instruction(s) appliquées
+✓ 8 objet(s) reversés dans minshop-pilote-certif-production-images
+
+Comparaison
+✓ 26 table(s) identiques à l'archive, empreinte pour empreinte
+
+Coffre
+! 2 clé(s) du coffre ne s'ouvrent pas ici : resend_api_key, turnstile_secret_key.
+    Elles sont chiffrées avec la SECRETS_KEK du Worker de production sur Miijot, qui ne quitte jamais son Worker. Ressaisissez-les dans Admin → Réglages : d'ici là, la boutique les croit posées, et ce qui en dépend (paiement, e-mails, anti-robots) répond en erreur.
+! Turnstile est activé avec une clé secrète illisible : la connexion à l'administration sera refusée.
+    Désactivez-le avant de vous connecter : CLOUDFLARE_ACCOUNT_ID=305a2bac9fb247fb3d5bc9ff46a4635b npx wrangler d1 execute minshop-pilote-certif-production-db --remote --command "DELETE FROM settings WHERE key = 'turnstile_enabled'". Ressaisissez ensuite ses clés dans Admin → Réglages → Protection anti-robots, et réactivez-le.
+
+pilote-certif restauré en production depuis pilote-certif-production-20261029T172928Z.
+    Déployez le Worker si l'environnement est neuf : shopctl deploy --env production

@@ -1,0 +1,39 @@
+$ npm run shopctl -- provision --env production
+npm notice run minshop@0.3.33 shopctl
+npm notice run node shopctl/bin/shopctl.mjs provision --env production
+
+Compte Cloudflare
+✓ Miijot (b8505b293a291d9d82edf5417b02084d) — attendu par le manifeste (cloudflare.productionAccountId)
+
+Ressources de pilote-certif en production
+✓ base D1 minshop-pilote-certif-production-db — déjà présent (e4996e2f-b035-4e9a-a331-452fd74f7cdd)
+✓ minshop-pilote-certif-production-db — marquée pour pilote-certif (damiengr/shop-pilote-certif) (base antérieure au marqueur)
+✓ bucket images minshop-pilote-certif-production-images — déjà présent (eu)
+✓ bucket fichiers minshop-pilote-certif-production-files — déjà présent (eu)
+✓ bucket sauvegardes minshop-pilote-certif-production-backups — déjà présent (eu)
+
+Juridiction
+✓ minshop-pilote-certif-production-db — juridiction eu
+✓ minshop-pilote-certif-production-images — visible en juridiction eu, absent de la juridiction par défaut
+✓ minshop-pilote-certif-production-files — visible en juridiction eu, absent de la juridiction par défaut
+✓ minshop-pilote-certif-production-backups — visible en juridiction eu, absent de la juridiction par défaut
+
+Exposition publique
+✓ minshop-pilote-certif-production-files — privé : ni URL r2.dev, ni domaine attaché
+✓ minshop-pilote-certif-production-backups — privé : ni URL r2.dev, ni domaine attaché
+✓ minshop-pilote-certif-production-images — domaine d'images : images-certif-minshop.miijot.fr
+
+Conservation des sauvegardes
+✓ minshop-pilote-certif-production-backups — archives (pilote-certif-production-) expirées après 90 jours (règle remplacée)
+✓ minshop-pilote-certif-production-backups — médias du pool (pool/) expirées après 180 jours
+
+Configuration et migrations
+✓ wrangler.jsonc rendu pour minshop-pilote-certif-production (base e4996e2f-b035-4e9a-a331-452fd74f7cdd)
+✓ migrations appliquées à minshop-pilote-certif-production-db
+✓ minshop-pilote-certif-production-db — démonstration de paiement déjà coupée
+
+Secrets internes
+✓ AUTH_SECRET déjà posé — conservé (signe les sessions de l'administration)
+✓ SECRETS_KEK déjà posé — conservé (chiffre les clés de paiement saisies dans Admin → Réglages)
+
+production provisionné pour pilote-certif. Suite : npm run shopctl -- deploy --env production.

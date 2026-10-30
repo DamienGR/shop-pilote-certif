@@ -1,0 +1,57 @@
+Nightly de la flotte, créneau programmé de 03:17 UTC : run 41037762590 (DamienGR/minshop-fleet), event schedule,
+démarré par GitHub le 2026-10-30T10:02:15Z (6 h 45 de retard, comme le socle et la boutique les jours
+précédents : 09:03 à 10:08), terminé 10:03:11Z, succès. Commit b2a2088 (« Flotte : registre et workflows »).
+Premier run programmé du dépôt de flotte. Journaux lus par l'agent (gh api …/jobs/<id>/logs), extraits ;
+aucune annotation ##[error] ni ##[warning] (les lignes « ::error:: » du journal sont le texte des gardes
+du workflow, affiché, non exécuté).
+
+Read fleet.json : succès (job 124002727890)
+
+Production backup (pilote-certif), job 124002788615
+✓ SHOPCTL_BACKUP_KEY — clé a08808754f049baf
+Compte Cloudflare
+✓ <email>'s Account (***)
+✓ minshop-pilote-certif-production-db — marquée pour pilote-certif (damiengr/shop-pilote-certif)
+✓ wrangler.jsonc rendu pour minshop-pilote-certif-production
+✓ 8 objet(s) réutilisables (copies de moins de 83 jours)
+✓ 26 table(s), schéma 0046_legal_pages_title_once.sql (47 migration(s) appliquée(s))
+✓ index non sauvegardés, reconstruits à la restauration : products_fts
+✓ 105 ligne(s) lues
+✓ 8 image(s), 0 fichier(s) privé(s)
+✓ 0 objet(s) emportés, 8 déjà dans minshop-pilote-certif-production-backups (ni relus ni recopiés)
+Sauvegarde
+✓ pilote-certif-production-20261030T100302Z — 12384 octet(s) chiffrés
+✓ pilote-certif-production-20261030T100302Z copiée dans minshop-pilote-certif-production-backups : 0 objet(s) écrit(s), 8 déjà dans le pool
+backup verify :
+✓ pilote-certif — production, 2026-10-30T10:03:02.723Z, socle 0.3.33
+✓ taille du corps — 12384 octet(s), le manifeste en annonce 12384
+✓ empreinte du corps — c18e79a2e09e4fd2e8faf953bac316ba5b1c0198963e0b0ad94af56cf66a25f4
+✓ objets du bucket de sauvegarde — 8 objet(s) restés dans le pool du bucket -backups, non relus ici
+✓ ouverture — authentifiée par le manifeste en clair
+✓ 26 tables relues (products 21, product_variants 9, orders 1, settings 13, media 8, …)
+Archive complète et cohérente.
+
+Production error rate and quotas (pilote-certif), job 124002788495
+Analytique de minshop-pilote-certif-production — 24 dernières heures (plan gratuit)
+✓ taux d'erreur — 0 erreur(s) sur 1144 requêtes (0.00 %, seuil 1.00 %)
+✓ requêtes Workers (plan gratuit) — 1144 sur 100000 par jour (1.14 %, seuil 70 %)
+✓ lignes D1 lues (plan gratuit) — 48998 sur 5000000 par jour (0.98 %, seuil 70 %)
+✓ lignes D1 écrites (plan gratuit) — 965 sur 100000 par jour (0.97 %, seuil 70 %)
+✓ invocations arrêtées (plan gratuit) — 0 invocation(s) arrêtée(s) par Cloudflare pour ressources dépassées (erreur 1102) en 24 h
+· CPU p99 — 55.22 ms par requête ; le plan gratuit en accorde 10 et tolère un dépassement occasionnel par isolat — les invocations arrêtées sont le signal
+
+Shared account usage, job 124002788432
+Compte *** — Workers Free, quotas du compte, jour UTC le plus chargé depuis le 2026-10-29
+✓ requêtes Workers du compte — 615 sur 100 000 par jour (0,61 %, seuil 70 %)
+✓ lignes D1 lues du compte — 48 998 sur 5 000 000 par jour (0,98 %, seuil 70 %)
+✓ lignes D1 écrites du compte — 965 sur 100 000 par jour (0,97 %, seuil 70 %)
+✓ invocations arrêtées — 0 invocation(s) arrêtée(s) par Cloudflare pour ressources dépassées (erreur 1102), 10 ms de CPU par requête au plan gratuit
+✓ base D1 la plus grosse — 0,47 sur 500 Mo (0,09 %, seuil 70 %)
+✓ stockage D1 du compte — 0,47 sur 5 000 Mo (0,01 %, seuil 70 %)
+✓ Workers du compte — 1 Worker(s) invoqué(s) depuis hier, un cron chacun : 5 visés par compte, 5 au plus
+
+Note : « 1 Worker invoqué depuis hier » lève la réserve du run manuel 40966588970 (qui en comptait 2, ceux
+de l'essai SaaS du 2026-10-28 inclus). Les 1144 requêtes de la fenêtre de 24 h chevauchent deux jours UTC ;
+le compte, lui, retient le jour le plus chargé (615).
+
+Nuit verte de la flotte : condition du §7 remplie.

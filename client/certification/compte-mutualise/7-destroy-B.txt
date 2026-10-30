@@ -1,0 +1,49 @@
+§7, destruction de B, 2026-10-30 vers 10:50 UTC (Damien). Avant, dans le tableau de bord de B (Miijot) :
+domaine images-certif-minshop.miijot.fr retiré du bucket -images ; Empty Bucket sur les buckets qui portaient
+des objets. Archive du jour J gardée sur le poste : ~/shop-pilote-certif/backups/pilote-certif-production-20261029T172928Z
+(compte b8505b293a291d9d82edf5417b02084d, Miijot), à effacer après quatre-vingt-dix jours (2027-01-28).
+$ npm run shopctl -- destroy --env production --confirm pilote-certif --yes
+npm notice run minshop@0.3.33 shopctl
+npm notice run node shopctl/bin/shopctl.mjs destroy --env production --confirm pilote-certif --yes
+Compte Cloudflare
+✓ Miijot (b8505b293a291d9d82edf5417b02084d)
+À supprimer — pilote-certif en production
+! Worker minshop-pilote-certif-production
+! namespace KV des sessions minshop-pilote-certif-production-session
+! bucket images minshop-pilote-certif-production-images
+! bucket fichiers minshop-pilote-certif-production-files
+! bucket sauvegardes minshop-pilote-certif-production-backups
+! base D1 minshop-pilote-certif-production-db
+✓ minshop-pilote-certif-production-db — marquée pour pilote-certif (damiengr/shop-pilote-certif)
+Suppression
+✓ Worker minshop-pilote-certif-production supprimé
+✓ namespace KV des sessions minshop-pilote-certif-production-session supprimé
+✓ bucket images minshop-pilote-certif-production-images supprimé
+✓ bucket fichiers minshop-pilote-certif-production-files supprimé
+✓ bucket sauvegardes minshop-pilote-certif-production-backups supprimé
+✓ base D1 minshop-pilote-certif-production-db supprimé
+production supprimé pour pilote-certif. Le dépôt Git et son historique ne sont pas touchés.
+$ git worktree remove ../pilote-certif-B        (Damien ; l'arbre n'avait aucune modification)
+git worktree list, après : ~/shop-pilote-certif seul.
+Vu de l'extérieur par l'agent, 10:55:57 UTC :
+- https://certif-minshop.miijot.fr/ : HTTP 200 en 0,54 s (servi par le compte mutualisé) ;
+- https://images-certif-minshop.dg-tech.dev/media/053b6b97fc5ccaf2b08c.png : 200 image/png ;
+- images-certif-minshop.miijot.fr : ne résout plus (dig @1.1.1.1 vide, curl HTTP 000).
+Dépôt de la boutique à ce moment : secrets de dépôt MONITOR_CLOUDFLARE_ACCOUNT_ID et MONITOR_CLOUDFLARE_API_TOKEN ;
+environnements backup et production (CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN, SHOPCTL_BACKUP_KEY chacun) ;
+plus d'environnement staging (variable STAGING_RETIRED = 2026-10-23). La fiche dit « les trois environnements » :
+il y en a deux. Avec MINSHOP_FLEET posée, le Deploy et le Nightly de la boutique sautent les jobs qui les ouvrent.
+Nettoyage du dépôt de la boutique, 2026-10-30 vers 11:05 UTC (Damien, par `!` dans la session) :
+$ gh secret delete MONITOR_CLOUDFLARE_ACCOUNT_ID -R DamienGR/shop-pilote-certif
+$ gh secret delete MONITOR_CLOUDFLARE_API_TOKEN -R DamienGR/shop-pilote-certif
+$ gh api -X DELETE repos/DamienGR/shop-pilote-certif/environments/production
+$ gh api -X DELETE repos/DamienGR/shop-pilote-certif/environments/backup
+fait
+Relu par l'agent : aucun secret de dépôt, aucun environnement (total_count 0) ; variables MINSHOP_FLEET =
+DamienGR/minshop-fleet et STAGING_RETIRED seules. Les six secrets de B nommés par `repo --fleet` et les deux
+copies de la clé de sauvegarde sont partis.
+Jetons de la boutique révoqués sur B, 2026-10-30 vers 11:15 UTC (Damien, tableau de bord : My Profile →
+API Tokens, et Account API Tokens de Miijot) : ceux qui portaient sur Miijot, soit d'après la fiche et le
+§0 le jeton minshop-pilote-certif-production-lot8, l'ancien jeton de déploiement de B (valeur perdue), le
+jeton de sauvegarde et le jeton de lecture de B. Noms exacts non relevés au moment de la suppression.
+B garde la zone miijot.fr (CNAME certif-minshop → fallback.dg-tech.dev, enregistrements Resend).

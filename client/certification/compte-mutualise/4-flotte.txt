@@ -1,0 +1,47 @@
+Dépôt de flotte, 2026-10-29 vers 21:36 UTC.
+
+Partie locale (agent) : ~/minshop-fleet, fleet.json (pilote-certif, path ../shop-pilote-certif,
+repository DamienGR/shop-pilote-certif), `shopctl fleet init` au socle v0.3.33 :
+✓ .github/workflows/deploy.yml — créé (socle v0.3.33)
+✓ .github/workflows/nightly.yml — créé (socle v0.3.33)
+✓ .github/fleet/shops.mjs — créé (socle v0.3.33)
+✓ .gitignore — /.shopctl/ ignorés (la clé de sauvegarde ne se publie pas, les boutiques sont des dépôts à part)
+✓ pilote-certif — DamienGR/shop-pilote-certif
+Commit « Flotte : registre et workflows » : cinq fichiers, fins de ligne LF.
+
+Publication (Damien, son terminal, jetons par read -rs) :
+
+$ export SHOPCTL_BACKUP_KEY="$(cat ../shop-pilote-certif/.shopctl/backup.key)"
+$ node ../shop-pilote-certif/shopctl/bin/shopctl.mjs fleet repo --reviewer DamienGR
+
+GitHub
+Dépôt déduit : DamienGR/minshop-fleet (ni --origin ni remote « origin »)
+✓ DamienGR/minshop-fleet créé (public)
+✓ remote « origin » configuré sur git@github.com:DamienGR/minshop-fleet.git
+✓ main poussée sur origin
+
+Environnements
+✓ staging — créé
+✓ production — créé, 1 relecteur(s) obligatoire(s)
+✓ backup — créé, limité à la branche main
+
+Secrets
+✓ staging — CLOUDFLARE_API_TOKEN (depuis CLOUDFLARE_API_TOKEN) et CLOUDFLARE_ACCOUNT_ID (305a2bac9fb247fb3d5bc9ff46a4635b) posés
+✓ staging — SHOPCTL_BACKUP_KEY posé (clé a08808754f049baf, depuis SHOPCTL_BACKUP_KEY)
+✓ production — CLOUDFLARE_API_TOKEN (depuis CLOUDFLARE_API_TOKEN) et CLOUDFLARE_ACCOUNT_ID (305a2bac9fb247fb3d5bc9ff46a4635b) posés
+✓ production — SHOPCTL_BACKUP_KEY posé (clé a08808754f049baf, depuis SHOPCTL_BACKUP_KEY)
+✓ backup — CLOUDFLARE_API_TOKEN (depuis CLOUDFLARE_API_TOKEN_BACKUP) et CLOUDFLARE_ACCOUNT_ID (305a2bac9fb247fb3d5bc9ff46a4635b) posés
+✓ backup — SHOPCTL_BACKUP_KEY posé (clé a08808754f049baf, depuis SHOPCTL_BACKUP_KEY)
+✓ dépôt — MONITOR_CLOUDFLARE_API_TOKEN (depuis CLOUDFLARE_API_TOKEN_MONITOR) et MONITOR_CLOUDFLARE_ACCOUNT_ID posés
+
+Dépôt de flotte prêt : https://github.com/DamienGR/minshop-fleet. Côté boutique : `shopctl repo --fleet DamienGR/minshop-fleet`.
+
+$ gh variable set MINSHOP_ACCOUNT_PLAN --body free -R DamienGR/minshop-fleet
+
+Relu par l'agent (gh, lecture) : dépôt PUBLIC, branche main ; arbre publié = .github/fleet/shops.mjs,
+.github/workflows/deploy.yml, .github/workflows/nightly.yml, .gitignore, fleet.json (aucune clé) ;
+variable MINSHOP_ACCOUNT_PLAN=free ; secrets de dépôt MONITOR_CLOUDFLARE_ACCOUNT_ID et
+MONITOR_CLOUDFLARE_API_TOKEN ; environnements backup (branch_policy), production (required_reviewers),
+staging.
+
+Écart à la fiche : elle annonce la clé « 64fb… » ; celle du pilote est a08808754f049baf.

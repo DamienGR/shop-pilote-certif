@@ -1,0 +1,17 @@
+§7, simulation de la destruction de B, 2026-10-30 vers 10:15 UTC (Damien, terminal séparé, depuis
+~/pilote-certif-B, arbre détaché sur 3113581 qui garde le manifeste de B, jeton
+minshop-pilote-certif-production-lot8 de B). Après le Nightly programmé vert 41037762590.
+$ npm run shopctl -- destroy --env production --confirm pilote-certif --dry-run
+npm notice run minshop@0.3.33 shopctl
+npm notice run node shopctl/bin/shopctl.mjs destroy --env production --confirm pilote-certif --dry-run
+Compte Cloudflare
+✓ Miijot (b8505b293a291d9d82edf5417b02084d)
+À supprimer — pilote-certif en production (simulation)
+! Worker minshop-pilote-certif-production
+! namespace KV des sessions minshop-pilote-certif-production-session
+! bucket images minshop-pilote-certif-production-images
+! bucket fichiers minshop-pilote-certif-production-files
+! bucket sauvegardes minshop-pilote-certif-production-backups
+! base D1 minshop-pilote-certif-production-db
+✓ minshop-pilote-certif-production-db — marquée pour pilote-certif (damiengr/shop-pilote-certif)
+Simulation. Pour supprimer : npm run shopctl -- destroy --env production --confirm pilote-certif --yes

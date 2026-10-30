@@ -1,0 +1,16 @@
+§6, remise en état, 2026-10-29 vers 22:00 UTC (Damien, dans l'administration ; relu de l'extérieur par l'agent).
+
+Damien, points 1 à 8 faits :
+- connexion à l'administration avec le mot de passe d'avant, Turnstile coupé ;
+- Réglages → E-mail : clé Resend ressaisie ;
+- Réglages → Protection anti-robots : clés du widget « certif-minshop » du compte mutualisé, Turnstile réactivé ;
+- e-mail de test envoyé depuis Réglages → E-mail : reçu ;
+- déconnexion puis reconnexion : widget affiché, connexion acceptée ;
+- une fiche produit : image servie par https://images-certif-minshop.dg-tech.dev/ ;
+- moyens de paiement laissés tous inactifs, comme avant le §1.
+
+Agent, de l'extérieur :
+- /admin/login charge challenges.cloudflare.com/turnstile/v0/api.js, widget à clé de site 0x4AAAAA… ;
+- page d'accueil : 10 adresses d'images, toutes en https://images-certif-minshop.dg-tech.dev.
+
+Reste au §6 : le Nightly de la flotte (sauvegarde, backup verify, monitor et fleet usage au plan gratuit).
