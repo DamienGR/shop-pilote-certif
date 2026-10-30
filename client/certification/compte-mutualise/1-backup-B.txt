@@ -1,0 +1,103 @@
+Admin → Réglages → Paiements, 2026-10-29 : tous les moyens déjà inactifs (démonstration coupée,
+clés Stripe retirées à l'étape 10) — aucune session de paiement ouverte, pas d'attente de trente minutes.
+
+$ npm run shopctl -- backup --env production --upload
+npm notice run minshop@0.3.33 shopctl
+npm notice run node shopctl/bin/shopctl.mjs backup --env production --upload
+
+Clé
+✓ .shopctl/backup.key — clé a08808754f049baf
+
+Compte Cloudflare
+✓ Miijot (b8505b293a291d9d82edf5417b02084d)
+✓ minshop-pilote-certif-production-db — marquée pour pilote-certif (damiengr/shop-pilote-certif)
+✓ wrangler.jsonc rendu pour minshop-pilote-certif-production
+
+Médias déjà sauvegardés — minshop-pilote-certif-production-backups
+✓ 8 objet(s) réutilisables (copies de moins de 83 jours)
+
+Schéma
+✓ 26 table(s), schéma 0046_legal_pages_title_once.sql (47 migration(s) appliquée(s))
+✓ index non sauvegardés, reconstruits à la restauration : products_fts
+
+Données
+✓ 106 ligne(s) lues
+
+Objets R2
+✓ 8 image(s), 0 fichier(s) privé(s)
+✓ 0 objet(s) emportés, 8 déjà dans minshop-pilote-certif-production-backups (ni relus ni recopiés)
+
+Sauvegarde
+✓ pilote-certif-production-20261029T172928Z — 12442 octet(s) chiffrés dans ~/shop-pilote-certif/backups/pilote-certif-production-20261029T172928Z
+✓ pilote-certif-production-20261029T172928Z copiée dans minshop-pilote-certif-production-backups : 0 objet(s) écrit(s), 8 déjà dans le pool
+
+Contrôlez-la : shopctl backup verify pilote-certif-production-20261029T172928Z
+    Restaurez-la : shopctl restore --env staging --from pilote-certif-production-20261029T172928Z
+
+$ npm run shopctl -- backup pull pilote-certif-production-20261029T172928Z --env production
+npm notice run minshop@0.3.33 shopctl
+npm notice run node shopctl/bin/shopctl.mjs backup pull pilote-certif-production-20261029T172928Z --env production
+
+Compte Cloudflare
+✓ Miijot (b8505b293a291d9d82edf5417b02084d)
+
+Rapatriement de pilote-certif-production-20261029T172928Z depuis minshop-pilote-certif-production-backups
+✓ 8 objet(s) rapatrié(s) du pool
+✓ taille du corps — 12442 octet(s), le manifeste en annonce 12442
+✓ empreinte du corps — cbb66e68a89f28b7f294f8815311094e14852f62ad9a20e2806dee29d4b7c956
+✓ objet media/053b6b97fc5ccaf2b08c.png — intact
+✓ objet media/57d97735a1aad93e22d6.png — intact
+✓ objet media/9a337e73d21f749e20e3.png — intact
+✓ objet media/b630063abd1cec42c79d.png — intact
+✓ objet media/bde9ce8d5d67b3a6925c.png — intact
+✓ objet media/c305815dae2ad10c293b.png — intact
+✓ objet media/c35201cd8b09cc286be4.png — intact
+✓ objet media/e9df9de207b06c5bf0b8.png — intact
+
+Restaurez-la : shopctl restore --env production --from pilote-certif-production-20261029T172928Z
+
+$ npm run shopctl -- backup verify pilote-certif-production-20261029T172928Z
+npm notice run minshop@0.3.33 shopctl
+npm notice run node shopctl/bin/shopctl.mjs backup verify pilote-certif-production-20261029T172928Z
+
+Sauvegarde pilote-certif-production-20261029T172928Z
+✓ pilote-certif — production, 2026-10-29T17:29:28.183Z, socle 0.3.33
+✓ taille du corps — 12442 octet(s), le manifeste en annonce 12442
+✓ empreinte du corps — cbb66e68a89f28b7f294f8815311094e14852f62ad9a20e2806dee29d4b7c956
+✓ objet media/053b6b97fc5ccaf2b08c.png — intact
+✓ objet media/57d97735a1aad93e22d6.png — intact
+✓ objet media/9a337e73d21f749e20e3.png — intact
+✓ objet media/b630063abd1cec42c79d.png — intact
+✓ objet media/bde9ce8d5d67b3a6925c.png — intact
+✓ objet media/c305815dae2ad10c293b.png — intact
+✓ objet media/c35201cd8b09cc286be4.png — intact
+✓ objet media/e9df9de207b06c5bf0b8.png — intact
+✓ ouverture — authentifiée par le manifeste en clair
+✓ table admin_login_attempts — 1 ligne(s)
+✓ table categories — 4 ligne(s)
+✓ table checkout_reservations — 1 ligne(s)
+✓ table media — 8 ligne(s)
+✓ table menu_items — 4 ligne(s)
+✓ table order_guest_access — 1 ligne(s)
+✓ table order_item_ids — 1 ligne(s)
+✓ table order_reference_aliases — 0 ligne(s)
+✓ table orders — 1 ligne(s)
+✓ table pages — 4 ligne(s)
+✓ table pending_payments — 0 ligne(s)
+✓ table products — 21 ligne(s)
+✓ table refund_sync_events — 1 ligne(s)
+✓ table settings — 13 ligne(s)
+✓ table sweep_cursors — 0 ligne(s)
+✓ table order_inventory_exceptions — 0 ligne(s)
+✓ table order_items — 1 ligne(s)
+✓ table order_notifications — 2 ligne(s)
+✓ table page_media — 0 ligne(s)
+✓ table product_categories — 23 ligne(s)
+✓ table product_extras — 0 ligne(s)
+✓ table product_images — 10 ligne(s)
+✓ table product_variants — 9 ligne(s)
+✓ table refunds — 1 ligne(s)
+✓ table shipping_label_attempts — 0 ligne(s)
+✓ table shipping_labels — 0 ligne(s)
+
+Archive complète et cohérente.

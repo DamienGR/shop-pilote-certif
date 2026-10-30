@@ -1,0 +1,48 @@
+Second passage, après `git checkout -- wrangler.jsonc` (rendu sans compte : minshop-pilote-certif-db, id 0000…).
+
+$ npm run shopctl -- provision --env production
+npm notice run minshop@0.3.33 shopctl
+npm notice run node shopctl/bin/shopctl.mjs provision --env production
+
+Compte Cloudflare
+✓ <email>'s Account (305a2bac9fb247fb3d5bc9ff46a4635b) — attendu par le manifeste (cloudflare.accountId)
+
+Ressources de pilote-certif en production
+✓ base D1 minshop-pilote-certif-production-db — déjà présent (6c90c0f2-7b0a-49de-8eb4-e246d95021d7)
+✓ minshop-pilote-certif-production-db — marquée pour pilote-certif (damiengr/shop-pilote-certif) (base antérieure au marqueur)
+✓ bucket images minshop-pilote-certif-production-images — créé (juridiction eu)
+✓ bucket fichiers minshop-pilote-certif-production-files — créé (juridiction eu)
+✓ bucket sauvegardes minshop-pilote-certif-production-backups — créé (juridiction eu)
+
+Juridiction
+✓ minshop-pilote-certif-production-db — juridiction eu
+✓ minshop-pilote-certif-production-images — visible en juridiction eu, absent de la juridiction par défaut
+✓ minshop-pilote-certif-production-files — visible en juridiction eu, absent de la juridiction par défaut
+✓ minshop-pilote-certif-production-backups — visible en juridiction eu, absent de la juridiction par défaut
+
+Exposition publique
+✓ minshop-pilote-certif-production-files — privé : ni URL r2.dev, ni domaine attaché
+✓ minshop-pilote-certif-production-backups — privé : ni URL r2.dev, ni domaine attaché
+✓ minshop-pilote-certif-production-images — images servies par le Worker (aucun domaine d'images)
+· cloudflare.imagesDomain annonce images-certif-minshop.dg-tech.dev : attachez-le à minshop-pilote-certif-production-images avant le déploiement.
+    Tableau de bord → R2 → minshop-pilote-certif-production-images → Settings → Custom Domains. `shopctl deploy --env production` refuse tant qu'il n'y est pas.
+
+Conservation des sauvegardes
+✓ minshop-pilote-certif-production-backups — archives (pilote-certif-production-) expirées après 90 jours
+✓ minshop-pilote-certif-production-backups — médias du pool (pool/) expirées après 180 jours
+
+Nom d'hôte du commerçant — certif-minshop.miijot.fr par la zone dg-tech.dev
+✓ origine de repli de dg-tech.dev : fallback.dg-tech.dev
+· certif-minshop.miijot.fr — créé, en attente du DNS du commerçant (état pending, certificat initializing)
+    Dans le DNS du commerçant (chez son registrar, ou en DNS seul si sa zone est chez Cloudflare) : CNAME certif-minshop.miijot.fr → fallback.dg-tech.dev. La validation et le certificat suivent seuls (validation HTTP).
+
+Configuration et migrations
+✓ wrangler.jsonc rendu pour minshop-pilote-certif-production (base 6c90c0f2-7b0a-49de-8eb4-e246d95021d7)
+✓ migrations appliquées à minshop-pilote-certif-production-db
+✓ minshop-pilote-certif-production-db — démonstration de paiement coupée : le panier n'offre rien tant que Stripe n'est pas configuré
+
+Secrets internes
+· minshop-pilote-certif-production n'est pas encore déployé : AUTH_SECRET et SECRETS_KEK seront posés au premier déploiement.
+    shopctl deploy --env production les génère, puis `shopctl provision` les confirme.
+
+production provisionné pour pilote-certif. Suite : npm run shopctl -- deploy --env production.

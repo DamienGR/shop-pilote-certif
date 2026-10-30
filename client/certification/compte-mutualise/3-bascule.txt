@@ -1,0 +1,73 @@
+Bascule du 2026-10-29 (heures UTC), vue de l'extérieur depuis le poste WSL (dig @1.1.1.1, curl, openssl ;
+une mesure toutes les 15 s) et par le provision de Damien.
+
+Avant : certif-minshop.miijot.fr servi par le domaine personnalisé du Worker de B, certificat Google Trust
+Services WE1 (notBefore 2026-10-21), HTTP 200.
+
+21:20:43  dernier 200 servi par B
+21:20:58  HTTP 522 (certificat Let's Encrypt YE2) : domaine retiré du Worker de B, la coupure commence
+21:21:28  plus de réponse (HTTP 000 : le nom ne résout plus)
+21:22:29  CNAME certif-minshop → fallback.dg-tech.dev vu pour la première fois à 1.1.1.1
+          (puis en alternance avec une réponse vide selon le nœud de 1.1.1.1 : cache négatif)
+~21:24:20 certificat du nom d'hôte personnalisé émis (Google Trust Services WE1, notAfter 2027-01-27 21:24:20)
+          provision : « certif-minshop.miijot.fr — déjà présent, actif, certificat actif »
+21:27     par l'IP de l'origine de repli (104.21.25.184, réponse de 8.8.8.8) : HTTP 200 en 0,24 s,
+          <title>Certif Minshop</title>, noindex, images sur images-certif-minshop.dg-tech.dev
+          https://images-certif-minshop.dg-tech.dev/media/053b6b97fc5ccaf2b08c.png : 200 image/png
+
+Coupure : environ quatre minutes pour un résolveur qui n'a pas interrogé le nom pendant le trou.
+Constat : le trou entre le retrait du domaine (21:20:58) et le CNAME (21:22:29) laisse une réponse
+négative dans les caches, gardée jusqu'au minimum du SOA de miijot.fr, 1800 s. Le résolveur du poste
+(WSL → Windows → box) ne voyait toujours pas le nom à 21:27 : jusqu'à trente minutes de coupure pour un
+visiteur dont le résolveur a interrogé le nom dans ce trou. La fiche annonce cinq minutes.
+
+21:46:44  le résolveur du poste voit enfin le CNAME : HTTP 200, certificat Google Trust Services WE1
+          (deux fois de suite à 21:47:00). Vue de ce poste, la coupure a duré 21:20:58 → 21:46:44,
+          vingt-six minutes, dont vingt-deux de cache négatif.
+
+DNS de miijot.fr après : CNAME certif-minshop → fallback.dg-tech.dev (DNS seul), à l'autoritaire
+stanley.ns.cloudflare.com, à 1.1.1.1 et à 8.8.8.8.
+
+$ npm run shopctl -- provision --env production
+npm notice run minshop@0.3.33 shopctl
+npm notice run node shopctl/bin/shopctl.mjs provision --env production
+
+Compte Cloudflare
+✓ <email>'s Account (305a2bac9fb247fb3d5bc9ff46a4635b) — attendu par le manifeste (cloudflare.accountId)
+
+Ressources de pilote-certif en production
+✓ base D1 minshop-pilote-certif-production-db — déjà présent (6c90c0f2-7b0a-49de-8eb4-e246d95021d7)
+✓ minshop-pilote-certif-production-db — marquée pour pilote-certif (damiengr/shop-pilote-certif)
+✓ bucket images minshop-pilote-certif-production-images — déjà présent (eu)
+✓ bucket fichiers minshop-pilote-certif-production-files — déjà présent (eu)
+✓ bucket sauvegardes minshop-pilote-certif-production-backups — déjà présent (eu)
+
+Juridiction
+✓ minshop-pilote-certif-production-db — juridiction eu
+✓ minshop-pilote-certif-production-images — visible en juridiction eu, absent de la juridiction par défaut
+✓ minshop-pilote-certif-production-files — visible en juridiction eu, absent de la juridiction par défaut
+✓ minshop-pilote-certif-production-backups — visible en juridiction eu, absent de la juridiction par défaut
+
+Exposition publique
+✓ minshop-pilote-certif-production-files — privé : ni URL r2.dev, ni domaine attaché
+✓ minshop-pilote-certif-production-backups — privé : ni URL r2.dev, ni domaine attaché
+✓ minshop-pilote-certif-production-images — domaine d'images : images-certif-minshop.dg-tech.dev
+
+Conservation des sauvegardes
+✓ minshop-pilote-certif-production-backups — archives (pilote-certif-production-) expirées après 90 jours
+✓ minshop-pilote-certif-production-backups — médias du pool (pool/) expirées après 180 jours
+
+Nom d'hôte du commerçant — certif-minshop.miijot.fr par la zone dg-tech.dev
+✓ origine de repli de dg-tech.dev : fallback.dg-tech.dev
+✓ certif-minshop.miijot.fr — déjà présent, actif, certificat actif
+
+Configuration et migrations
+✓ wrangler.jsonc rendu pour minshop-pilote-certif-production (base 6c90c0f2-7b0a-49de-8eb4-e246d95021d7)
+✓ migrations appliquées à minshop-pilote-certif-production-db
+✓ minshop-pilote-certif-production-db — démonstration de paiement déjà coupée
+
+Secrets internes
+✓ AUTH_SECRET déjà posé — conservé (signe les sessions de l'administration)
+✓ SECRETS_KEK déjà posé — conservé (chiffre les clés de paiement saisies dans Admin → Réglages)
+
+production provisionné pour pilote-certif. Suite : npm run shopctl -- deploy --env production.

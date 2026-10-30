@@ -1,0 +1,79 @@
+$ CLOUDFLARE_ACCOUNT_ID=305a2bac9fb247fb3d5bc9ff46a4635b npx wrangler d1 execute minshop-pilote-certif-production-db --remote --command "DELETE FROM settings WHERE key = 'turnstile_enabled'"
+npm notice run minshop@0.3.33 npx
+npm notice run 'wrangler' d1 execute minshop-pilote-certif-production-db --remote --command DELETE FROM settings WHERE key = 'turnstile_enabled'
+
+ ⛅️ wrangler 4.154.0 (update available 4.155.0)
+───────────────────────────────────────────────
+Resource location: remote
+
+🌀 Executing on remote database minshop-pilote-certif-production-db (6c90c0f2-7b0a-49de-8eb4-e246d95021d7):
+🌀 To execute on your local development database, remove the --remote flag from your wrangler command.
+🚣 Executed 1 command in 0.49ms
+
+$ npm run shopctl -- deploy --env production --yes --skip-smoke
+npm notice run minshop@0.3.33 shopctl
+npm notice run node shopctl/bin/shopctl.mjs deploy --env production --yes --skip-smoke
+
+Compte Cloudflare
+✓ <email>'s Account (305a2bac9fb247fb3d5bc9ff46a4635b)
+✓ clé de sauvegarde a08808754f049baf (.shopctl/backup.key)
+
+Ressources de pilote-certif en production
+✓ minshop-pilote-certif-production-db (6c90c0f2-7b0a-49de-8eb4-e246d95021d7), minshop-pilote-certif-production-images, minshop-pilote-certif-production-files — juridiction eu
+✓ minshop-pilote-certif-production-db — marquée pour pilote-certif (damiengr/shop-pilote-certif)
+✓ minshop-pilote-certif-production-files — toujours privé
+✓ minshop-pilote-certif-production-images — domaine d'images images-certif-minshop.dg-tech.dev attaché
+
+Nom d'hôte du commerçant — certif-minshop.miijot.fr par la zone dg-tech.dev
+! certif-minshop.miijot.fr n'est pas encore actif sur dg-tech.dev (état pending, certificat pending_validation) : la boutique ne répondra sur son domaine qu'une fois le DNS posé.
+    Dans le DNS du commerçant (chez son registrar, ou en DNS seul si sa zone est chez Cloudflare) : CNAME certif-minshop.miijot.fr → fallback.dg-tech.dev. La validation et le certificat suivent seuls (validation HTTP).
+
+Configuration
+✓ wrangler.jsonc rendu pour minshop-pilote-certif-production
+
+Vérification
+[npm run verify, sortie abrégée : 136 fichiers de test, 2006 tests passés ; astro check 0 erreur,
+0 avertissement, 6 indices ; check:deploy dans les budgets (Worker 836,5 Kio / 1024 gzip, JS client
+5,5 Kio / 24) ; porte de sécurité 42 contrôles passés ; mcp:check et scaffold:check verts]
+✓ npm run verify
+
+Sauvegarde préalable
+
+Médias déjà sauvegardés — minshop-pilote-certif-production-backups
+✓ pool vide : les objets sont lus et copiés une fois
+
+Schéma
+✓ 26 table(s), schéma 0046_legal_pages_title_once.sql (47 migration(s) appliquée(s))
+✓ index non sauvegardés, reconstruits à la restauration : products_fts
+
+Données
+✓ 105 ligne(s) lues
+
+Objets R2
+✓ 8 image(s), 0 fichier(s) privé(s)
+✓ 8 objet(s) emportés
+
+Sauvegarde
+✓ pilote-certif-production-20261029T194120Z — 12433 octet(s) chiffrés dans ~/shop-pilote-certif/backups/pilote-certif-production-20261029T194120Z
+✓ pilote-certif-production-20261029T194120Z copiée dans minshop-pilote-certif-production-backups : 8 objet(s) écrit(s)
+
+Base de données
+✓ bookmark Time Travel avant migration : 00000005-00000000-00005113-1b2cdf7835c7fbf0ff68c2246af6a4bb
+    Filet de sécurité court terme, pas une sauvegarde (ADR 0005).
+✓ migrations appliquées à minshop-pilote-certif-production-db
+
+Build et déploiement
+[astro build]
+✓ npm run build
+✓ minshop-pilote-certif-production déployé — https://certif-minshop.miijot.fr
+
+Secrets internes
+✓ AUTH_SECRET généré et transmis par entrée standard (signe les sessions de l'administration)
+✓ SECRETS_KEK généré et transmis par entrée standard (chiffre les clés de paiement saisies dans Admin → Réglages)
+
+Test de fumée
+! test de fumée sauté (--skip-smoke).
+
+pilote-certif est déployé en production, mais https://certif-minshop.miijot.fr ne mène à lui qu'une fois son nom d'hôte actif.
+
+Note : 105 lignes contre 106 dans l'archive de B — la ligne turnstile_enabled supprimée juste avant.

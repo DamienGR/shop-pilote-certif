@@ -1,0 +1,35 @@
+$ npm run shopctl -- repo --fleet DamienGR/minshop-fleet      (agent, branche migration/compte-mutualise)
+
+GitHub
+✓ DamienGR/shop-pilote-certif existe déjà (public)
+! DamienGR/shop-pilote-certif est PUBLIC alors que le dépôt d'une boutique est privé par défaut.
+    Il porte le manifeste, le catalogue et les contenus d'un client. Le repasser en privé ne défait pas les clones déjà faits : vérifiez d'abord que c'était voulu.
+✓ migration/compte-mutualise poussée sur origin
+
+Flotte
+✓ variable MINSHOP_FLEET = DamienGR/minshop-fleet posée : les workflows Deploy et Nightly de la boutique laissent le compte à la flotte
+! dépôt : MONITOR_CLOUDFLARE_ACCOUNT_ID est encore posé.
+    Un jeton du compte mutualisé ouvre toutes les boutiques (ADR 0019). Une fois la boutique déployée par la flotte : gh secret delete MONITOR_CLOUDFLARE_ACCOUNT_ID --repo DamienGR/shop-pilote-certif
+! dépôt : MONITOR_CLOUDFLARE_API_TOKEN est encore posé.
+    Un jeton du compte mutualisé ouvre toutes les boutiques (ADR 0019). Une fois la boutique déployée par la flotte : gh secret delete MONITOR_CLOUDFLARE_API_TOKEN --repo DamienGR/shop-pilote-certif
+! environnement backup : CLOUDFLARE_ACCOUNT_ID est encore posé.
+    Un jeton du compte mutualisé ouvre toutes les boutiques (ADR 0019). Une fois la boutique déployée par la flotte : gh secret delete CLOUDFLARE_ACCOUNT_ID --env backup --repo DamienGR/shop-pilote-certif
+! environnement backup : CLOUDFLARE_API_TOKEN est encore posé.
+    Un jeton du compte mutualisé ouvre toutes les boutiques (ADR 0019). Une fois la boutique déployée par la flotte : gh secret delete CLOUDFLARE_API_TOKEN --env backup --repo DamienGR/shop-pilote-certif
+! environnement production : CLOUDFLARE_ACCOUNT_ID est encore posé.
+    Un jeton du compte mutualisé ouvre toutes les boutiques (ADR 0019). Une fois la boutique déployée par la flotte : gh secret delete CLOUDFLARE_ACCOUNT_ID --env production --repo DamienGR/shop-pilote-certif
+! environnement production : CLOUDFLARE_API_TOKEN est encore posé.
+    Un jeton du compte mutualisé ouvre toutes les boutiques (ADR 0019). Une fois la boutique déployée par la flotte : gh secret delete CLOUDFLARE_API_TOKEN --env production --repo DamienGR/shop-pilote-certif
+· aucun fleet.json au-dessus de ~/shop-pilote-certif : inscrivez la boutique dans celui du dépôt de flotte DamienGR/minshop-fleet, avec "repository": "DamienGR/shop-pilote-certif".
+
+Dépôt prêt : https://github.com/DamienGR/shop-pilote-certif, déployé par DamienGR/minshop-fleet.
+
+Notes de l'agent :
+- dépôt public : voulu pour la campagne (dépôts DamienGR/shop-*-certif publics depuis l'étape 2) ;
+- les six secrets nommés sont ceux de B (jetons et compte de B), gardés jusqu'au §7 pour le retour
+  arrière. Le motif affiché (« un jeton du compte mutualisé ») ne leur correspond pas : défaut de
+  libellé, ils viennent du compte de la boutique ;
+- le fleet.json est à côté (~/minshop-fleet), pas au-dessus : la boutique y est déjà inscrite avec son
+  dépôt. Ligne d'information sans objet ici.
+
+Pull request : https://github.com/DamienGR/shop-pilote-certif/pull/44 (ouverte par l'agent).

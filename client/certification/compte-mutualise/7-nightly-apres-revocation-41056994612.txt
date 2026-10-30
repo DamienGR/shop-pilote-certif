@@ -1,0 +1,22 @@
+Nightly de la flotte lancé à la main par Damien après la révocation des jetons de B : run 41056994612
+(DamienGR/minshop-fleet), workflow_dispatch, 2026-10-30T12:39:32Z → 12:40:39Z, succès, aucune annotation
+survécu (la page API Tokens du profil liste les jetons des deux comptes).
+Production backup (pilote-certif), job 124066981752
+✓ SHOPCTL_BACKUP_KEY — clé a08808754f049baf
+✓ <email>'s Account (***)
+✓ minshop-pilote-certif-production-db — marquée pour pilote-certif (damiengr/shop-pilote-certif)
+✓ 0 objet(s) emportés, 8 déjà dans minshop-pilote-certif-production-backups (ni relus ni recopiés)
+✓ pilote-certif-production-20261030T124028Z — 12384 octet(s) chiffrés
+✓ pilote-certif-production-20261030T124028Z copiée dans minshop-pilote-certif-production-backups : 0 objet(s) écrit(s), 8 déjà dans le pool
+✓ ouverture — authentifiée par le manifeste en clair
+Archive complète et cohérente.
+Production error rate and quotas (pilote-certif), job 124066981549
+✓ taux d'erreur — 0 erreur(s) sur 1747 requêtes (0.00 %, seuil 1.00 %)
+✓ invocations arrêtées (plan gratuit) — 0 invocation(s) arrêtée(s) par Cloudflare pour ressources dépassées (erreur 1102) en 24 h
+· CPU p99 — 50.81 ms par requête
+Shared account usage, job 124066981585
+✓ requêtes Workers du compte — 1 132 sur 100 000 par jour (1,13 %, seuil 70 %)
+✓ Workers du compte — 1 Worker(s) invoqué(s) depuis hier, un cron chacun : 5 visés par compte, 5 au plus
+Le jeton de déploiement du compte mutualisé n'est pas exercé par le Nightly : contrôlé à l'œil sur la page
+API Tokens (Damien).
+Contrôlé à l'œil par Damien, 2026-10-30 : trois jetons portent sur <email>'s Account (déploiement, sauvegarde, lecture).
