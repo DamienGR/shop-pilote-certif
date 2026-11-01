@@ -59,19 +59,29 @@ export function shopRepository(root) {
  * Two questions rather than one: a SELECT on a table that is not there is an
  * error, and an unmarked database is the ordinary state of every shop
  * provisioned before ADR 0019, not a failure.
+ *
+ * Asked of the database by its ID, the one the account listing returned, never
+ * by its name. Wrangler resolves a name through the tree's `wrangler.jsonc`
+ * first and takes the id it finds there at its word, and the marker is read
+ * BEFORE the configuration is rendered for this environment — on purpose, so
+ * that it never points at a database not yet proven this shop's. A render left
+ * by the same environment on another account (lot 8: a backup on the
+ * merchant's account, then `provision` on the shared one) names the right
+ * database with the other account's id, and the call fails on an id this
+ * account has never seen. An id is looked up on the account itself.
  */
-export function readOwner(database, { cwd }) {
+export function readOwner(id, { cwd }) {
   const [tables] = query([`SELECT name FROM sqlite_master WHERE type = 'table' AND name = '${OWNER_TABLE}';`], {
     cwd,
     remote: true,
-    database,
+    database: id,
     what: 'le marqueur de la boutique',
   });
   if (tables.length === 0) return null;
   const [rows] = query([`SELECT repository, slug, marked_at FROM ${OWNER_TABLE} WHERE id = 1;`], {
     cwd,
     remote: true,
-    database,
+    database: id,
     what: 'le marqueur de la boutique',
   });
   const row = rows[0];
@@ -101,15 +111,15 @@ export function judgeOwner(marker, { repository, slug }) {
 }
 
 /** Write (or rewrite) the one row. `id = 1` makes a second row impossible
- *  rather than unlikely. */
-export function markOwner(database, { cwd, repository, slug, at = new Date().toISOString() }) {
+ *  rather than unlikely. The database by its ID, for `readOwner`'s reason. */
+export function markOwner(id, { cwd, repository, slug, at = new Date().toISOString() }) {
   applyScript(
     [
       `CREATE TABLE IF NOT EXISTS ${OWNER_TABLE} (id INTEGER PRIMARY KEY CHECK (id = 1), repository TEXT, slug TEXT NOT NULL, marked_at TEXT NOT NULL);`,
       `INSERT INTO ${OWNER_TABLE} (id, repository, slug, marked_at) VALUES (1, ${literal(repository)}, ${literal(slug)}, ${literal(at)}) ` +
         'ON CONFLICT(id) DO UPDATE SET repository = excluded.repository, slug = excluded.slug, marked_at = excluded.marked_at;',
     ],
-    { cwd, remote: true, database },
+    { cwd, remote: true, database: id },
   );
 }
 
@@ -145,12 +155,15 @@ export function ownerRefusal(verdict, { database, marker, repository, slug, env 
  * before ADR 0019 is one, and the remedy — a `provision` run — is cheap and
  * idempotent.
  *
+ * `database` is the name the sentences use, `databaseId` the one the account
+ * listing gave for it, and the one asked.
+ *
  * @returns {{ repository: string|null, verdict: string, marker: object|null }}
  */
-export function guardOwner({ database, root, manifest, env, reporter }) {
+export function guardOwner({ database, databaseId, root, manifest, env, reporter }) {
   const slug = manifest.client.slug;
   const repository = shopRepository(root);
-  const marker = readOwner(database, { cwd: root });
+  const marker = readOwner(databaseId, { cwd: root });
   const verdict = judgeOwner(marker, { repository, slug });
   if (verdict === 'foreign' || verdict === 'unproven') {
     throw ownerRefusal(verdict, { database, marker, repository, slug, env });

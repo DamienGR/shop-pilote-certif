@@ -13,14 +13,14 @@ import { HOSTILE, IMAGE_BYTES, IMAGE_KEY, names, seededShop, takeBackup } from '
 import { ACCOUNT } from '../helpers/provisioned-shop.mjs';
 
 /** Everything the shop wrote, as the target database holds it now. */
-function contents(target) {
+function contents(target, database = 'DB') {
   return {
-    products: target.query('SELECT slug, name, description, price_cents, image_key FROM products ORDER BY id'),
-    orders: target.query('SELECT provider_session_id, email, amount_total_cents, status, refunded_cents FROM orders ORDER BY id'),
-    items: target.query('SELECT order_id, product_id, name, quantity FROM order_items ORDER BY id'),
-    media: target.query('SELECT image_key, original_name FROM media ORDER BY id'),
-    settings: target.query('SELECT key, value FROM settings ORDER BY key'),
-    categories: target.query('SELECT slug, name FROM categories ORDER BY id'),
+    products: target.query('SELECT slug, name, description, price_cents, image_key FROM products ORDER BY id', database),
+    orders: target.query('SELECT provider_session_id, email, amount_total_cents, status, refunded_cents FROM orders ORDER BY id', database),
+    items: target.query('SELECT order_id, product_id, name, quantity FROM order_items ORDER BY id', database),
+    media: target.query('SELECT image_key, original_name FROM media ORDER BY id', database),
+    settings: target.query('SELECT key, value FROM settings ORDER BY key', database),
+    categories: target.query('SELECT slug, name FROM categories ORDER BY id', database),
   };
 }
 
@@ -442,7 +442,9 @@ describe('shopctl restore', () => {
 
       expect(local(target, 'SELECT slug, name, description, price_cents, image_key FROM products ORDER BY id')).toEqual(before.products);
       // The remote database is the one the archive came from, and untouched.
-      expect(contents(target)).toEqual(before);
+      // Asked by its id: the configuration now points `DB` at the local one.
+      const remote = target.read().d1.find((entry) => entry.name === names(target.slug, 'staging').database).uuid;
+      expect(contents(target, remote)).toEqual(before);
     });
 
     it('refuses a production archive: a runner is not where buyers\' data goes', () => {

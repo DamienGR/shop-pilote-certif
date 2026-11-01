@@ -1,0 +1,37 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/shipping/v3.1/shipping-order/2610301905POFR56EJFR/tracking",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "ms": 647,
+    "contentType": "application/json",
+    "body": {
+      "timestamp": "2026-10-30T19:06:05.265868+01:00",
+      "status": 200,
+      "content": [
+        {
+          "packageId": "CR261030000000000UYY1",
+          "packageExternalId": "essai-att-mvva9992-1",
+          "trackingNumber": "CR261030000000000UYY",
+          "packageTrackingUrl": "https://www.laposte.fr/outils/suivre-vos-envois?code=CR261030000000000UYY1",
+          "trackingDateTime": "2026-10-30 00:00:00",
+          "status": "ANNOUNCED",
+          "message": "Envoi préparé",
+          "isFinal": false,
+          "history": [
+            {
+              "trackingDateTime": "2026-10-30 00:00:00",
+              "status": "ANNOUNCED",
+              "message": "Envoi préparé",
+              "location": null,
+              "isFinal": false
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -8,6 +8,7 @@ import type {
 import { STRIPE_CHECKOUT_TTL_SECONDS } from './provider';
 import { stripeAllowedCountries } from './stripeCountries.ts';
 import { DEFAULT_CURRENCY, LANG } from '../i18n/locale.ts';
+import { parseDeliveryMethod, type DeliveryMethod } from '../shipping/calculator.ts';
 
 /**
  * Stripe's locale enum is language-level ('fr'), not a BCP 47 tag with a
@@ -29,16 +30,15 @@ const STRIPE_LOCALE = stripeLocale(LANG);
 
 /**
  * The delivery mode a chosen Stripe rate encodes. Session creation stamps every
- * rate's metadata with delivery: pickup|shipping; anything else (older sessions
+ * rate's metadata with delivery: pickup|shipping|relay; anything else (older sessions
  * created before that stamping, hand-made rates) is 'unknown' — which blocks
  * label purchase rather than being coalesced into a delivery order, because the
  * customer may have chosen pickup.
  */
 export function classifyRateDelivery(
   metadata: Record<string, string> | null | undefined,
-): 'pickup' | 'shipping' | 'unknown' {
-  const d = metadata?.delivery;
-  return d === 'pickup' ? 'pickup' : d === 'shipping' ? 'shipping' : 'unknown';
+): DeliveryMethod | 'unknown' {
+  return parseDeliveryMethod(metadata?.delivery) ?? 'unknown';
 }
 
 // Shipping details have moved across Stripe API versions (session.shipping_details
@@ -74,6 +74,12 @@ export function createStripeProvider(
 
   return {
     async createCheckout(params: CreateCheckoutParams): Promise<CheckoutResult> {
+      // Set when /checkout took the address, the phone, the rate and, for a
+      // relay rate, the point (a zone with a relay rate sends the card there:
+      // api/checkout.ts). The session then charges that rate alone and asks for
+      // nothing again — the order's address rides the reservation instead.
+      const chosen = params.selectedShipping;
+      const weightGrams = chosen ? chosen.weightGrams : params.shipping?.shipmentWeightGrams;
       const session = await stripe.checkout.sessions.create({
         mode: 'payment',
         // The hosted page is the ONE screen of the purchase the store does not
@@ -101,19 +107,38 @@ export function createStripeProvider(
         })),
         success_url: params.successUrl,
         cancel_url: params.cancelUrl,
-        ...((params.metadata || params.shipping?.shipmentWeightGrams != null) && {
+        ...((params.metadata || weightGrams != null) && {
           metadata: {
             ...(params.metadata ?? {}),
             // Stripe picks the rate AFTER the session exists, so the weight it was
             // priced at has to travel with the session to reach the order.
-            ...(params.shipping?.shipmentWeightGrams != null && {
-              shipping_weight_grams: String(params.shipping.shipmentWeightGrams),
-            }),
+            ...(weightGrams != null && { shipping_weight_grams: String(weightGrams) }),
           },
         }),
         ...(params.allowPromotionCodes && { allow_promotion_codes: true }),
         ...(params.automaticTax && { automatic_tax: { enabled: true } }),
-        ...(params.shipping && {
+        // Stripe keeps the phone apart from the address, in customer_details:
+        // settlement folds it back into the snapshot the order page reads.
+        ...(params.shipping?.collectPhone && { phone_number_collection: { enabled: true } }),
+        ...(chosen && {
+          // Typed at /checkout: prefilled, so the shopper is not asked twice.
+          ...(chosen.email && { customer_email: chosen.email }),
+          shipping_options: [
+            {
+              shipping_rate_data: {
+                type: 'fixed_amount' as const,
+                display_name: chosen.label,
+                fixed_amount: {
+                  amount: chosen.amountCents,
+                  currency: params.lineItems[0]?.currency ?? DEFAULT_CURRENCY,
+                },
+                metadata: { delivery: chosen.deliveryMethod },
+                ...(params.automaticTax && { tax_behavior: 'exclusive' as const }),
+              },
+            },
+          ],
+        }),
+        ...(!chosen && params.shipping && {
           shipping_address_collection: {
             allowed_countries: stripeAllowedCountries(
               params.shipping.addressCountries,
@@ -231,7 +256,7 @@ export function createStripeProvider(
         // rate is chosen on Stripe's page. `display_name` is the label we sent as
         // `shipping_rate_data.display_name`, so no duplicate metadata is needed.
         let shippingLabel: string | null = null;
-        let deliveryMethod: 'pickup' | 'shipping' | 'unknown' | null = null;
+        let deliveryMethod: DeliveryMethod | 'unknown' | null = null;
         const rateRef = session.shipping_cost?.shipping_rate;
         if (typeof rateRef === 'string') {
           try {
@@ -276,6 +301,7 @@ export function createStripeProvider(
               state: a.state ?? null,
               postal: a.postal_code ?? null,
               country: a.country ?? null,
+              ...(session.customer_details?.phone && { phone: session.customer_details.phone }),
             }
           : null;
 

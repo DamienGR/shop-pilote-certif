@@ -49,13 +49,16 @@ import { getEmailProvider } from '../../features/email';
 import { normalizeTimeZone, allTimeZones } from '../../features/settings/timeZone';
 import { WEIGHT_UNITS, isWeightUnit } from '../../features/shipping/weight';
 import { shippingFor } from '../../features/shipping/effective';
+import { getBoxtalSettings } from '../../features/shipping/boxtal/index.ts';
+import { BOXTAL_HOME_OFFERS, parseRetainedOffers, type BoxtalCollection } from '../../features/shipping/boxtal/offers.ts';
+import { BOXTAL_CONTENTS, boxtalContent } from '../../features/shipping/boxtal/contents.ts';
 import SecretField from '../../components/SecretField.astro';
 import MethodToggle from '../../components/MethodToggle.astro';
 import { onDemandImageDeliveryAvailable } from '../../features/products/image';
 import { catalogIsOrphaned } from '../../features/navigation/db';
 import { CACHE_TAG } from '../../features/cache/tags';
 import { purgeCacheTags } from '../../features/cache/purge';
-import { t, tn } from '../../features/i18n';
+import { t, tn, type MessageKey } from '../../features/i18n';
 
 const capabilities: RuntimeCapabilities = {
   vault: vaultReady(),
@@ -334,8 +337,33 @@ if (Astro.request.method === 'POST') {
         await applySecrets([secretName]);
       }
     }
-  } else if (action === 'save_shippo') {
-    await applySecrets(['shippo_api_key']);
+  } else if (action === 'save_boxtal') {
+    // The environment, the offers and the content are plain settings; the two
+    // key pairs go to the vault. Production is an explicit choice: absent means
+    // the sandbox, where nothing is billed.
+    const environment = String(form.get('boxtal_environment') ?? '');
+    const offers = parseRetainedOffers(JSON.stringify(form.getAll('boxtal_offers').map(String)));
+    const content = boxtalContent(String(form.get('boxtal_content') ?? ''));
+    await setSetting(env.DB, 'boxtal_environment', environment === 'live' ? 'live' : null);
+    await setSetting(env.DB, 'boxtal_offers', offers.length > 0 ? JSON.stringify(offers) : null);
+    await setSetting(env.DB, 'boxtal_content', content?.id ?? null);
+    await applySecrets(['boxtal_access_key', 'boxtal_secret_key', 'boxtal_quote_access_key', 'boxtal_quote_secret_key']);
+    // Shippo left the offer (ADR 0020): its key can only be removed now.
+    if (String(form.get('clear:shippo_api_key')) === '1') {
+      try {
+        await setSecret(env.DB, 'shippo_api_key', null);
+      } catch {}
+    }
+    // A key without its pair opens nothing; say so rather than look configured.
+    const pairs: [SecretName, SecretName][] = [
+      ['boxtal_access_key', 'boxtal_secret_key'],
+      ['boxtal_quote_access_key', 'boxtal_quote_secret_key'],
+    ];
+    for (const [access, secret] of pairs) {
+      if (!!(await getSecret(env.DB, access)) !== !!(await getSecret(env.DB, secret))) {
+        validationError = t('admin.settings.boxtal.error.halfPair');
+      }
+    }
   } else if (action === 'save_opennode') {
     await setSetting(env.DB, 'opennode_api_url', String(form.get('opennode_api_url') ?? '').trim() || null);
     await applySecrets(['opennode_api_key']);
@@ -518,6 +546,15 @@ const payments = {
 // D1 under SECRETS_KEK, never echoed back. Needs a KEK; without it the vault is
 // dormant (the store runs demo-only).
 const vault = capabilities.vault;
+
+// Boxtal (ADR 0020, 0021): the environment, the retained home offers and the
+// declared content; its keys are in the vault with the others.
+const boxtal = await getBoxtalSettings(env.DB);
+const COLLECTION_LABELS: Record<BoxtalCollection, MessageKey> = {
+  POST_OFFICE: 'admin.settings.boxtal.collection.POST_OFFICE',
+  DROPOFF_POINT: 'admin.settings.boxtal.collection.DROPOFF_POINT',
+  COMPANY: 'admin.settings.boxtal.collection.COMPANY',
+};
 const inD1 = (name: string) => settings.configuredSecrets.includes(name);
 // Per-method toggle/installed state, keyed by method for the cards below.
 const pmMap = Object.fromEntries(pmRows.map((r) => [r.m, r])) as Record<
@@ -831,18 +868,75 @@ const sections = [
       </form>
     </div>
 
-    {/* Shipping labels are optional infrastructure like the payment rails: the
-        card is one token field, and nothing label-related renders anywhere else
-        until the token exists. */}
-    <div class="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-4">
-      <p class="font-medium">{t('admin.settings.shippo.title')}</p>
+    {/* Shipping labels are optional infrastructure like the payment rails: nothing
+        label-related renders on an order until the v3 keys, an offer and a
+        content are here (ADR 0020). */}
+    <div id="boxtal" class="mb-4 scroll-mt-16 rounded-lg border border-gray-200 bg-white px-4 py-4">
+      <p class="font-medium">{t('admin.settings.boxtal.title')}</p>
       <p class="mt-1 text-xs text-gray-500">
-        {t('admin.settings.shippo.intro')}
-        <code class="text-[11px]">shippo_test_…</code> {t('admin.settings.shippo.introAfter')}
+        {t('admin.settings.boxtal.intro')}
       </p>
-      <form method="POST" class="mt-3 space-y-3">
-        <input type="hidden" name="_action" value="save_shippo" />
-        <SecretField name="shippo_api_key" label={t('admin.settings.shippo.token')} hint={t('admin.settings.shippo.tokenHint')} storedInD1={inD1('shippo_api_key')} vault={vault} />
+      <form method="POST" class="mt-3 space-y-4">
+        <input type="hidden" name="_action" value="save_boxtal" />
+        <fieldset class="space-y-1">
+          <legend class="mb-1 text-xs uppercase tracking-widest text-gray-400">{t('admin.settings.boxtal.environment')}</legend>
+          <label class="flex items-center gap-2 text-sm">
+            <input type="radio" name="boxtal_environment" value="sandbox" checked={boxtal.sandbox} class="size-4" />
+            {t('admin.settings.boxtal.sandbox')}
+          </label>
+          <label class="flex items-center gap-2 text-sm">
+            <input type="radio" name="boxtal_environment" value="live" checked={!boxtal.sandbox} class="size-4" />
+            {t('admin.settings.boxtal.live')}
+          </label>
+          <p class="text-xs text-gray-400">{t('admin.settings.boxtal.environmentHint')}</p>
+        </fieldset>
+        <div class="space-y-3">
+          <SecretField name="boxtal_access_key" label={t('admin.settings.boxtal.accessKey')} storedInD1={inD1('boxtal_access_key')} vault={vault} />
+          <SecretField name="boxtal_secret_key" label={t('admin.settings.boxtal.secretKey')} storedInD1={inD1('boxtal_secret_key')} vault={vault} />
+          <p class="text-xs text-gray-400">{t('admin.settings.boxtal.keysHint')}</p>
+        </div>
+        <div class="space-y-3">
+          <SecretField name="boxtal_quote_access_key" label={t('admin.settings.boxtal.quoteAccessKey')} storedInD1={inD1('boxtal_quote_access_key')} vault={vault} />
+          <SecretField name="boxtal_quote_secret_key" label={t('admin.settings.boxtal.quoteSecretKey')} storedInD1={inD1('boxtal_quote_secret_key')} vault={vault} />
+          <p class="text-xs text-gray-400">{t('admin.settings.boxtal.quoteKeysHint')}</p>
+        </div>
+        <fieldset class="space-y-1">
+          <legend class="mb-1 text-xs uppercase tracking-widest text-gray-400">{t('admin.settings.boxtal.offers')}</legend>
+          {BOXTAL_HOME_OFFERS.map((offer) => (
+            <label class="flex items-baseline gap-2 text-sm">
+              <input type="checkbox" name="boxtal_offers" value={offer.code} checked={boxtal.offers.includes(offer.code)} class="size-4 self-center" />
+              <span>
+                {offer.carrier} · {offer.service}
+                <span class="text-xs text-gray-400"> · {t(COLLECTION_LABELS[offer.collection])}</span>
+              </span>
+            </label>
+          ))}
+          <p class="text-xs text-gray-400">{t('admin.settings.boxtal.offersHint')}</p>
+        </fieldset>
+        <label class="flex flex-col gap-1 text-xs uppercase tracking-widest text-gray-400">
+          {t('admin.settings.boxtal.content')}
+          <select
+            name="boxtal_content"
+            class="w-80 max-w-full rounded-md border border-gray-300 px-3 py-2 text-sm normal-case tracking-normal text-gray-900 focus:border-brand focus:outline-none"
+          >
+            <option value="">{t('admin.settings.boxtal.contentNone')}</option>
+            {BOXTAL_CONTENTS.map((content) => (
+              <option value={content.id} selected={content.id === boxtal.contentId}>
+                {content.label}
+              </option>
+            ))}
+          </select>
+          <span class="text-xs normal-case tracking-normal text-gray-400">{t('admin.settings.boxtal.contentHint')}</span>
+        </label>
+        {inD1('shippo_api_key') && (
+          <div class="rounded-md border border-gray-100 bg-gray-50 p-3 text-xs text-gray-600">
+            <p>{t('admin.settings.boxtal.shippoLeft')}</p>
+            <label class="mt-2 flex items-center gap-2">
+              <input type="checkbox" name="clear:shippo_api_key" value="1" class="size-4" />
+              {t('admin.settings.boxtal.shippoRemove')}
+            </label>
+          </div>
+        )}
         {vault && (
           <button type="submit" class="mt-1 rounded-md bg-brand px-4 py-2 text-xs font-medium uppercase tracking-wider text-white hover:bg-brand-hover">
             {t('admin.common.save')}

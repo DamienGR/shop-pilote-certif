@@ -52,3 +52,26 @@ export function trackingUrl(carrier: string | null, number: string | null): stri
       return null; // 'other' / unknown — show the number without a link
   }
 }
+
+/**
+ * The link for an order's tracking number: the carrier page the label provider
+ * returned with the parcel (ADR 0021), else one built from a number typed by
+ * hand. The stored URL is a provider's text and lands in an e-mail's href, so
+ * only an https URL is a link, and it goes out as the URL parser serializes it
+ * (quotes and angle brackets percent-encoded), never as received.
+ */
+export function orderTrackingUrl(order: {
+  tracking_carrier: string | null;
+  tracking_number: string | null;
+  tracking_url?: string | null;
+}): string | null {
+  if (order.tracking_url && order.tracking_number) {
+    try {
+      const parsed = new URL(order.tracking_url);
+      if (parsed.protocol === 'https:') return parsed.href;
+    } catch {
+      // Not a URL: fall back to the carrier's pattern.
+    }
+  }
+  return trackingUrl(order.tracking_carrier, order.tracking_number);
+}

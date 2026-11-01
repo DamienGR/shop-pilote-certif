@@ -85,6 +85,7 @@ describe('classifyRateDelivery', () => {
   it('reads the stamped mode', () => {
     expect(classifyRateDelivery({ delivery: 'pickup' })).toBe('pickup');
     expect(classifyRateDelivery({ delivery: 'shipping' })).toBe('shipping');
+    expect(classifyRateDelivery({ delivery: 'relay' })).toBe('relay');
   });
   it('treats anything unstamped as unknown, never as delivery', () => {
     // 'unknown' blocks label purchase until reconciled; guessing 'shipping'

@@ -5,7 +5,8 @@ import {
   productEmailImageUrl,
   type ImageDelivery,
 } from '../products/image';
-import { shippedCarrierName, trackingUrl } from '../orders/tracking';
+import { orderTrackingUrl, shippedCarrierName } from '../orders/tracking';
+import { orderRelayPoint, relayPointLines } from '../shipping/relay.ts';
 import { t, formatNumber } from '../i18n/index.ts';
 import type { EmailMessage } from './provider';
 import {
@@ -87,6 +88,22 @@ function formatShipAddress(order: Order): string {
 }
 
 /**
+ * The relay point a relay order is collected at, under its heading: the
+ * shopper reads where to go, the merchant also reads the code the label needs.
+ */
+function relayBlock(order: Order, heading: string, withCode = false): { text: string[]; html: string } {
+  const point = orderRelayPoint(order);
+  if (!point) return { text: [], html: '' };
+  const lines = [...relayPointLines(point), ...(withCode ? [t('email.relay.code', { code: point.code })] : [])];
+  return {
+    text: [``, `${heading} :`, ...lines],
+    html:
+      emailLabel(heading) +
+      `<p style="margin:0;font-size:14px;line-height:1.6;">${lines.map((line) => escapeHtml(line)).join('<br>')}</p>`,
+  };
+}
+
+/**
  * Build the order-confirmation email for a paid order. `order.email` must be set.
  * `baseUrl` is the site origin (e.g. https://shop.example.com) for the order link.
  */
@@ -104,6 +121,7 @@ export function orderConfirmationEmail(
   const money = (cents: number) => formatPrice(cents, order.currency);
   const orderUrl = guestOrderUrl ?? null;
   const hasDigital = items.some((item) => Boolean(item.file_key));
+  const relay = relayBlock(order, t('email.relay.heading'));
 
   const rows = items.map(
     (it) => `${it.name} × ${it.quantity}: ${money(it.price_cents * it.quantity)}`,
@@ -116,6 +134,7 @@ export function orderConfirmationEmail(
     ``,
     ...rows,
     ...totalLines(order, money),
+    ...relay.text,
     ...(hasDigital && orderUrl ? [``, t('email.order.download')] : []),
     ...(orderUrl ? [``, t('email.order.viewOrderLine', { url: orderUrl })] : []),
   ].join('\n');
@@ -134,6 +153,7 @@ export function orderConfirmationEmail(
         })),
         totalRows(order, money),
       ) +
+      relay.html +
       (hasDigital && orderUrl
         ? `<p style="margin:20px 0 0;font-size:14px;">${escapeHtml(t('email.order.download'))}</p>`
         : '') +
@@ -170,6 +190,7 @@ export function orderNotificationEmail(
   const num = orderReference(order.public_id, order.id, getConfig().orderNumber);
   const money = (cents: number) => formatPrice(cents, order.currency);
   const shipText = formatShipAddress(order);
+  const relay = relayBlock(order, t('email.notification.relayPoint'), true);
   const adminUrl = `${baseUrl}/admin/orders/${order.public_id ?? order.id}`;
 
   const rows = items.map(
@@ -184,6 +205,7 @@ export function orderNotificationEmail(
     ``,
     `${t('email.notification.shipTo')} :`,
     shipText,
+    ...relay.text,
     ``,
     ...rows,
     ...totalLines(order, money),
@@ -205,6 +227,7 @@ export function orderNotificationEmail(
       )}<br><span style="font-family:monospace;">${escapeHtml(publicId)}</span></p>` +
       emailLabel(t('email.notification.shipTo')) +
       `<p style="margin:0;font-size:14px;line-height:1.6;">${escapeHtml(shipText).replace(/\n/g, '<br>')}</p>` +
+      relay.html +
       emailItemsTable(
         items.map((it) => ({
           thumb: thumbCell(it.image_key, baseUrl, imageDelivery),
@@ -234,9 +257,10 @@ export function orderShippedEmail(
 ): EmailMessage {
   const cfg = getConfig();
   const num = orderReference(order.public_id, order.id, cfg.orderNumber);
-  const url = trackingUrl(order.tracking_carrier, order.tracking_number);
+  const url = orderTrackingUrl(order);
   const carrier = shippedCarrierName(order.tracking_carrier);
   const orderUrl = guestOrderUrl ?? null;
+  const relay = relayBlock(order, t('email.shipped.relayPoint'));
 
   const text = [
     t('email.shipped.text', { numero: num }),
@@ -248,6 +272,7 @@ export function orderShippedEmail(
           ...(url ? [t('email.shipped.trackLine', { url })] : []),
         ]
       : []),
+    ...relay.text,
     ...(orderUrl ? [``, t('email.order.viewOrderLine', { url: orderUrl })] : []),
   ].join('\n');
 
@@ -269,6 +294,7 @@ export function orderShippedEmail(
     subheading: t('email.shipped.subheading', { numero: num }),
     body:
       trackingHtml +
+      relay.html +
       (url
         ? emailButton(url, t('email.shipped.trackButton'))
         : orderUrl

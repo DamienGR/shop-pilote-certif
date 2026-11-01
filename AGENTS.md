@@ -198,7 +198,11 @@ src/
     orders/    db · number · reservations (atomic checkout stock holds)
     payments/  provider (port) · stripe · opennode · lightning-provider · index (factory)
                lightning/  backend (port) · phoenixd · lnbits · index · rate · pending
-    shipping/  calculator (zones + ShippingCalculator port)
+    shipping/  calculator (zones + ShippingCalculator port) · provider (label, relay-point, quote ports)
+               recipient (the phone checkout asks once Boxtal buys the labels)
+               relay (the point /checkout lists: cached search, served-code check, snapshot)
+               labels (Shippo, disabled: ADR 0020) · labelStore (label state machine)
+               boxtal/  v3 · quote (v1) · offers · contents · orderLabel (the order page's steps) · index
     storage/   provider (port) · r2 · index (factory)
     email/     provider (port) · resend · cloudflare · index (factory) · orderConfirmation
     search/    provider (port) · fts · vector · index (factory) · query
@@ -230,6 +234,7 @@ To swap/add a provider, write one adapter file + wire the factory:
 | `PaymentProvider` | `payments/provider.ts` | `payments/index.ts` | stripe, opennode, lightning |
 | `LightningBackend` | `payments/lightning/backend.ts` | `payments/lightning/index.ts` | phoenixd, lnbits |
 | `ShippingCalculator` | `shipping/calculator.ts` | (config-rates) | carrier rates (future) |
+| `LabelProvider`, `PickupPointProvider`, `ShippingQuoteProvider` | `shipping/provider.ts` | `shipping/boxtal/index.ts` | boxtal (v3; the quote on v1, optional) |
 | `StorageProvider` | `storage/provider.ts` | `storage/index.ts` | r2 |
 | `EmailProvider` | `email/provider.ts` | `email/index.ts` | resend, cloudflare |
 | `SearchProvider` | `search/provider.ts` | `search/index.ts` | fts, vector (Workers AI + Vectorize) |
@@ -390,6 +395,13 @@ total, never per line.
   `features/payments/lightning/<name>.ts`; add a case to `getLightningBackend()`.
 - **A shipping zone/rate:** edit `shipping.zones` in `config.ts` default (or
   `store.config.ts`). Pure logic lives in `shipping/calculator.ts` — unit-test it.
+  A relay rate names a Boxtal relay offer (`BOXTAL_RELAY_OFFERS`) and is quoted
+  only to a caller that passes it in `relayOffers`: a surface that cannot let
+  the shopper pick a point never shows one. `/checkout` is that surface; the
+  point it lists rides the reservation to the order (`relay_point`). A card
+  payment to a zone with a relay rate goes through it too (`zoneOffersRelay`):
+  Stripe then gets the chosen rate alone, and the address rides the
+  reservation (`ship_address`).
 - **A migration:** `npx wrangler d1 migrations create minshop-db <name>` → edit →
   `npm run db:migrate` (local). A deployed environment is migrated by
   `shopctl deploy`, which backs production up first — never migrate it by hand.

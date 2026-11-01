@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 // .mjs like its neighbours: tsconfig pins `types` to the Cloudflare types, so
 // node builtins have no declarations in a .ts file here.
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { EXIT_CODES } from '../../shopctl/src/errors.mjs';
@@ -11,7 +12,7 @@ import { OWNER_TABLE, judgeOwner } from '../../shopctl/src/owner.mjs';
 import { classifyTables } from '../../shopctl/src/backup/schema.mjs';
 import { collisionFindings } from '../../shopctl/src/commands/fleet.mjs';
 import { loadManifest } from '../../scripts/manifest.mjs';
-import { names, shop } from '../helpers/provisioned-shop.mjs';
+import { ACCOUNT, OTHER_ACCOUNT, names, shop } from '../helpers/provisioned-shop.mjs';
 
 /**
  * The guard of the shared account (ADR 0019).
@@ -105,6 +106,16 @@ describe('the marker provision writes', () => {
     expect(marker(target)).toHaveLength(1);
   });
 
+  // The line is read as "this database is claimed". Printed before the write,
+  // it stood above the error of a write that never happened (lot 8).
+  it('is announced once written, not before', () => {
+    const target = shop({ forge: true });
+    target.account({ failAt: 'd1 execute' });
+    const result = target.run(['provision', '--env', 'staging']);
+    expect(result.status).toBe(EXIT_CODES.external);
+    expect(result.stdout).not.toMatch(/marquée pour/);
+  });
+
   it('is only announced by a dry run', () => {
     const target = shop({ forge: true });
     const { report, status } = target.json(['provision', '--env', 'staging', '--dry-run']);
@@ -148,6 +159,66 @@ describe('the marker provision writes', () => {
     const { tables, skipped } = classifyTables(master);
     expect(tables.map((table) => table.name)).toEqual(['products']);
     expect(skipped).toContainEqual({ name: OWNER_TABLE, reason: 'propriétaire' });
+  });
+});
+
+/**
+ * A tree whose `wrangler.jsonc` was rendered for the same environment on
+ * ANOTHER account: the migration of lot 8 (2026-10-29), where the backup on the
+ * merchant's account left its render behind and `provision` ran next on the
+ * shared one. Wrangler takes a configuration entry of the right name at its
+ * word, id included, so every call by name went to the other account's id.
+ */
+describe('a configuration left by another account', () => {
+  /** The same tree moved to another account: a state of its own, in a
+   *  directory of its own (the double keeps D1's bytes beside its state, by
+   *  name), and the manifest naming it. */
+  function moved(target) {
+    const state = join(mkdtempSync(join(tmpdir(), 'shopctl-other-account-')), 'cf-state.json');
+    writeFileSync(state, JSON.stringify({ authenticated: true, accounts: [OTHER_ACCOUNT], d1: [], r2: [], workers: [], calls: [] }, null, 2));
+    const manifest = join(target.root, 'client/client.yaml');
+    writeFileSync(manifest, readFileSync(manifest, 'utf8').replace(`accountId: ${ACCOUNT.id}`, `accountId: ${OTHER_ACCOUNT.id}`));
+    return {
+      run: (args) => target.run(args, { WRANGLER_DOUBLE_STATE: state }),
+      read: () => JSON.parse(readFileSync(state, 'utf8')),
+    };
+  }
+
+  const config = (target) => join(target.root, 'wrangler.jsonc');
+
+  it('does not send provision to the database it names', () => {
+    const target = provisioned();
+    const stale = readFileSync(config(target), 'utf8');
+    const elsewhere = moved(target);
+
+    const result = elsewhere.run(['provision', '--env', 'staging']);
+    expect(result.status, result.stderr).toBe(EXIT_CODES.ok);
+    const [database] = elsewhere.read().d1;
+    expect(stale).not.toContain(database.uuid);
+    expect(readFileSync(config(target), 'utf8')).toContain(database.uuid);
+
+    // Marked, and found marked by the next run rather than claimed again.
+    const again = elsewhere.run(['provision', '--env', 'staging']);
+    expect(again.stdout).toMatch(new RegExp(`${database.name} — marquée pour ${target.slug} \\(${target.nameWithOwner}\\)\\n`));
+  });
+
+  it('does not send backup, deploy or destroy to it either', () => {
+    const target = provisioned();
+    const stale = readFileSync(config(target), 'utf8');
+    const elsewhere = moved(target);
+    expect(elsewhere.run(['provision', '--env', 'staging']).status).toBe(EXIT_CODES.ok);
+    expect(target.run(['backup', 'keygen']).status).toBe(EXIT_CODES.ok);
+
+    for (const args of [
+      ['backup', '--env', 'staging'],
+      ['deploy', '--env', 'staging', ...FAST],
+      ['destroy', '--env', 'staging', '--confirm', target.slug, '--dry-run'],
+    ]) {
+      writeFileSync(config(target), stale);
+      const result = elsewhere.run(args);
+      expect(result.status, `${args.join(' ')}: ${result.stderr}`).toBe(EXIT_CODES.ok);
+      expect(result.stdout, args.join(' ')).toMatch(/marquée pour/);
+    }
   });
 });
 

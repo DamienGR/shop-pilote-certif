@@ -343,6 +343,40 @@ describe('validateShippingDocument', () => {
     });
     expect(messages(bad)).toContain('Indiquez un prix.');
   });
+  it('accepts a relay rate priced like a home rate, and checks its offer’s shape', () => {
+    const relay = (pricing: unknown) =>
+      doc({
+        zones: [
+          {
+            ...doc().zones[0]!,
+            rates: [{ label: 'Mondial Relay', pricing: pricing as RuntimeShippingConfig['zones'][number]['rates'][number]['pricing'] }],
+          },
+        ],
+      });
+    const flat = { type: 'flat', amountCents: 390 };
+    expect(validateShippingDocument(relay({ type: 'relay', offer: 'MONR-CpourToi', price: flat }))).toEqual([]);
+    expect(
+      validateShippingDocument(
+        relay({ type: 'relay', offer: 'CHRP-ChronoRelais', price: { type: 'weight', bands: [{ upToGrams: null, amountCents: 590 }] } }),
+      ),
+    ).toEqual([]);
+    // A code this core does not list is still well formed: checkout drops it.
+    expect(validateShippingDocument(relay({ type: 'relay', offer: 'ABCD-Retired', price: flat }))).toEqual([]);
+    expect(messages(relay({ type: 'relay', offer: 'MONRCpourToi', price: flat }))).toContain(
+      'Choisissez une offre de point relais.',
+    );
+    expect(messages(relay({ type: 'relay', offer: 'MONR-CpourToi', price: { type: 'pickup', amountCents: 0 } }))).toContain(
+      'Choisissez un mode de tarification.',
+    );
+    expect(messages(relay({ type: 'relay', offer: 'MONR-CpourToi', price: { type: 'flat', amountCents: -1 } }))).toContain(
+      'Indiquez un prix.',
+    );
+  });
+  it('reads a document an older core saved, and refuses one from a newer core', () => {
+    expect(parseRuntimeShippingConfig(serializeRuntimeShippingConfig(doc({ schema: 3 }))).status).toBe('valid');
+    expect(SHIPPING_SCHEMA_VERSION).toBe(4);
+    expect(parseRuntimeShippingConfig(serializeRuntimeShippingConfig(doc({ schema: 5 }))).status).toBe('invalid');
+  });
   it('requires at least one band on a weight rate', () => {
     const empty = doc({
       zones: [
@@ -498,6 +532,77 @@ describe('parseShippingForm', () => {
     const { document, errors } = parseShippingForm(form, { currency: 'usd', unit: 'g' });
     expect(errors).toEqual([]);
     expect(document.zones[0]!.rates[0]!.pricing).toEqual({ type: 'pickup', amountCents: 0 });
+  });
+  it('parses a relay rate from the editor, flat or by weight, on an offer it can buy', () => {
+    const relayForm = (pricing: 'flat' | 'weight', offer = 'MONR-CpourToi') =>
+      new TestForm()
+        .set('enabled', '1')
+        .set('revision', '1')
+        .set('zone_order', 'z_a')
+        .set('zone[z_a][name]', 'France')
+        .set('zone[z_a][countries][]', 'FR')
+        .set('zone[z_a][rate_order]', 'r_1')
+        .set('zone[z_a][rate][r_1][label]', 'Point relais')
+        .set('zone[z_a][rate][r_1][mode]', 'relay')
+        .set('zone[z_a][rate][r_1][relay_offer]', offer)
+        .set('zone[z_a][rate][r_1][relay_pricing]', pricing)
+        .set('zone[z_a][rate][r_1][amount]', '3.90')
+        .set('zone[z_a][rate][r_1][band_order]', 'b_1')
+        .set('zone[z_a][rate][r_1][band][b_1][no_max]', '1')
+        .set('zone[z_a][rate][r_1][band][b_1][amount]', '4.90');
+    const options = { currency: 'eur', unit: 'g' as const, relayOffers: ['MONR-CpourToi'] };
+
+    const flat = parseShippingForm(relayForm('flat'), options);
+    expect(flat.errors).toEqual([]);
+    expect(flat.document.zones[0]!.rates[0]!.pricing).toEqual({
+      type: 'relay',
+      offer: 'MONR-CpourToi',
+      price: { type: 'flat', amountCents: 390 },
+    });
+    expect(flat.model.zones[0]!.rates[0]).toMatchObject({ mode: 'relay', relayOffer: 'MONR-CpourToi', relayPricing: 'flat' });
+
+    const weight = parseShippingForm(relayForm('weight'), options);
+    expect(weight.errors).toEqual([]);
+    expect(weight.document.zones[0]!.rates[0]!.pricing).toEqual({
+      type: 'relay',
+      offer: 'MONR-CpourToi',
+      price: { type: 'weight', bands: [{ upToGrams: null, amountCents: 490 }] },
+    });
+
+    // An offer outside the catalogue is refused on save, once; a blank one too.
+    for (const offer of ['UPSE-StandardAP', '']) {
+      const refused = parseShippingForm(relayForm('flat', offer), options);
+      expect(refused.errors.filter((e) => e.field === 'offer').map((e) => e.message)).toEqual([
+        'Choisissez une offre de point relais.',
+      ]);
+    }
+  });
+  it('round-trips a relay rate through the editor model', () => {
+    const relayDoc = doc({
+      zones: [
+        {
+          ...doc().zones[0]!,
+          rates: [
+            {
+              label: 'Chrono Relais',
+              pricing: {
+                type: 'relay',
+                offer: 'CHRP-ChronoRelais',
+                price: { type: 'weight', bands: [{ upToGrams: 1000, amountCents: 590 }] },
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const [rate] = documentToForm(relayDoc, 'eur', 'g', formatWeightValue).zones[0]!.rates;
+    expect(rate).toMatchObject({
+      mode: 'relay',
+      relayOffer: 'CHRP-ChronoRelais',
+      relayPricing: 'weight',
+      amountValue: '',
+      bands: [{ upToValue: '1000', noMax: false, amountValue: '5.9' }],
+    });
   });
   it('scales amounts by the currency, not by a hardcoded 100', () => {
     const { document } = parseShippingForm(submitted(), { currency: 'jpy', unit: 'g' });

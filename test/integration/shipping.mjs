@@ -69,13 +69,16 @@ const SCHEMA = `
                        status TEXT NOT NULL DEFAULT 'paid',
                        fulfillment_status TEXT NOT NULL DEFAULT 'unfulfilled',
                        tracking_carrier TEXT, tracking_number TEXT,
-                       fulfilled_at TEXT, label_url TEXT, delivery_method TEXT);
+                       fulfilled_at TEXT, label_url TEXT, tracking_url TEXT,
+                       delivery_method TEXT);
   CREATE TABLE shipping_labels (order_id INTEGER PRIMARY KEY,
                                 status TEXT NOT NULL, shipment_id TEXT NOT NULL,
                                 rate_id TEXT, transaction_id TEXT, provider TEXT,
                                 service TEXT, amount_cents INTEGER,
                                 tracking_number TEXT, label_url TEXT, error TEXT,
                                 claim_token TEXT,
+                                vendor TEXT NOT NULL DEFAULT 'shippo',
+                                parcel TEXT, offers TEXT,
                                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                                 updated_at TEXT NOT NULL DEFAULT (datetime('now')));
   CREATE TABLE shipping_label_attempts (
@@ -87,6 +90,7 @@ const SCHEMA = `
                                 transaction_id TEXT, provider TEXT, service TEXT,
                                 amount_cents INTEGER, tracking_number TEXT,
                                 label_url TEXT, error TEXT,
+                                vendor TEXT NOT NULL DEFAULT 'shippo',
                                 created_at TEXT NOT NULL,
                                 settled_at TEXT NOT NULL DEFAULT (datetime('now')));
   CREATE TABLE order_notifications (order_id INTEGER NOT NULL, kind TEXT NOT NULL,
@@ -141,6 +145,30 @@ await check('an edit at the current revision succeeds and increments it', async 
   const second = await saveRuntimeShippingConfig(db, 1, document({ zones: [zone('US', 700)] }));
   assert.equal(second.ok, true);
   assert.equal(second.config.revision, 2);
+});
+
+await check('a relay rate saves as schema 4 and reads back whole', async () => {
+  // Schema 4, so a core that knows 3 at most fails closed on the document
+  // instead of dropping the relay rate it does not understand.
+  const db = await freshDb();
+  const relay = {
+    ...zone(),
+    countries: ['FR'],
+    rates: [
+      { label: 'Colissimo', pricing: { type: 'flat', amountCents: 690 } },
+      {
+        label: 'Mondial Relay',
+        pricing: { type: 'relay', offer: 'MONR-CpourToi', price: { type: 'flat', amountCents: 390 } },
+      },
+    ],
+  };
+  const saved = await saveRuntimeShippingConfig(db, 0, document({ zones: [relay] }));
+  assert.equal(saved.ok, true);
+  const raw = await readRaw(db);
+  assert.equal(JSON.parse(raw).schema, 4);
+  const parsed = parseRuntimeShippingConfig(raw);
+  assert.equal(parsed.status, 'valid');
+  assert.deepEqual(parsed.config.zones[0].rates[1].pricing, relay.rates[1].pricing);
 });
 
 await check('two writes from the same revision: exactly one wins', async () => {

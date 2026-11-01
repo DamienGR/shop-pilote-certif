@@ -216,7 +216,7 @@ export async function runDeploy(args, reporter) {
   // Before the backup, the migrations and the upload: on a shared account
   // (ADR 0019) the database found by this name may be another shop's, and
   // everything below would write into it.
-  guardOwner({ database: names.database, root, manifest, env, reporter });
+  guardOwner({ database: names.database, databaseId, root, manifest, env, reporter });
 
   // Re-asked at every deploy, not only at provisioning. The bucket holds the
   // merchant's paid downloads and it is one dashboard click from being public;
@@ -363,7 +363,10 @@ export async function runDeploy(args, reporter) {
   // the origin of a gated staging or of any production would be nothing at all.
   const host = environmentHost(manifest, env);
   const origin = args.values['--url'] ?? (host ? `https://${host}` : originFromDeployOutput(`${uploaded.stdout}\n${uploaded.stderr}`));
-  reporter.ok(`${names.worker} déployé${origin ? ` — ${origin}` : ''}`);
+  // A pending hostname is said on this line too: read alone, as a deploy log
+  // is, "déployé — https://…" promised an address that did not answer yet.
+  const pending = hostnamePending && host && origin === `https://${host}` ? ' (nom d\'hôte en attente : n\'y répond pas encore)' : '';
+  reporter.ok(`${names.worker} déployé${origin ? ` — ${origin}${pending}` : ''}`);
 
   // ── The secrets provisioning could not set ────────────────────────────────
   //

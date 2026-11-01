@@ -4,6 +4,7 @@ import { applyMigrations } from '../helpers/d1-schema.mjs';
 import { sweepAbandonedGuestAccess } from '../../src/features/orders/guestAccess.ts';
 import { listOrderItems, listOrderItemsWithImages } from '../../src/features/orders/db.ts';
 import { listAllProducts } from '../../src/features/products/db.ts';
+import { listLabelsNeedingAttention } from '../../src/features/shipping/labelStore.ts';
 import { parseCsvRecords } from '../../shopctl/src/catalog/csv.mjs';
 import { buildCatalogue } from '../../shopctl/src/catalog/contract.mjs';
 import { resolveCatalogueImages } from '../../shopctl/src/catalog/media.mjs';
@@ -87,6 +88,8 @@ try {
          FROM n WHERE i <= ${ORDERS}`,
     `INSERT INTO product_variants (product_id, label, price_cents, stock, sku, position)
        SELECT (i % ${PRODUCTS}) + 1, 'T' || i, 1000, 5, 'HV-' || i, i FROM n WHERE i <= ${VARIANTS}`,
+    `INSERT INTO shipping_labels (order_id, status, shipment_id, vendor)
+       SELECT i, 'purchased', printf('ord_h%09d-ref', i), 'boxtal' FROM n WHERE i <= ${ORDERS}`,
   ];
   for (const sql of seed) {
     await raw.prepare(`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ${ORDERS}) ${sql}`).run();
@@ -122,6 +125,14 @@ try {
   const idle = take();
   assert.ok(idle < 20, `once caught up, a sweep reads ${idle} rows`);
   console.log(`  ✓ sweep: ${worst} rows per call at most, ${idle} once caught up (was ${2 * ORDERS} every call)`);
+
+  // ── The orders list's label banner: the purchases to settle, not every label ──
+  await raw.prepare(`UPDATE shipping_labels SET status = 'uncertain' WHERE order_id = ${ORDERS / 2}`).run();
+  const toSettle = await listLabelsNeedingAttention(db);
+  const banner = take();
+  assert.deepEqual(toSettle.map((label) => label.order_id), [ORDERS / 2]);
+  assert.ok(banner < 10, `the label banner reads ${banner} rows, not every label bought`);
+  console.log(`  ✓ labels to settle: ${banner} rows (a scan would be ${ORDERS})`);
 
   // ── One order's lines ──
   await listOrderItems(db, ORDERS / 2);

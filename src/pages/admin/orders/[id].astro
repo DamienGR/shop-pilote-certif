@@ -4,23 +4,25 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { formatPrice, formatDate, getConfig } from '../../../config';
 import { getOrderByPublicId, listOrderItemsWithImages, listOrderInventoryExceptions } from '../../../features/orders/db';
 import { orderReference } from '../../../features/orders/number';
-import { CARRIERS, carrierName, trackingUrl } from '../../../features/orders/tracking';
-import { getSecret } from '../../../features/secrets/store';
+import { CARRIERS, carrierName, orderTrackingUrl } from '../../../features/orders/tracking';
 import { getEmailProvider } from '../../../features/email';
 import { getStoreSettings } from '../../../features/settings/db';
 import { getSetting } from '../../../features/settings/db';
 import { formatWeightValue } from '../../../features/shipping/weight';
 import {
-  distanceUnitFor,
-  getShipmentRates,
-  type LabelRate,
-  type ShipFrom,
-} from '../../../features/shipping/labels.ts';
-import {
   getLabelRecord,
   isPurchaseStale,
   listLabelAttempts,
 } from '../../../features/shipping/labelStore';
+import { getBoxtalLabelContext } from '../../../features/shipping/boxtal/index.ts';
+import { relayOffer } from '../../../features/shipping/boxtal/offers.ts';
+import { orderRelayPoint, relayPointLines } from '../../../features/shipping/relay.ts';
+import {
+  parseQuotedOffers,
+  parseSender,
+  splitName,
+  type LabelSender,
+} from '../../../features/shipping/boxtal/orderLabel.ts';
 import { shouldSendCustomerOrderEmail } from '../../../features/email/orderPolicy';
 import RefundPanel from '../../../features/refunds/RefundPanel.astro';
 import { formatWeight } from '../../../features/shipping/weight';
@@ -70,63 +72,82 @@ const inventoryExceptions = await listOrderInventoryExceptions(env.DB, order.id)
 const fulfilled = order.fulfillment_status === 'fulfilled';
 const weightUnit = Astro.locals.settings?.weightUnit ?? 'g';
 
-// ── Shipping label (Shippo) ──────────────────────────────────────────────────
-// Gated on the token (stores without Shippo see nothing) and on the order being
-// a paid, unfulfilled DELIVERY order — pickup orders have no parcel to send.
-// All label state lives in this order's shipping_labels row; the page never
-// reads a shipment id from the URL, so another order's quote cannot be spliced
-// in. Rates render on a plain GET, so the flow needs no JS.
-const shippoToken = await getSecret(env.DB, 'shippo_api_key');
-// canLabel gates QUOTING AND BUYING only. The label record itself is loaded
-// unconditionally: a purchased label whose order refused fulfillment (refund
-// mid-purchase, forced manual fulfil) is money already spent, and it must stay
-// visible on fulfilled/refunded orders — even if the Shippo token was removed.
+// ── Shipping label (Boxtal) ──────────────────────────────────────────────────
+// Gated on Boxtal's keys (a shop without them ships by hand, as before: ADR
+// 0020) and on the order being a paid, unfulfilled DELIVERY order — pickup
+// orders have no parcel to send. All label state lives in this order's
+// shipping_labels row; the page never reads a reference from the URL, so
+// another order's quote cannot be spliced in. Offers render on a plain GET,
+// so the flow needs no JS.
+const boxtal = await getBoxtalLabelContext(env.DB, order.currency);
+const boxtalSettings = boxtal?.settings ?? null;
+// The label record is loaded unconditionally: a purchased label whose order
+// refused fulfillment (refund mid-purchase, forced manual fulfil) is money
+// already spent, and it must stay visible on fulfilled/refunded orders — even
+// if the keys were removed.
 const labelRecord = await getLabelRecord(env.DB, order.id);
 const labelAttempts = await listLabelAttempts(env.DB, order.id);
-const canLabel =
-  !!shippoToken &&
+const labelEligible =
   !!order.ship_address &&
   !fulfilled &&
   order.status === 'paid' &&
-  // Exactly 'shipping': pickup orders have no parcel, and 'unknown' (a Stripe
-  // settlement that lost the rate lookup) must be reconciled, not guessed at.
-  // 0036 backfilled legacy physical orders, so NULL here really means unknown.
-  order.delivery_method === 'shipping';
-let labelRates: LabelRate[] = [];
-let labelRatesError: string | null = null;
-if (canLabel && labelRecord?.status === 'quoted' && shippoToken) {
-  const rates = await getShipmentRates(shippoToken, labelRecord.shipment_id);
-  if (rates.ok) labelRates = rates.value;
-  else labelRatesError = rates.error;
-}
+  // Exactly 'shipping' or 'relay': pickup orders have no parcel, and 'unknown'
+  // (a Stripe settlement that lost the rate lookup) must be reconciled, not
+  // guessed at. 0036 backfilled legacy physical orders, so NULL here really
+  // means unknown.
+  (order.delivery_method === 'shipping' || order.delivery_method === 'relay');
+// Keys alone are not enough: a label needs an offer to buy and a declared
+// content. A relay order brings its offer with its point.
+const labelSettingsReady =
+  !!boxtalSettings &&
+  (order.delivery_method === 'relay' || boxtalSettings.offers.length > 0) &&
+  !!boxtalSettings.contentId;
+const canLabel = !!boxtal && labelSettingsReady && labelEligible;
+const boxtalLabel = labelRecord?.vendor === 'boxtal';
+const quoted =
+  canLabel && boxtalLabel && labelRecord?.status === 'quoted' ? parseQuotedOffers(labelRecord.offers) : null;
 // A purchasing row inside its lease has a live request behind it: show progress,
-// allow nothing. Past the lease it is a crash mid-flight — same reconciliation
-// as an ambiguous outcome: human checks the dashboard, then discards.
+// allow nothing. Past the lease it is a crash mid-flight — the same human
+// settlement as an ambiguous outcome.
 const labelInFlight = labelRecord?.status === 'purchasing' && !isPurchaseStale(labelRecord);
+const labelUncertain =
+  labelRecord?.status === 'uncertain' ||
+  (labelRecord?.status === 'purchasing' && isPurchaseStale(labelRecord));
+// Bought, and Boxtal has not confirmed it yet: the number comes on a re-read.
+const labelAwaitingTracking =
+  boxtalLabel && labelRecord?.status === 'purchased' && !labelRecord.tracking_number && !fulfilled;
 // Paid for but not what the order shows: the order refused fulfillment (refund
 // mid-purchase) or was fulfilled another way. Rendered persistently — this must
 // survive the transient redirect notice.
 const labelUnreconciled =
   labelRecord?.status === 'purchased' &&
-  (order.tracking_number !== labelRecord.tracking_number || order.label_url !== labelRecord.label_url);
-const labelUncertain =
-  labelRecord?.status === 'uncertain' ||
-  (labelRecord?.status === 'purchasing' && isPurchaseStale(labelRecord));
-let shipFrom: Partial<ShipFrom> = {};
+  (labelRecord.tracking_number
+    ? order.tracking_number !== labelRecord.tracking_number || order.label_url !== labelRecord.label_url
+    : fulfilled);
+// A Boxtal label is read again on each download (ADR 0021); a Shippo one kept its URL.
+const labelHref =
+  labelRecord?.status === 'purchased'
+    ? boxtalLabel
+      ? `/api/admin/orders/${order.public_id}/label`
+      : labelRecord.label_url
+    : null;
+const orderLabelHref =
+  order.label_url ??
+  (boxtalLabel && labelRecord?.status === 'purchased' && labelRecord.tracking_number === order.tracking_number
+    ? labelHref
+    : null);
+let shipFrom: Partial<LabelSender> = {};
 let parcelDefault: Partial<{ length: number; width: number; height: number }> = {};
 if (canLabel) {
-  try {
-    shipFrom = JSON.parse((await getSetting(env.DB, 'ship_from')) ?? '{}');
-  } catch {}
+  shipFrom = parseSender(await getSetting(env.DB, 'ship_from'));
   try {
     parcelDefault = JSON.parse((await getSetting(env.DB, 'parcel_default')) ?? '{}');
   } catch {}
 }
-const dimUnit = distanceUnitFor(weightUnit);
 const parcelWeightValue =
   order.shipping_weight_grams != null ? formatWeightValue(order.shipping_weight_grams, weightUnit) : '';
 
-const trackUrl = trackingUrl(order.tracking_carrier, order.tracking_number);
+const trackUrl = orderTrackingUrl(order);
 const error = Astro.url.searchParams.get('error');
 const noticeMsg = Astro.url.searchParams.get('notice');
 // Reissue is offered only where it can work: a settled ord_ order with an
@@ -152,13 +173,21 @@ const ship = order.ship_address
       state: string | null;
       postal: string | null;
       country: string | null;
+      phone?: string | null;
     })
   : null;
+// Where the buyer collects a relay order, as the checkout served it.
+const relayPoint = orderRelayPoint(order);
+const relayPointOffer = relayPoint ? relayOffer(relayPoint.offer) : null;
 // Domestic-only for now: international labels need a customs declaration this
 // flow doesn't collect. Warn on the page only when the saved origin makes the
-// mismatch knowable; the POST enforces it regardless.
+// mismatch knowable; the POST enforces it regardless. A relay parcel goes to
+// its point.
+const arrivalCountry = relayPoint?.country ?? ship?.country;
 const labelInternational =
-  !!shipFrom.country && !!ship?.country && shipFrom.country.toUpperCase() !== ship.country.toUpperCase();
+  !!shipFrom.country && !!arrivalCountry && shipFrom.country.toUpperCase() !== arrivalCountry.toUpperCase();
+// Prefill for the recipient Boxtal requires by first and last name.
+const recipient = splitName(ship?.name);
 // Whether fulfillment will actually email the customer — demo orders never do,
 // there may be no address on file, and email itself may be unconfigured (no
 // provider key). The UI must not promise a send that would be skipped.
@@ -272,9 +301,26 @@ const willEmailCustomer =
               ship.line2,
               [ship.city, ship.state, ship.postal].filter(Boolean).join(', '),
               ship.country,
+              ship.phone,
             ]
               .filter(Boolean)
               .join('\n')}
+          </dd>
+        </div>
+      )
+    }
+    {
+      relayPoint && (
+        <div class="col-span-2">
+          <dt class="text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.relayPoint')}</dt>
+          <dd class="whitespace-pre-line">
+            {relayPointLines(relayPoint).join('\n')}
+            <span class="block text-gray-500">
+              {t('admin.orders.detail.relayCode', {
+                code: relayPoint.code,
+                offre: relayPointOffer ? `${relayPointOffer.carrier} ${relayPointOffer.service}` : relayPoint.offer,
+              })}
+            </span>
           </dd>
         </div>
       )
@@ -299,35 +345,57 @@ const willEmailCustomer =
           <p class="mb-2 font-medium">{t('admin.orders.detail.label.unreconciled.heading')}</p>
           <p class="mb-2">
             {labelRecord.provider} {labelRecord.service}
-            {labelRecord.amount_cents != null && <> · {formatPrice(labelRecord.amount_cents)}</>}
-            {' '}· {t('admin.orders.detail.label.tracking')} <span class="tabular-nums">{labelRecord.tracking_number}</span>
+            {labelRecord.amount_cents != null && (
+              <> · {formatPrice(labelRecord.amount_cents)}{boxtalLabel && <> {t('admin.orders.detail.label.exclTax')}</>}</>
+            )}
+            {labelRecord.tracking_number && (
+              <> · {t('admin.orders.detail.label.tracking')} <span class="tabular-nums">{labelRecord.tracking_number}</span></>
+            )}
             {' '}· {t('admin.orders.detail.label.transaction')} <code class="text-xs">{labelRecord.transaction_id}</code>
           </p>
           <p class="mb-2">
             {t('admin.orders.detail.label.unreconciled.body')}
           </p>
-          {labelRecord.label_url && (
-            <a href={labelRecord.label_url} target="_blank" rel="noopener" class="font-medium underline">
+          {labelHref && (
+            <a href={labelHref} target="_blank" rel="noopener" class="font-medium underline">
               {t('admin.orders.detail.label.pdf')}
             </a>
           )}
         </div>
       )
     }
+    {/* An uncertain purchase is settled by a human, keys or not, fulfilled or
+        not: a charge may exist at the provider either way (ADR 0021). */}
     {
-      !canLabel && labelUncertain && labelRecord && (
+      labelUncertain && labelRecord && (
         <div class="mb-4 space-y-3 rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
           <p>
             {t('admin.orders.detail.label.uncertain.lead')}
-            {labelRecord.error && <> ({labelRecord.error})</>} {t('admin.orders.detail.label.uncertain.mayBefore')} <strong>{t('admin.orders.detail.label.uncertain.may')}</strong> {t('admin.orders.detail.label.uncertain.mayAfter')}
-            ({t('admin.orders.detail.label.uncertain.reference')} <code class="text-xs">{order.public_id}</code>).
+            {labelRecord.error && <> ({labelRecord.error})</>} {t('admin.orders.detail.label.uncertain.mayBefore')} <strong>{t('admin.orders.detail.label.uncertain.may')}</strong> {t('admin.orders.detail.label.uncertain.mayAfter')}.
           </p>
-          <form method="POST" action={`/api/admin/orders/${order.public_id}`}>
-            <input type="hidden" name="_action" value="label_reconcile" />
-            <button type="submit" class="rounded-md bg-brand px-4 py-2 text-xs font-medium uppercase tracking-wider text-white hover:bg-brand-hover">
-              {t('admin.orders.detail.label.reconcile')}
-            </button>
-          </form>
+          {boxtalLabel ? (
+            <Fragment>
+              <p>{t('admin.orders.detail.label.uncertain.boxtal', { reference: labelRecord.shipment_id })}</p>
+              <form method="POST" action={`/api/admin/orders/${order.public_id}`} class="flex flex-wrap items-end gap-3">
+                <input type="hidden" name="_action" value="label_reconcile" />
+                <label class="block">
+                  <span class="block text-xs uppercase tracking-widest">{t('admin.orders.detail.label.settle.id')}</span>
+                  <input
+                    name="boxtal_id"
+                    required
+                    autocomplete="off"
+                    spellcheck="false"
+                    class="mt-1 rounded-md border border-amber-300 bg-white px-3 py-2 font-mono"
+                  />
+                </label>
+                <button type="submit" class="rounded-md bg-brand px-4 py-2 text-xs font-medium uppercase tracking-wider text-white hover:bg-brand-hover">
+                  {t('admin.orders.detail.label.settle.button')}
+                </button>
+              </form>
+            </Fragment>
+          ) : (
+            <p>{t('admin.orders.detail.label.uncertain.shippo')}</p>
+          )}
           <details class="text-xs text-amber-900/80">
             <summary class="cursor-pointer">{t('admin.orders.detail.label.override.summary')}</summary>
             <p class="mt-2">
@@ -362,9 +430,9 @@ const willEmailCustomer =
               )}
             </p>
           )}
-          {order.label_url && (
+          {orderLabelHref && (
             <p>
-              <a href={order.label_url} target="_blank" rel="noopener" class="text-accent hover:underline">
+              <a href={orderLabelHref} target="_blank" rel="noopener" class="text-accent hover:underline">
                 {t('admin.orders.detail.labelPdf')}
               </a>
             </p>
@@ -378,160 +446,228 @@ const willEmailCustomer =
         </div>
       ) : (
         <div class="space-y-6">
-          {canLabel && (
+          {!labelUncertain && (canLabel || labelAwaitingTracking) && (
             <div class="rounded-md border border-line bg-white/60 p-4 text-sm">
               <p class="mb-3 text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.buyHeading')}</p>
+              {boxtalSettings?.sandbox && (
+                <p class="mb-3 rounded-md border border-line bg-paper px-3 py-2 text-gray-600">
+                  {t('admin.orders.detail.label.sandbox')}
+                </p>
+              )}
               {labelInFlight ? (
                 <p class="rounded-md border border-line bg-paper px-3 py-2 text-gray-600">
                   {t('admin.orders.detail.label.inFlight')}
                 </p>
-              ) : labelUncertain ? (
+              ) : labelAwaitingTracking && labelRecord ? (
                 <div class="space-y-3">
-                  <p class="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">
-                    {t('admin.orders.detail.label.uncertain.lead')}
-                    {labelRecord?.error && <> ({labelRecord.error})</>} {t('admin.orders.detail.label.uncertain.mayBefore')} <strong>{t('admin.orders.detail.label.uncertain.may')}</strong> {t('admin.orders.detail.label.uncertain.mayAfter')}.
-                    {' '}{t('admin.orders.detail.label.uncertain.explain')}
+                  <p>
+                    {t('admin.orders.detail.label.awaiting', {
+                      service: `${labelRecord.provider ?? ''} ${labelRecord.service ?? ''}`.trim(),
+                      envoi: labelRecord.transaction_id ?? '—',
+                    })}
                   </p>
-                  <form method="POST" action={`/api/admin/orders/${order.public_id}`}>
-                    <input type="hidden" name="_action" value="label_reconcile" />
-                    <button type="submit" class="rounded-md bg-brand px-4 py-2 text-xs font-medium uppercase tracking-wider text-white hover:bg-brand-hover">
-                      {t('admin.orders.detail.label.reconcile')}
-                    </button>
-                  </form>
-                  <details class="text-xs text-amber-900/80">
-                    <summary class="cursor-pointer">{t('admin.orders.detail.label.override.summary')}</summary>
-                    <p class="mt-2">
-                      {t('admin.orders.detail.label.override.body')}
-                    </p>
-                    <form method="POST" action={`/api/admin/orders/${order.public_id}`} class="mt-2">
-                      <input type="hidden" name="_action" value="label_force_discard" />
-                      <button type="submit" class="rounded-md border border-amber-400 px-3 py-1.5 font-medium uppercase tracking-wider hover:bg-amber-100">
-                        {t('admin.orders.detail.label.override.button')}
+                  <div class="flex flex-wrap items-center gap-4">
+                    <form method="POST" action={`/api/admin/orders/${order.public_id}`}>
+                      <input type="hidden" name="_action" value="label_tracking" />
+                      <button type="submit" class="rounded-md bg-brand px-5 py-2 font-medium text-white hover:bg-brand-hover">
+                        {t('admin.orders.detail.label.readTracking')}
                       </button>
                     </form>
-                  </details>
+                    {labelHref && (
+                      <a href={labelHref} target="_blank" rel="noopener" class="text-accent hover:underline">
+                        {t('admin.orders.detail.label.pdf')}
+                      </a>
+                    )}
+                  </div>
                 </div>
               ) : labelRecord?.status === 'purchased' ? (
                 <p>
                   {t('admin.orders.detail.label.purchased', { service: `${labelRecord.provider} ${labelRecord.service}` })}{' '}
-                  {labelRecord.label_url && (
-                    <a href={labelRecord.label_url} target="_blank" rel="noopener" class="text-accent hover:underline">
+                  {labelHref && (
+                    <a href={labelHref} target="_blank" rel="noopener" class="text-accent hover:underline">
                       {t('admin.orders.detail.label.pdf')}
                     </a>
                   )}
                 </p>
-              ) : labelInternational && labelRates.length === 0 ? (
+              ) : labelInternational ? (
                 <p class="text-gray-600">
                   {t('admin.orders.detail.label.international', {
-                    destination: ship?.country ?? '—',
+                    destination: arrivalCountry ?? '—',
                     origine: shipFrom.country ?? '—',
                   })}
                 </p>
+              ) : quoted ? (
+                <Fragment>
+                  {quoted.quoteError ? (
+                    <p class="mb-3 text-amber-800">{t('admin.orders.detail.label.quoteFailed', { erreur: quoted.quoteError })}</p>
+                  ) : (
+                    quoted.offers.every((offer) => offer.available && offer.priceExclTaxCents == null) && (
+                      <p class="mb-3 text-gray-600">{t('admin.orders.detail.label.noQuote')}</p>
+                    )
+                  )}
+                  <form method="POST" action={`/api/admin/orders/${order.public_id}`} class="space-y-4">
+                    <input type="hidden" name="_action" value="buy_label" />
+                    <fieldset class="space-y-2">
+                      <legend class="mb-1 text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.offers')}</legend>
+                      {quoted.offers.map((offer, i) => (
+                        <label class:list={['flex items-center gap-3', !offer.available && 'text-gray-400']}>
+                          <input
+                            type="radio"
+                            name="offer"
+                            value={offer.code}
+                            checked={i === 0 && offer.available}
+                            disabled={!offer.available}
+                            required
+                            class="size-4"
+                          />
+                          <span class="flex-1">{offer.carrier} · {offer.service}</span>
+                          <span class="tabular-nums">
+                            {!offer.available
+                              ? t('admin.orders.detail.label.notOffered')
+                              : offer.priceExclTaxCents != null
+                                ? `${formatPrice(offer.priceExclTaxCents, offer.currency ?? order.currency)} ${t('admin.orders.detail.label.exclTax')}`
+                                : t('admin.orders.detail.label.unpriced')}
+                          </span>
+                        </label>
+                      ))}
+                      {relayPoint && (
+                        <p class="text-xs text-gray-500">
+                          {t('admin.orders.detail.label.relayPoint', { nom: relayPoint.name, code: relayPoint.code })}
+                        </p>
+                      )}
+                    </fieldset>
+                    <fieldset class="space-y-2">
+                      <legend class="mb-1 text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.recipient')}</legend>
+                      <div class="grid gap-3 sm:grid-cols-3">
+                        <label class="block">
+                          <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.firstName')}</span>
+                          <input name="to_first_name" value={recipient.firstName} required autocomplete="off" class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2" />
+                        </label>
+                        <label class="block">
+                          <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.lastName')}</span>
+                          <input name="to_last_name" value={recipient.lastName} required autocomplete="off" class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2" />
+                        </label>
+                        <label class="block">
+                          <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.phone')}</span>
+                          <input name="to_phone" type="tel" value={ship?.phone ?? ''} required autocomplete="off" class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2" />
+                        </label>
+                      </div>
+                      <p class="text-xs text-gray-500">{t('admin.orders.detail.label.recipientHint')}</p>
+                    </fieldset>
+                    <div class="flex items-center gap-4">
+                      <button
+                        type="submit"
+                        class="rounded-md bg-brand px-5 py-2 font-medium text-white hover:bg-brand-hover"
+                      >
+                        {t('admin.orders.detail.label.buy')}
+                      </button>
+                      <button
+                        type="submit"
+                        form="label-discard"
+                        formnovalidate
+                        class="text-xs uppercase tracking-widest text-gray-400 hover:text-brand"
+                      >
+                        {t('admin.orders.detail.label.startOver')}
+                      </button>
+                    </div>
+                    <p class="text-xs text-gray-500">
+                      {t('admin.orders.detail.label.buyHint')}{' '}
+                      {willEmailCustomer
+                        ? t('admin.orders.detail.label.willEmail')
+                        : t('admin.orders.detail.label.noEmail')}
+                    </p>
+                  </form>
+                  <form method="POST" action={`/api/admin/orders/${order.public_id}`} id="label-discard">
+                    <input type="hidden" name="_action" value="label_discard" />
+                  </form>
+                </Fragment>
               ) : (
                 <Fragment>
-              {labelRecord?.status === 'failed' && labelRecord.error && (
-                <p class="mb-3 text-red-700">{labelRecord.error}</p>
-              )}
-              {labelRatesError && <p class="mb-3 text-red-700">{labelRatesError}</p>}
-              {labelRates.length > 0 ? (
-                <form method="POST" action={`/api/admin/orders/${order.public_id}`} class="space-y-2">
-                  <input type="hidden" name="_action" value="buy_label" />
-                  {labelRates.map((r, i) => (
-                    <label class="flex items-center gap-3">
-                      <input type="radio" name="rate" value={r.rateId} checked={i === 0} class="size-4" />
-                      <span class="flex-1">
-                        {r.provider} {r.service}
-                        {r.estimatedDays != null && (
-                          <span class="text-gray-500"> · {t('admin.orders.detail.label.estimatedDays', { jours: r.estimatedDays })}</span>
-                        )}
-                      </span>
-                      <span class="tabular-nums">{formatPrice(r.amountCents, r.currency)}</span>
-                    </label>
-                  ))}
-                  <div class="flex items-center gap-4 pt-2">
+                  {labelRecord?.status === 'failed' && labelRecord.error && (
+                    <p class="mb-3 text-red-700">{labelRecord.error}</p>
+                  )}
+                  <form method="POST" action={`/api/admin/orders/${order.public_id}`} class="space-y-4">
+                    <input type="hidden" name="_action" value="label_rates" />
+                    <fieldset class="space-y-2">
+                      <legend class="mb-1 text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.sender')}</legend>
+                      <div class="grid gap-3 sm:grid-cols-6">
+                        <label class="block sm:col-span-6">
+                          <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.company')}</span>
+                          <input name="from_company" value={shipFrom.company ?? ''} required class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2" />
+                        </label>
+                        <label class="block sm:col-span-3">
+                          <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.firstName')}</span>
+                          <input name="from_first_name" value={shipFrom.firstName ?? ''} required class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2" />
+                        </label>
+                        <label class="block sm:col-span-3">
+                          <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.lastName')}</span>
+                          <input name="from_last_name" value={shipFrom.lastName ?? ''} required class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2" />
+                        </label>
+                        <label class="block sm:col-span-3">
+                          <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.email')}</span>
+                          <input name="from_email" type="email" value={shipFrom.email ?? ''} required class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2" />
+                        </label>
+                        <label class="block sm:col-span-3">
+                          <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.phone')}</span>
+                          <input name="from_phone" type="tel" value={shipFrom.phone ?? ''} required class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2" />
+                        </label>
+                        <label class="block sm:col-span-6">
+                          <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.street')}</span>
+                          <input name="from_street" value={shipFrom.street ?? ''} required class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2" />
+                        </label>
+                        <label class="block sm:col-span-2">
+                          <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.postal')}</span>
+                          <input name="from_postal" value={shipFrom.postalCode ?? ''} required class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2" />
+                        </label>
+                        <label class="block sm:col-span-3">
+                          <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.city')}</span>
+                          <input name="from_city" value={shipFrom.city ?? ''} required class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2" />
+                        </label>
+                        <label class="block sm:col-span-1">
+                          <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.country')}</span>
+                          <input name="from_country" value={shipFrom.country ?? 'FR'} required maxlength="2" class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2 uppercase" />
+                        </label>
+                      </div>
+                    </fieldset>
+                    <fieldset class="space-y-2">
+                      <legend class="mb-1 text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.parcel')}</legend>
+                      <div class="grid gap-3 sm:grid-cols-4">
+                        <label class="block">
+                          <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.length', { unite: 'cm' })}</span>
+                          <input name="parcel_length" value={parcelDefault.length ?? ''} required inputmode="decimal" class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2" />
+                        </label>
+                        <label class="block">
+                          <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.width', { unite: 'cm' })}</span>
+                          <input name="parcel_width" value={parcelDefault.width ?? ''} required inputmode="decimal" class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2" />
+                        </label>
+                        <label class="block">
+                          <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.height', { unite: 'cm' })}</span>
+                          <input name="parcel_height" value={parcelDefault.height ?? ''} required inputmode="decimal" class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2" />
+                        </label>
+                        <label class="block">
+                          <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.weight', { unite: weightUnit })}</span>
+                          <input name="parcel_weight" value={parcelWeightValue} required inputmode="decimal" class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2" />
+                        </label>
+                      </div>
+                    </fieldset>
                     <button
                       type="submit"
                       class="rounded-md bg-brand px-5 py-2 font-medium text-white hover:bg-brand-hover"
                     >
-                      {t('admin.orders.detail.label.buy')}
+                      {t('admin.orders.detail.label.getRates')}
                     </button>
-                    <button
-                      type="submit"
-                      form="label-discard"
-                      class="text-xs uppercase tracking-widest text-gray-400 hover:text-brand"
-                    >
-                      {t('admin.orders.detail.label.startOver')}
-                    </button>
-                  </div>
-                  <p class="text-xs text-gray-500">
-                    {t('admin.orders.detail.label.buyHint')}{' '}
-                    {willEmailCustomer
-                      ? t('admin.orders.detail.label.willEmail')
-                      : t('admin.orders.detail.label.noEmail')}
-                  </p>
-                </form>
-                <form method="POST" action={`/api/admin/orders/${order.public_id}`} id="label-discard">
-                  <input type="hidden" name="_action" value="label_discard" />
-                </form>
-              ) : (
-                <form method="POST" action={`/api/admin/orders/${order.public_id}`} class="space-y-3">
-                  <input type="hidden" name="_action" value="label_rates" />
-                  <div class="grid gap-3 sm:grid-cols-3">
-                    <label class="block sm:col-span-3">
-                      <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.fromName')}</span>
-                      <input name="from_name" value={shipFrom.name ?? ''} required class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2" />
-                    </label>
-                    <label class="block sm:col-span-3">
-                      <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.street')}</span>
-                      <input name="from_street1" value={shipFrom.street1 ?? ''} required class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2" />
-                    </label>
-                    <label class="block">
-                      <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.city')}</span>
-                      <input name="from_city" value={shipFrom.city ?? ''} required class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2" />
-                    </label>
-                    <label class="block">
-                      <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.state')}</span>
-                      <input name="from_state" value={shipFrom.state ?? ''} class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2" />
-                    </label>
-                    <label class="block">
-                      <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.postal')}</span>
-                      <input name="from_zip" value={shipFrom.zip ?? ''} required class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2" />
-                    </label>
-                    <label class="block">
-                      <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.country')}</span>
-                      <input name="from_country" value={shipFrom.country ?? 'US'} required maxlength="2" class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2 uppercase" />
-                    </label>
-                    <label class="block">
-                      <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.length', { unite: dimUnit })}</span>
-                      <input name="parcel_length" value={parcelDefault.length ?? ''} required inputmode="decimal" class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2" />
-                    </label>
-                    <label class="block">
-                      <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.width', { unite: dimUnit })}</span>
-                      <input name="parcel_width" value={parcelDefault.width ?? ''} required inputmode="decimal" class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2" />
-                    </label>
-                    <label class="block">
-                      <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.height', { unite: dimUnit })}</span>
-                      <input name="parcel_height" value={parcelDefault.height ?? ''} required inputmode="decimal" class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2" />
-                    </label>
-                    <label class="block">
-                      <span class="block text-xs uppercase tracking-widest text-gray-400">{t('admin.orders.detail.label.weight', { unite: weightUnit })}</span>
-                      <input name="parcel_weight" value={parcelWeightValue} required inputmode="decimal" class="mt-1 w-full rounded-md border border-line bg-paper px-3 py-2" />
-                    </label>
-                  </div>
-                  <button
-                    type="submit"
-                    class="rounded-md bg-brand px-5 py-2 font-medium text-white hover:bg-brand-hover"
-                  >
-                    {t('admin.orders.detail.label.getRates')}
-                  </button>
-                  <p class="text-xs text-gray-500">
-                    {t('admin.orders.detail.label.ratesHint')}
-                  </p>
-                </form>
-              )}
+                    <p class="text-xs text-gray-500">
+                      {t('admin.orders.detail.label.ratesHint')}
+                    </p>
+                  </form>
                 </Fragment>
               )}
             </div>
+          )}
+          {!canLabel && boxtal && !labelSettingsReady && labelEligible && (
+            <p class="text-xs text-gray-500">
+              <a href="/admin/settings#boxtal" class="text-accent hover:underline">{t('admin.orders.detail.label.settingsMissing')}</a>
+            </p>
           )}
         <form
           method="POST"

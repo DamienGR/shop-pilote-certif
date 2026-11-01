@@ -506,9 +506,12 @@ function fleetMember({ shop, reporter, dryRun, target, url, created, derived, vi
     for (const [scope, names] of scopes) {
       for (const name of names.filter((secret) => CLOUDFLARE_SECRETS.includes(secret))) {
         leftovers.push({ env: scope, name });
+        // Whose credential it is, this command cannot say: the shared
+        // account's, or — a shop migrated onto it, lot 8 — the account the
+        // shop left, still needed by the way back until that one is closed.
         reporter.warn(
           `${scope ? `environnement ${scope}` : 'dépôt'} : ${name} est encore posé.`,
-          `Un jeton du compte mutualisé ouvre toutes les boutiques (ADR 0019). Une fois la boutique déployée par la flotte : gh secret delete ${name}${scope ? ` --env ${scope}` : ''} --repo ${target.nameWithOwner}`,
+          `Posé avant la flotte, il vise le compte mutualisé, dont un jeton ouvre toutes les boutiques, ou l'ancien compte de la boutique (ADR 0019). Une fois la boutique déployée par la flotte, et son ancien compte fermé s'il en a un : gh secret delete ${name}${scope ? ` --env ${scope}` : ''} --repo ${target.nameWithOwner}`,
         );
       }
     }

@@ -1,0 +1,23 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/shipping/v3.1/shipping-order/2610301905POFR56EJFR/shipping-document",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "ms": 159,
+    "contentType": "application/json",
+    "body": {
+      "timestamp": "2026-10-30T19:06:05.427621+01:00",
+      "status": 200,
+      "content": [
+        {
+          "type": "LABEL",
+          "format": "PDF_A4",
+          "url": "https://document.boxtal.build/shipping-label/2610301905POFR56EJFR_bordereau_1.pdf?Expires=1796061965&Signature=REDACTED&Key-Pair-Id=REDACTED"
+        }
+      ]
+    }
+  }
+}

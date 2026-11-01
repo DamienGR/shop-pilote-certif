@@ -1,4 +1,5 @@
 import type { PaidOrderInput, ShippingAddress } from '../orders/db';
+import type { DeliveryMethod } from '../shipping/calculator';
 
 /** Keep anonymous hosted inventory holds short and aligned with provider expiry. */
 export const STRIPE_CHECKOUT_TTL_SECONDS = 30 * 60;
@@ -55,6 +56,8 @@ export interface CreateCheckoutParams {
     options: ShippingOption[];
     /** Priced-at weight, snapshotted so the order can explain its shipping line. */
     shipmentWeightGrams?: number | null;
+    /** Also ask the recipient's phone, for the carrier (features/shipping/recipient.ts). */
+    collectPhone?: boolean;
   };
   /**
    * Set when the in-app step has ALREADY collected an address and a chosen rate
@@ -67,8 +70,9 @@ export interface CreateCheckoutParams {
     amountCents: number;
     weightGrams: number | null;
     /** How the order reaches the customer. Data, not inferred from the label
-     *  text — a rate NAMED "Local pickup" could be priced as delivery. */
-    deliveryMethod: 'pickup' | 'shipping';
+     *  text — a rate NAMED "Local pickup" could be priced as delivery. A relay
+     *  order's point rides on the reservation, not here. */
+    deliveryMethod: DeliveryMethod;
     address: ShippingAddress;
     email: string | null;
   };

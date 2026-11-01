@@ -74,11 +74,23 @@ export const COLUMN_POLICY = {
     ship_address: { action: 'address', why: 'Nom, rue, ville et code postal du destinataire.' },
     tracking_number: { action: 'erase', why: "Désigne chez le transporteur un colis et l'adresse qui l'a reçu." },
     label_url: { action: 'erase', why: "L'étiquette porte l'adresse de livraison en toutes lettres." },
+    tracking_url: { action: 'erase', why: 'Ouvre le suivi du colis chez le transporteur, comme le numéro.' },
+    relay_point: {
+      action: 'address',
+      why: "Le point relais choisi par le client : une adresse près de chez lui, réduite au pays comme l'adresse de livraison.",
+    },
     provider_session_id: { action: 'processor', why: 'La session Stripe qui détient les mêmes données chez le sous-traitant.' },
     provider_payment_id: { action: 'processor', why: 'Le paiement Stripe : la ligne bancaire se rapproche par lui.' },
     refund_review_reason: { action: 'review', why: "Texte libre saisi par l'exploitant au moment d'un remboursement." },
     refund_reviewed_by: { action: 'internal', why: "L'identité d'un opérateur de la boutique, pas celle du client." },
     settlement_token: { action: 'internal', why: "Une revendication d'idempotence du règlement, jamais communiquée au client." },
+  },
+  checkout_reservations: {
+    relay_point: { action: 'address', why: 'La copie du point relais que la commande recopie au règlement.' },
+    ship_address: {
+      action: 'address',
+      why: "L'adresse saisie à /checkout pour un paiement par carte, effacée au règlement, ou trois jours après un abandon.",
+    },
   },
   pending_payments: {
     email: { action: 'subject', why: "L'adresse saisie à un paiement qui n'a jamais abouti." },
@@ -149,11 +161,17 @@ export const NOT_PERSONAL = {
 /**
  * Tables that hold a buyer's rows without a foreign key to follow.
  *
- * `via` names the column of `orders` whose value they carry. All four exist for
- * the same reason: they were written to survive the order row being read by a
- * public page, so they key on the public identifier rather than the rowid.
+ * `via` names the column of `orders` whose value they carry. The four that key
+ * on an order public identifier were written to survive the order row being
+ * read by a public page, so they key on it rather than the rowid. The
+ * reservation shares the order's public identifier because it exists first:
+ * it is claimed before the shopper leaves, and the order is written from it.
+ * A reservation that never became an order is reached by no one, and holds no
+ * one for long: its cart, at most a relay point (a business's address), and an
+ * address typed for a card payment, cleared three days after the checkout ended.
  */
 export const EXTRA_LINKS = [
+  { table: 'checkout_reservations', column: 'public_id', via: 'public_id' },
   { table: 'order_guest_access', column: 'order_public_id', via: 'public_id' },
   { table: 'order_item_ids', column: 'order_public_id', via: 'public_id' },
   { table: 'order_reference_aliases', column: 'order_public_id', via: 'public_id' },
@@ -172,7 +190,7 @@ export const ADDRESS_KEPT = ['country'];
 
 /** Columns whose NAME could hold a person. Deliberately over-broad. */
 export const SUSPECT_COLUMN =
-  /(^|_)(email|mail|address|adresse|phone|tel|name|city|postal|zip|country|token|url|note|reason|error|ip|user|customer|client|tracking|session|label|body)(s)?($|_)/i;
+  /(^|_)(email|mail|address|adresse|phone|tel|name|city|postal|zip|country|token|url|note|reason|error|ip|user|customer|client|tracking|session|label|body|relay|point)(s)?($|_)/i;
 
 /** Columns whose NAME says the row hangs off an order. */
 export const LINK_COLUMN = /^(order_id|order_public_id|provider_payment_id)$/;

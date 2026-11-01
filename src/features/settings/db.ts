@@ -31,8 +31,11 @@ export type SettingKey =
   | 'shipping_enabled' // LEGACY: overrides config.shipping.enabled. Only consulted while no shipping_config document exists.
   | 'shipping_config' // the merchant-managed shipping document (JSON; see features/shipping/settings.ts)
   | 'weight_unit' // 'g' | 'kg' | 'oz' | 'lb' — Admin input/display unit; storage is always grams
-  | 'ship_from' // JSON ShipFrom — the store's return address for label purchase (read at label time, not in locals)
+  | 'ship_from' // JSON ShipFrom — the sender on a label (read at label time, not in locals)
   | 'parcel_default' // JSON {length,width,height} — remembered box dimensions for label purchase
+  | 'boxtal_environment' // 'live' = Boxtal production; absent = its sandbox (keys open one or the other, never both)
+  | 'boxtal_offers' // JSON array of the home offer codes the merchant retained (features/shipping/boxtal/offers.ts)
+  | 'boxtal_content' // the nature of contents every parcel declares (content:v1:<code>)
   | 'admin_password_hash' // PBKDF2 hash of the admin password (set at setup). NOT in StoreSettings — read only by the auth layer, never loaded into locals.
   // Integrations configured in the admin dashboard (non-secret halves; the keys
   // live encrypted in the vault — see features/secrets/store.ts).

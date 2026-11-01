@@ -28,6 +28,18 @@ export function stripeConfigured(
   );
 }
 
+/**
+ * Boxtal can buy labels and search relay points: the v3 key pair is in a vault
+ * this Worker can open. The optional v1 quote keys alone do neither.
+ */
+export function boxtalConfigured(configuredSecrets: readonly string[], vault: boolean): boolean {
+  return (
+    vault &&
+    configuredSecrets.includes('boxtal_access_key') &&
+    configuredSecrets.includes('boxtal_secret_key')
+  );
+}
+
 export function emailConfigured(
   settings: StoreSettings,
   caps: RuntimeCapabilities,

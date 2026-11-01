@@ -26,6 +26,22 @@ export interface ShippingOption {
    *  DATA (orders record it as delivery_method); the label text is merchant
    *  prose and must never be parsed for meaning. */
   pickup?: boolean;
+  /** Delivered to a relay point the shopper picks: the provider's offer code,
+   *  which fixes the network searched and the label bought (ADR 0020). */
+  relayOffer?: string;
+}
+
+/** How an order reaches the buyer, as orders and pending payments record it. */
+export type DeliveryMethod = 'pickup' | 'shipping' | 'relay';
+
+/** The delivery an option promises — read off its data, never its label. */
+export function deliveryMethodOf(option: ShippingOption): DeliveryMethod {
+  return option.pickup ? 'pickup' : option.relayOffer !== undefined ? 'relay' : 'shipping';
+}
+
+/** A stored delivery_method, or null for a legacy row or a value this core does not know. */
+export function parseDeliveryMethod(value: string | null | undefined): DeliveryMethod | null {
+  return value === 'pickup' || value === 'shipping' || value === 'relay' ? value : null;
 }
 
 export interface FlatRatePricing {
@@ -60,7 +76,20 @@ export interface PickupRatePricing {
   amountCents: number;
 }
 
-export type RatePricing = FlatRatePricing | WeightRatePricing | PickupRatePricing;
+/**
+ * Delivered to a relay point (ADR 0020). The offer names the provider's relay
+ * service, which fixes its network; the merchant prices it like a home rate,
+ * flat or by weight. Offered only to a caller that can serve the offer — it
+ * passes `relayOffers` — so a shop without the provider's keys, or a core
+ * that no longer lists the offer, simply does not show it.
+ */
+export interface RelayRatePricing {
+  type: 'relay';
+  offer: string;
+  price: FlatRatePricing | WeightRatePricing;
+}
+
+export type RatePricing = FlatRatePricing | WeightRatePricing | PickupRatePricing | RelayRatePricing;
 
 export interface ShippingRate {
   label: string;
@@ -127,6 +156,9 @@ export interface ShippingQuoteInput {
   itemWeightGrams: number | null;
   /** Records behind an unknown weight, for the "fix these products" message. */
   missingWeight?: MissingWeightRecord[];
+  /** Relay offers the caller can serve right now. Absent = none: a relay rate
+   *  is never quoted to a surface that cannot let the shopper pick a point. */
+  relayOffers?: readonly string[];
 }
 
 /** Normalize either accepted rate shape to the internal discriminated one. */
@@ -171,8 +203,10 @@ export function quoteShipping(cfg: ShippingConfig, input: ShippingQuoteInput): S
   const options: ShippingOption[] = [];
   const omitted: OmittedRate[] = [];
 
-  // Whether some DELIVERY service resolved — pickup never counts: it is not a
-  // way to send the parcel, so it must not unlock free *delivery*.
+  // Whether some HOME delivery service resolved. Pickup never counts: it is not
+  // a way to send the parcel, so it must not unlock free *delivery*. Nor does a
+  // relay rate: the free option is a home delivery, and a relay-only zone must
+  // not conjure one the merchant never configured.
   let deliveryResolved = false;
   for (const rate of rates) {
     if (rate.pricing.type === 'pickup') {
@@ -180,23 +214,27 @@ export function quoteShipping(cfg: ShippingConfig, input: ShippingQuoteInput): S
       options.push({ label: rate.label, amountCents: rate.pricing.amountCents, pickup: true });
       continue;
     }
-    if (rate.pricing.type === 'flat') {
+    const relayOffer = rate.pricing.type === 'relay' ? rate.pricing.offer : undefined;
+    if (relayOffer !== undefined && !input.relayOffers?.includes(relayOffer)) continue;
+    const price = rate.pricing.type === 'relay' ? rate.pricing.price : rate.pricing;
+    const tag = relayOffer !== undefined ? { relayOffer } : {};
+    if (price.type === 'flat') {
       // Flat rates do not care about weight, so an unknown weight must not hide them.
-      options.push({ label: rate.label, amountCents: rate.pricing.amountCents });
-      deliveryResolved = true;
+      options.push({ label: rate.label, amountCents: price.amountCents, ...tag });
+      if (relayOffer === undefined) deliveryResolved = true;
       continue;
     }
     if (shipmentWeightGrams == null) {
       omitted.push({ label: rate.label, reason: 'missing_weight' });
       continue;
     }
-    const band = bandFor(shipmentWeightGrams, rate.pricing.bands);
+    const band = bandFor(shipmentWeightGrams, price.bands);
     if (!band) {
       omitted.push({ label: rate.label, reason: 'overweight' });
       continue;
     }
-    options.push({ label: rate.label, amountCents: band.amountCents });
-    deliveryResolved = true;
+    options.push({ label: rate.label, amountCents: band.amountCents, ...tag });
+    if (relayOffer === undefined) deliveryResolved = true;
   }
 
   // "Free shipping" is a DELIVERY promise, so it is synthesized only when a real
@@ -245,8 +283,26 @@ export function zonesRequireWeight(cfg: ShippingConfig): boolean {
   if (!cfg.enabled) return false;
   return cfg.zones.some((zone) => {
     const rates = zone.rates.map(normalizeRate);
-    return rates.length > 0 && rates.every((rate) => rate.pricing.type === 'weight');
+    return (
+      rates.length > 0 &&
+      rates.every(
+        (rate) =>
+          rate.pricing.type === 'weight' ||
+          (rate.pricing.type === 'relay' && rate.pricing.price.type === 'weight'),
+      )
+    );
   });
+}
+
+/**
+ * Whether the zone serving `country` holds a relay rate. A card payment then
+ * goes through /checkout, the one surface where a point can be picked, rather
+ * than straight to Stripe's page, which offers only a fixed list (ADR 0020).
+ */
+export function zoneOffersRelay(cfg: ShippingConfig, country: string): boolean {
+  if (!cfg.enabled) return false;
+  const zone = shippingZoneFor(country, cfg.zones);
+  return zone !== null && zone.rates.map(normalizeRate).some((rate) => rate.pricing.type === 'relay');
 }
 
 /** Whether any zone accepts the rest of the world. Providers expand this into their

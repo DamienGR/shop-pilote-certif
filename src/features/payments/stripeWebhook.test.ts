@@ -175,6 +175,27 @@ describe('a paid checkout', () => {
     expect(outbound).toEqual([]);
   });
 
+  it('folds the phone Stripe collected into the address snapshot', async () => {
+    const shipped = {
+      collected_information: {
+        shipping_details: {
+          name: 'Camille Durand',
+          address: { line1: '3 quai Ceineray', city: 'Nantes', postal_code: '44000', country: 'FR' },
+        },
+      },
+    };
+    const withPhone = await verify(
+      event(
+        'checkout.session.completed',
+        session({ ...shipped, customer_details: { email: 'cliente@exemple.fr', phone: '+33639980001' } }),
+      ),
+    );
+    expect(withPhone.order?.shippingAddress).toMatchObject({ city: 'Nantes', phone: '+33639980001' });
+    // A session that never asked keeps the snapshot it always had.
+    const without = await verify(event('checkout.session.completed', session(shipped)));
+    expect(without.order?.shippingAddress).not.toHaveProperty('phone');
+  });
+
   it('reads the address from the pre-collected_information shape too', async () => {
     const result = await verify(
       event(

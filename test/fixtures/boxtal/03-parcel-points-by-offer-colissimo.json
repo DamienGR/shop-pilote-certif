@@ -1,0 +1,180 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/shipping/v3.2/parcel-point-by-shipping-offer?countryIsoCode=FR&postalCode=35000&city=Rennes&shippingOfferCode=POFR-ColissimoPickupStation&operationType=ARRIVAL",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "ms": 457,
+    "contentType": "application/json",
+    "body": {
+      "timestamp": "2026-10-30T16:32:08.824081+01:00",
+      "status": 200,
+      "content": [
+        {
+          "distanceFromSearchLocation": 338,
+          "parcelPoint": {
+            "code": "663997",
+            "name": "SIDIQI EXPRESS TELEPHONE",
+            "compatibleNetworks": [
+              "POFR_NETWORK",
+              "POFR_UP_TO_10_KG_NETWORK",
+              "POFR_UP_TO_16_KG_NETWORK",
+              "POFR_UP_TO_20_KG_NETWORK"
+            ],
+            "location": {
+              "street": "9 RUE DU PUITS MAUGER",
+              "city": "RENNES",
+              "postalCode": "35000",
+              "countryIsoCode": "FR",
+              "position": {
+                "longitude": -1.681975,
+                "latitude": 48.105699
+              }
+            },
+            "openingDays": {
+              "MONDAY": null,
+              "TUESDAY": null,
+              "WEDNESDAY": null,
+              "THURSDAY": null,
+              "FRIDAY": null,
+              "SATURDAY": null,
+              "SUNDAY": null
+            }
+          }
+        },
+        {
+          "distanceFromSearchLocation": 361,
+          "parcelPoint": {
+            "code": "359480",
+            "name": "BUREAU DE POSTE RENNES REPUBLIQUE",
+            "compatibleNetworks": [
+              "POFR_NETWORK",
+              "POFR_UP_TO_10_KG_NETWORK",
+              "POFR_UP_TO_16_KG_NETWORK",
+              "POFR_UP_TO_20_KG_NETWORK",
+              "POFR_UP_TO_30_KG_NETWORK"
+            ],
+            "location": {
+              "street": "PLACE DE LA REPUBLIQUE",
+              "city": "RENNES",
+              "postalCode": "35000",
+              "countryIsoCode": "FR",
+              "position": {
+                "longitude": -1.68007,
+                "latitude": 48.109598
+              }
+            },
+            "openingDays": {
+              "MONDAY": null,
+              "TUESDAY": null,
+              "WEDNESDAY": null,
+              "THURSDAY": null,
+              "FRIDAY": null,
+              "SATURDAY": null,
+              "SUNDAY": null
+            }
+          }
+        },
+        {
+          "distanceFromSearchLocation": 442,
+          "parcelPoint": {
+            "code": "487338",
+            "name": "CYBERPHONE DU MAIL",
+            "compatibleNetworks": [
+              "POFR_NETWORK",
+              "POFR_UP_TO_10_KG_NETWORK",
+              "POFR_UP_TO_16_KG_NETWORK",
+              "POFR_UP_TO_20_KG_NETWORK"
+            ],
+            "location": {
+              "street": "53 MAIL FRANCOIS MITTERRAND",
+              "city": "RENNES",
+              "postalCode": "35000",
+              "countryIsoCode": "FR",
+              "position": {
+                "longitude": -1.690245,
+                "latitude": 48.109288
+              }
+            },
+            "openingDays": {
+              "MONDAY": null,
+              "TUESDAY": null,
+              "WEDNESDAY": null,
+              "THURSDAY": null,
+              "FRIDAY": null,
+              "SATURDAY": null,
+              "SUNDAY": null
+            }
+          }
+        },
+        {
+          "distanceFromSearchLocation": 524,
+          "parcelPoint": {
+            "code": "663236",
+            "name": "LES BOITES BLEUES",
+            "compatibleNetworks": [
+              "POFR_NETWORK",
+              "POFR_UP_TO_10_KG_NETWORK",
+              "POFR_UP_TO_16_KG_NETWORK",
+              "POFR_UP_TO_20_KG_NETWORK"
+            ],
+            "location": {
+              "street": "55 BOULEVARD DE LA TOUR D AUVERGNE",
+              "city": "RENNES",
+              "postalCode": "35000",
+              "countryIsoCode": "FR",
+              "position": {
+                "longitude": -1.684137,
+                "latitude": 48.10353
+              }
+            },
+            "openingDays": {
+              "MONDAY": null,
+              "TUESDAY": null,
+              "WEDNESDAY": null,
+              "THURSDAY": null,
+              "FRIDAY": null,
+              "SATURDAY": null,
+              "SUNDAY": null
+            }
+          }
+        },
+        {
+          "distanceFromSearchLocation": 558,
+          "parcelPoint": {
+            "code": "364305",
+            "name": "MOBILE SHOP 3 SOLEILS RENNES",
+            "compatibleNetworks": [
+              "POFR_NETWORK",
+              "POFR_UP_TO_10_KG_NETWORK",
+              "POFR_UP_TO_16_KG_NETWORK",
+              "POFR_UP_TO_20_KG_NETWORK"
+            ],
+            "location": {
+              "street": "18 RUE D ISLY",
+              "city": "RENNES",
+              "postalCode": "35000",
+              "countryIsoCode": "FR",
+              "position": {
+                "longitude": -1.678019,
+                "latitude": 48.105678
+              }
+            },
+            "openingDays": {
+              "MONDAY": null,
+              "TUESDAY": null,
+              "WEDNESDAY": null,
+              "THURSDAY": null,
+              "FRIDAY": null,
+              "SATURDAY": null,
+              "SUNDAY": null
+            }
+          }
+        }
+      ]
+    },
+    "pointsReturned": 30
+  }
+}

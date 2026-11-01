@@ -208,7 +208,7 @@ export function runRestore(args, reporter) {
     const databaseId = database.uuid ?? database.database_id;
     // A restore with --overwrite replaces what is there: on a shared account
     // (ADR 0019) the database of this name has to be proven this shop's first.
-    guardOwner({ database: names.database, root, manifest, env, reporter });
+    guardOwner({ database: names.database, databaseId, root, manifest, env, reporter });
     renderEnvironmentConfig({ root, manifest, env, databaseId });
     reporter.ok(`${names.database} (${databaseId}) — wrangler.jsonc rendu`);
   }

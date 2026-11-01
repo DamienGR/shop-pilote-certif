@@ -27,8 +27,8 @@ signé : ce document ne le remplace pas.
 
 | Fournisseur | Rôle | Données personnelles reçues | Où elles sont stockées | Garanties de transfert |
 |---|---|---|---|---|
-| Cloudflare (Workers, D1, R2, KV, Turnstile, Cloudflare for SaaS) | hébergement de la boutique, de sa base, de ses images et fichiers, des sessions d'administration, des sauvegardes ; protection anti-robots des formulaires ; certificat et routage du domaine du commerçant sur le compte mutualisé | toutes celles de la boutique : e-mail, nom et adresse de livraison des acheteurs, commandes, adresse IP dans les journaux ; le jeton du widget Turnstile | base et buckets créés en juridiction `eu` et vérifiés au provisioning ([ADR 0004](../architecture/decisions/0004-localisation-des-donnees.md)) ; l'exécution du Worker et les journaux d'Observability sont distribués sur le réseau mondial | DPA de Cloudflare, à vérifier ; accepté par l'agence sur le compte mutualisé, par le commerçant sur son propre compte |
-| Stripe | encaissement, remboursements | e-mail, adresse de facturation et de livraison saisies sur sa page de paiement, données de carte (que la boutique ne voit jamais), montant et contenu de la commande | chez Stripe | DPA de Stripe, à vérifier |
+| Cloudflare (Workers, D1, R2, KV, Turnstile, Cloudflare for SaaS) | hébergement de la boutique, de sa base, de ses images et fichiers, des sessions d'administration, des sauvegardes ; protection anti-robots des formulaires ; certificat et routage du domaine du commerçant sur le compte mutualisé | toutes celles de la boutique : e-mail, nom et adresse de livraison des acheteurs, leur téléphone quand la boutique achète ses étiquettes chez Boxtal, commandes, adresse IP dans les journaux ; le jeton du widget Turnstile | base et buckets créés en juridiction `eu` et vérifiés au provisioning ([ADR 0004](../architecture/decisions/0004-localisation-des-donnees.md)) ; l'exécution du Worker et les journaux d'Observability sont distribués sur le réseau mondial | DPA de Cloudflare, à vérifier ; accepté par l'agence sur le compte mutualisé, par le commerçant sur son propre compte |
+| Stripe | encaissement, remboursements | e-mail, adresse de facturation et de livraison saisies sur sa page de paiement, téléphone quand la boutique achète ses étiquettes chez Boxtal, données de carte (que la boutique ne voit jamais), montant et contenu de la commande | chez Stripe | DPA de Stripe, à vérifier |
 | Resend | e-mails transactionnels (confirmation, expédition, remboursement, alerte au commerçant) | adresse e-mail du destinataire, contenu de l'e-mail : articles, montants, adresse de livraison | chez Resend | DPA de Resend, à vérifier |
 
 ## Selon la configuration
@@ -36,7 +36,7 @@ signé : ce document ne le remplace pas.
 | Fournisseur | Activé par | Données personnelles reçues | Garanties de transfert |
 |---|---|---|---|
 | Cloudflare Access | la preview privée du staging (agence) | adresses e-mail des personnes admises à la preview | DPA de Cloudflare |
-| Shippo | une clé dans Admin → Réglages, pour acheter des étiquettes | nom, adresse et téléphone de livraison, poids du colis | DPA de Shippo, à vérifier |
+| Boxtal | ses clés dans Admin → Réglages, pour acheter des étiquettes ; dès qu'elles y sont, la commande demande le téléphone de l'acheteur, que le commerçant nomme dans sa politique de confidentialité | nom, adresse, téléphone et e-mail du destinataire, poids, dimensions et valeur du colis, que Boxtal transmet au transporteur choisi ; le devis facultatif ne reçoit que codes postaux et villes | DPA de Boxtal, à vérifier |
 | OpenNode, ou le nœud Lightning du commerçant (phoenixd, LNbits) | Admin → Réglages → Paiements | montant de la facture, aucune identité | DPA d'OpenNode, à vérifier ; un nœud du commerçant n'est pas un sous-traitant |
 | Workers AI et Vectorize (Cloudflare) | la recherche sémantique, binding ajouté à la main | textes du catalogue, aucune donnée d'acheteur | DPA de Cloudflare |
 

@@ -206,7 +206,7 @@ export async function runProvision(args, reporter) {
   // shop's, and adopting it would deploy this shop onto that one's orders. A
   // new database is marked at once, so a run that stops before the buckets
   // still leaves it claimed.
-  const owner = markDatabase({ database: names.database, existing: Boolean(existing), root, slug, env, claim, dryRun, reporter });
+  const owner = markDatabase({ database: names.database, databaseId, existing: Boolean(existing), root, slug, env, claim, dryRun, reporter });
 
   // ── R2 ────────────────────────────────────────────────────────────────────
   const buckets = [['bucket images', names.images], ['bucket fichiers', names.files], ['bucket sauvegardes', names.backups]];
@@ -231,7 +231,7 @@ export async function runProvision(args, reporter) {
   if (dryRun && !databaseId) {
     reporter.todo(`${names.database} — juridiction ${jurisdiction} demandée à la création (simulation : rien à relire).`);
   } else {
-    const info = databaseInfo(names.database, { cwd: root });
+    const info = databaseInfo(names.database, { cwd: root, id: databaseId });
     const reported = info?.jurisdiction ?? null;
     if (reported === jurisdiction) {
       checks.push({ resource: names.database, expected: jurisdiction, reported, ok: true });
@@ -498,9 +498,9 @@ export async function runProvision(args, reporter) {
  *
  * @returns {{ repository: string|null, verdict: string, action: 'create'|'keep'|'update'|'claim' }}
  */
-function markDatabase({ database, existing, root, slug, env, claim, dryRun, reporter }) {
+function markDatabase({ database, databaseId, existing, root, slug, env, claim, dryRun, reporter }) {
   const repository = shopRepository(root);
-  const marker = existing ? readOwner(database, { cwd: root }) : null;
+  const marker = existing ? readOwner(databaseId, { cwd: root }) : null;
   const verdict = judgeOwner(marker, { repository, slug });
   const owner = describeOwner({ repository, slug });
 
@@ -508,21 +508,28 @@ function markDatabase({ database, existing, root, slug, env, claim, dryRun, repo
   if (verdict === 'foreign' || verdict === 'unproven') {
     if (!claim) throw ownerRefusal(verdict, { database, marker, repository, slug, env });
     action = 'claim';
-    reporter.warn(`${database} était marquée pour ${describeOwner(marker)} ; marqueur ${dryRun ? 'à réécrire' : 'réécrit'} pour ${owner} (--claim).`);
   } else if (verdict === 'unmarked') {
     action = 'create';
-    if (dryRun) reporter.todo(`${database} serait marquée pour ${owner}`);
-    else reporter.ok(`${database} — marquée pour ${owner}${existing ? ' (base antérieure au marqueur)' : ''}`);
   } else if (!marker.repository && repository) {
     action = 'update';
+  } else {
+    action = 'keep';
+  }
+
+  // Written, THEN said: a line printed before the write stood above the error
+  // of a write that never happened (lot 8), and read as a claimed database.
+  if (!dryRun && action !== 'keep') markOwner(databaseId, { cwd: root, repository, slug });
+  if (action === 'claim') {
+    reporter.warn(`${database} était marquée pour ${describeOwner(marker)} ; marqueur ${dryRun ? 'à réécrire' : 'réécrit'} pour ${owner} (--claim).`);
+  } else if (action === 'create') {
+    if (dryRun) reporter.todo(`${database} serait marquée pour ${owner}`);
+    else reporter.ok(`${database} — marquée pour ${owner}${existing ? ' (base antérieure au marqueur)' : ''}`);
+  } else if (action === 'update') {
     if (dryRun) reporter.todo(`${database} — le marqueur serait complété du dépôt ${repository}`);
     else reporter.ok(`${database} — marqueur complété du dépôt ${repository}`);
   } else {
-    action = 'keep';
     reporter.ok(`${database} — marquée pour ${describeOwner(marker)}`);
   }
-
-  if (!dryRun && action !== 'keep') markOwner(database, { cwd: root, repository, slug });
   if (!repository && action !== 'keep') {
     reporter.warn(
       'cet arbre n\'a pas de remote origin : le marqueur ne nomme que le slug.',

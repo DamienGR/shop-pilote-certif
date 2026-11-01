@@ -508,6 +508,10 @@ describe('shopctl repo --fleet', () => {
       { env: 'production', name: 'CLOUDFLARE_ACCOUNT_ID' },
     ]));
     expect(stderr).toContain(`gh secret delete CLOUDFLARE_API_TOKEN --env production --repo ${target.nameWithOwner}`);
+    // Not said to be the shared account's: after a migration (lot 8) they are
+    // the old account's, and the way back needs them until it is closed.
+    expect(stderr).toMatch(/ou l'ancien compte de la boutique/);
+    expect(stderr).toMatch(/et son ancien compte fermé s'il en a un/);
     expect(Object.keys(target.github().repos[target.nameWithOwner].environments.production.secrets)).toContain('CLOUDFLARE_API_TOKEN');
   });
 

@@ -1,0 +1,22 @@
+{
+  "request": {
+    "method": "DELETE",
+    "path": "/shipping/v3.1/shipping-order/2610301632MONR56E8FR",
+    "body": null
+  },
+  "response": {
+    "status": 422,
+    "ms": 506,
+    "contentType": "application/json",
+    "body": {
+      "timestamp": "2026-10-30T17:02:25.329529+01:00",
+      "status": 422,
+      "errors": [
+        {
+          "code": "InvalidRequestException",
+          "parameters": []
+        }
+      ]
+    }
+  }
+}

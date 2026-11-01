@@ -1,0 +1,84 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/shipping/v3.1/shipping-order",
+    "body": {
+      "shippingOfferCode": "POFR-ColissimoAccess",
+      "labelType": "PDF_10x15",
+      "shipment": {
+        "externalId": "essai-tel-mvva9992",
+        "packages": [
+          {
+            "type": "PARCEL",
+            "weight": 0.8,
+            "length": 30,
+            "width": 20,
+            "height": 10,
+            "value": {
+              "value": 42.4,
+              "currency": "EUR"
+            },
+            "content": {
+              "id": "content:v1:40110",
+              "description": "Vêtements neufs"
+            },
+            "externalId": "essai-tel-mvva9992-1"
+          }
+        ],
+        "fromAddress": {
+          "type": "BUSINESS",
+          "contact": {
+            "firstName": "Boutique",
+            "lastName": "Essai",
+            "company": "Boutique Essai",
+            "email": "expediteur@example.com",
+            "phone": "+33612345678"
+          },
+          "location": {
+            "number": "10",
+            "street": "rue de Rivoli",
+            "city": "Paris",
+            "postalCode": "75004",
+            "countryIsoCode": "FR"
+          }
+        },
+        "toAddress": {
+          "type": "RESIDENTIAL",
+          "contact": {
+            "firstName": "Jeanne",
+            "lastName": "Essai",
+            "email": "destinataire@example.com"
+          },
+          "location": {
+            "number": "5",
+            "street": "rue Pache",
+            "city": "Paris",
+            "postalCode": "75011",
+            "countryIsoCode": "FR"
+          }
+        }
+      }
+    }
+  },
+  "response": {
+    "status": 422,
+    "ms": 1295,
+    "contentType": "application/json",
+    "body": {
+      "timestamp": "2026-10-30T19:05:43.286604+01:00",
+      "status": 422,
+      "errors": [
+        {
+          "code": "RequestValidationException",
+          "parameters": [
+            {
+              "code": "ValidationException.Null",
+              "field": "shipment.toAddress.contact.phone",
+              "value": "may not be null"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

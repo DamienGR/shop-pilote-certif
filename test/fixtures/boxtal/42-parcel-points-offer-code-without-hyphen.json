@@ -1,0 +1,30 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/shipping/v3.2/parcel-point-by-shipping-offer?countryIsoCode=FR&postalCode=75011&city=Paris&shippingOfferCode=MONRCpourToi&operationType=ARRIVAL",
+    "body": null
+  },
+  "response": {
+    "status": 400,
+    "ms": 165,
+    "contentType": "application/json",
+    "body": {
+      "timestamp": "2026-10-30T17:27:07.070293+01:00",
+      "status": 400,
+      "errors": [
+        {
+          "code": "ValidationException",
+          "parameters": [
+            {
+              "code": "ValidationException.ValidShippingOfferCode",
+              "field": "shippingOfferCode",
+              "message": "Conversion exception : 'shippingOfferCode' cannot be converted. Check logs for details.",
+              "value": "MONRCpourToi",
+              "parameters": []
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

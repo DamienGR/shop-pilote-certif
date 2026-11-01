@@ -1,0 +1,338 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/shipping/v3.2/parcel-point-by-shipping-offer?countryIsoCode=FR&postalCode=75011&city=Paris&shippingOfferCode=MONR-CpourToi&operationType=ARRIVAL",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "ms": 470,
+    "contentType": "application/json",
+    "body": {
+      "timestamp": "2026-10-30T16:32:08.267723+01:00",
+      "status": 200,
+      "content": [
+        {
+          "distanceFromSearchLocation": 182,
+          "parcelPoint": {
+            "code": "41132",
+            "name": "ART THE ZEN",
+            "compatibleNetworks": [
+              "MONR_NETWORK",
+              "MONR_LOCKERS_EXCLUDED_UP_TO_30_KG_NETWORK"
+            ],
+            "location": {
+              "street": "5 RUE PACHE",
+              "city": "PARIS",
+              "postalCode": "75011",
+              "countryIsoCode": "FR",
+              "position": {
+                "longitude": 2.382114,
+                "latitude": 48.858547
+              }
+            },
+            "openingDays": {
+              "MONDAY": [],
+              "TUESDAY": [
+                {
+                  "openingTime": "11:00",
+                  "closingTime": "19:00"
+                }
+              ],
+              "WEDNESDAY": [
+                {
+                  "openingTime": "11:00",
+                  "closingTime": "19:00"
+                }
+              ],
+              "THURSDAY": [
+                {
+                  "openingTime": "11:00",
+                  "closingTime": "20:00"
+                }
+              ],
+              "FRIDAY": [
+                {
+                  "openingTime": "11:00",
+                  "closingTime": "19:00"
+                }
+              ],
+              "SATURDAY": [
+                {
+                  "openingTime": "11:00",
+                  "closingTime": "18:00"
+                }
+              ],
+              "SUNDAY": []
+            }
+          }
+        },
+        {
+          "distanceFromSearchLocation": 196,
+          "parcelPoint": {
+            "code": "26237",
+            "name": "SA INFORMATIQUE",
+            "compatibleNetworks": [
+              "MONR_NETWORK",
+              "MONR_LOCKERS_EXCLUDED_UP_TO_30_KG_NETWORK"
+            ],
+            "location": {
+              "street": "53 RUE BASFROI",
+              "city": "PARIS",
+              "postalCode": "75011",
+              "countryIsoCode": "FR",
+              "position": {
+                "longitude": 2.377901,
+                "latitude": 48.856563
+              }
+            },
+            "openingDays": {
+              "MONDAY": [
+                {
+                  "openingTime": "10:00",
+                  "closingTime": "20:00"
+                }
+              ],
+              "TUESDAY": [
+                {
+                  "openingTime": "10:00",
+                  "closingTime": "20:00"
+                }
+              ],
+              "WEDNESDAY": [
+                {
+                  "openingTime": "10:00",
+                  "closingTime": "20:00"
+                }
+              ],
+              "THURSDAY": [
+                {
+                  "openingTime": "10:00",
+                  "closingTime": "20:00"
+                }
+              ],
+              "FRIDAY": [
+                {
+                  "openingTime": "10:00",
+                  "closingTime": "12:30"
+                },
+                {
+                  "openingTime": "14:30",
+                  "closingTime": "20:00"
+                }
+              ],
+              "SATURDAY": [
+                {
+                  "openingTime": "10:00",
+                  "closingTime": "20:00"
+                }
+              ],
+              "SUNDAY": [
+                {
+                  "openingTime": "11:00",
+                  "closingTime": "17:00"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "distanceFromSearchLocation": 197,
+          "parcelPoint": {
+            "code": "35382",
+            "name": "LOCKER LAV EXPRESS POPINCOURT",
+            "compatibleNetworks": [
+              "MONR_NETWORK",
+              "MONR_LOCKERS_ONLY_NETWORK"
+            ],
+            "location": {
+              "street": "12 RUE POPINCOURT",
+              "city": "PARIS",
+              "postalCode": "75011",
+              "countryIsoCode": "FR",
+              "position": {
+                "longitude": 2.377349,
+                "latitude": 48.85754
+              }
+            },
+            "openingDays": {
+              "MONDAY": [
+                {
+                  "openingTime": "09:00",
+                  "closingTime": "21:00"
+                }
+              ],
+              "TUESDAY": [
+                {
+                  "openingTime": "09:00",
+                  "closingTime": "21:00"
+                }
+              ],
+              "WEDNESDAY": [
+                {
+                  "openingTime": "09:00",
+                  "closingTime": "21:00"
+                }
+              ],
+              "THURSDAY": [
+                {
+                  "openingTime": "09:00",
+                  "closingTime": "21:00"
+                }
+              ],
+              "FRIDAY": [
+                {
+                  "openingTime": "09:00",
+                  "closingTime": "21:00"
+                }
+              ],
+              "SATURDAY": [
+                {
+                  "openingTime": "09:00",
+                  "closingTime": "21:00"
+                }
+              ],
+              "SUNDAY": [
+                {
+                  "openingTime": "09:00",
+                  "closingTime": "21:00"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "distanceFromSearchLocation": 209,
+          "parcelPoint": {
+            "code": "35614",
+            "name": "FB MEDIA ALIMENTATION",
+            "compatibleNetworks": [
+              "MONR_NETWORK",
+              "MONR_LOCKERS_EXCLUDED_UP_TO_30_KG_NETWORK"
+            ],
+            "location": {
+              "street": "62 RUE SEDAINE",
+              "city": "PARIS",
+              "postalCode": "75011",
+              "countryIsoCode": "FR",
+              "position": {
+                "longitude": 2.377246,
+                "latitude": 48.857991
+              }
+            },
+            "openingDays": {
+              "MONDAY": [
+                {
+                  "openingTime": "11:00",
+                  "closingTime": "23:00"
+                }
+              ],
+              "TUESDAY": [
+                {
+                  "openingTime": "11:00",
+                  "closingTime": "23:00"
+                }
+              ],
+              "WEDNESDAY": [
+                {
+                  "openingTime": "11:00",
+                  "closingTime": "23:00"
+                }
+              ],
+              "THURSDAY": [
+                {
+                  "openingTime": "11:00",
+                  "closingTime": "23:00"
+                }
+              ],
+              "FRIDAY": [
+                {
+                  "openingTime": "11:00",
+                  "closingTime": "23:00"
+                }
+              ],
+              "SATURDAY": [
+                {
+                  "openingTime": "11:00",
+                  "closingTime": "23:00"
+                }
+              ],
+              "SUNDAY": [
+                {
+                  "openingTime": "11:00",
+                  "closingTime": "23:00"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "distanceFromSearchLocation": 218,
+          "parcelPoint": {
+            "code": "20499",
+            "name": "VOLTAIRE TELECOM",
+            "compatibleNetworks": [
+              "MONR_NETWORK",
+              "MONR_LOCKERS_EXCLUDED_UP_TO_30_KG_NETWORK"
+            ],
+            "location": {
+              "street": "150 RUE DE LA ROQUETTE",
+              "city": "PARIS",
+              "postalCode": "75011",
+              "countryIsoCode": "FR",
+              "position": {
+                "longitude": 2.382887,
+                "latitude": 48.858233
+              }
+            },
+            "openingDays": {
+              "MONDAY": [
+                {
+                  "openingTime": "10:30",
+                  "closingTime": "19:00"
+                }
+              ],
+              "TUESDAY": [
+                {
+                  "openingTime": "10:30",
+                  "closingTime": "19:00"
+                }
+              ],
+              "WEDNESDAY": [
+                {
+                  "openingTime": "10:30",
+                  "closingTime": "19:00"
+                }
+              ],
+              "THURSDAY": [
+                {
+                  "openingTime": "10:30",
+                  "closingTime": "19:00"
+                }
+              ],
+              "FRIDAY": [
+                {
+                  "openingTime": "10:30",
+                  "closingTime": "19:00"
+                }
+              ],
+              "SATURDAY": [
+                {
+                  "openingTime": "10:30",
+                  "closingTime": "19:00"
+                }
+              ],
+              "SUNDAY": [
+                {
+                  "openingTime": "12:00",
+                  "closingTime": "20:00"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "pointsReturned": 30
+  }
+}

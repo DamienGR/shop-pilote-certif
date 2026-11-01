@@ -278,9 +278,11 @@ export function createDatabase(name, { cwd, jurisdiction }) {
 }
 
 /** What the account says about one database. Its shape follows the D1 API, so
- *  fields come and go with the platform rather than with this CLI. */
-export function databaseInfo(name, { cwd }) {
-  const result = wrangler(['d1', 'info', name, '--json'], { cwd, allowFailure: true });
+ *  fields come and go with the platform rather than with this CLI. `id`, when
+ *  the caller has it, is what is asked: a name goes through the tree's
+ *  `wrangler.jsonc` first (`readOwner` in owner.mjs says why that matters). */
+export function databaseInfo(name, { cwd, id = name }) {
+  const result = wrangler(['d1', 'info', id, '--json'], { cwd, allowFailure: true });
   if (result.status !== 0) return null;
   return extractJson(result.stdout, `d1 info ${name}`);
 }
@@ -439,8 +441,9 @@ export function deleteWorker(worker, { cwd }) {
   return removal(wrangler(['delete', '--name', worker], { cwd, allowFailure: true }), worker);
 }
 
-export function deleteDatabase(name, { cwd }) {
-  return removal(wrangler(['d1', 'delete', name, '--skip-confirmation'], { cwd, allowFailure: true }), name);
+/** By `id` when the caller has it, for `databaseInfo`'s reason. */
+export function deleteDatabase(name, { cwd, id = name }) {
+  return removal(wrangler(['d1', 'delete', id, '--skip-confirmation'], { cwd, allowFailure: true }), name);
 }
 
 /**

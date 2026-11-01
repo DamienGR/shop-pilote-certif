@@ -23,7 +23,7 @@ ne signe pas à sa place.
 | Catalogue, prix, photos, stock | les saisit dans l'administration ou les fournit en CSV | l'import ([guide](../agents/catalogue.md)), le contrôle des colonnes |
 | Encaissement | ouvre et active son compte Stripe, porte le contrat, les litiges et les frais | l'intégration, la saisie des clés dans le coffre, l'endpoint de webhook |
 | Remboursements et rétractation | décide de chaque remboursement et tient le délai légal | le bouton de l'administration et la synchronisation avec Stripe ([procédure](remboursement.md)) |
-| Expédition et service client | prépare les colis, répond aux acheteurs | les e-mails d'expédition, les étiquettes si une clé Shippo est saisie |
+| Expédition et service client | prépare les colis, répond aux acheteurs ; ouvre son compte Boxtal en paiement par prélèvement et règle le jour même un achat d'étiquette incertain | les e-mails d'expédition, l'achat des étiquettes si les clés Boxtal sont saisies, la procédure de l'achat incertain ([runbook](runbooks/etiquette-incertaine.md)) |
 | Données personnelles | responsable du traitement : registre, politique de confidentialité, réponse aux demandes, notification d'une violation à la CNIL | sous-traitant : export et anonymisation d'une personne (`shopctl privacy`), alerte sans délai en cas de violation ([runbook](runbooks/violation-de-donnees.md)), liste des [sous-traitants](sous-traitants.md) |
 | Comptes Resend, domaine | les ouvre à son nom et les paie ; invite l'agence ; ajoute chez son registrar le CNAME que l'agence lui donne | la liste des droits à donner ([guide des comptes](../certification/comptes-et-acces.md)), le CNAME |
 | Passage à Resend Pro | décide et paie quand le volume l'exige | l'alerte (`shopctl monitor`) et le chiffrage |

@@ -6,6 +6,7 @@ import type {
   WebhookResult,
 } from './provider';
 import type { ShippingAddress } from '../orders/db';
+import type { DeliveryMethod } from '../shipping/calculator';
 import type { LightningBackend } from './lightning/backend';
 import { getBtcRate, fiatCentsToSats } from './lightning/rate';
 import {
@@ -27,7 +28,7 @@ export interface MintLightningOrderInput {
   shippingCents?: number;
   shippingLabel?: string | null;
   shippingWeightGrams?: number | null;
-  deliveryMethod?: 'pickup' | 'shipping' | null;
+  deliveryMethod?: DeliveryMethod | null;
   /** Pre-serialized JSON cart snapshot: [{ id, q, n, p }]. */
   itemsJson?: string | null;
   email?: string | null;

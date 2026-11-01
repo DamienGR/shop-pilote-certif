@@ -1,0 +1,86 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/shipping/v3.1/shipping-order",
+    "body": {
+      "shippingOfferCode": "MONR-CpourToi",
+      "labelType": "PDF_10x15",
+      "shipment": {
+        "externalId": "essai-rel-mvv4seit",
+        "packages": [
+          {
+            "type": "PARCEL",
+            "weight": 0.8,
+            "length": 30,
+            "width": 20,
+            "height": 10,
+            "value": {
+              "value": 42.4,
+              "currency": "EUR"
+            },
+            "content": {
+              "id": "content:v1:40110",
+              "description": "Vêtements neufs"
+            },
+            "externalId": "essai-rel-mvv4seit-1"
+          }
+        ],
+        "fromAddress": {
+          "type": "BUSINESS",
+          "contact": {
+            "firstName": "Boutique",
+            "lastName": "Essai",
+            "company": "Boutique Essai",
+            "email": "expediteur@example.com",
+            "phone": "+33612345678"
+          },
+          "location": {
+            "number": "10",
+            "street": "rue de Rivoli",
+            "city": "Paris",
+            "postalCode": "75004",
+            "countryIsoCode": "FR"
+          }
+        },
+        "toAddress": {
+          "type": "RESIDENTIAL",
+          "contact": {
+            "firstName": "Jeanne",
+            "lastName": "Essai",
+            "email": "destinataire@example.com",
+            "phone": "+33698765432"
+          },
+          "location": {
+            "number": "5",
+            "street": "rue Pache",
+            "city": "Paris",
+            "postalCode": "75011",
+            "countryIsoCode": "FR"
+          }
+        },
+        "pickupPointCode": "41132"
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "ms": 1416,
+    "contentType": "application/json",
+    "body": {
+      "timestamp": "2026-10-30T16:32:40.34781+01:00",
+      "status": 200,
+      "content": {
+        "id": "2610301632MONR56E8FR",
+        "shipmentId": "227112",
+        "status": "PENDING",
+        "deliveryPriceExclTax": {
+          "value": 4.19,
+          "currency": "EUR"
+        },
+        "insurancePriceExclTax": null,
+        "expectedTakingOverDate": "2026-10-31",
+        "estimatedDeliveryDate": "2026-11-06"
+      }
+    }
+  }
+}

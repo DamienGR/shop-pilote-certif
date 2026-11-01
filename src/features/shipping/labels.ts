@@ -13,6 +13,7 @@
  */
 
 import { t } from '../i18n/index.ts';
+import type { LabelResult } from './provider.ts';
 import { toGrams, type WeightParseResult, type WeightUnit } from './weight.ts';
 
 const SHIPPO_BASE = 'https://api.goshippo.com';
@@ -53,15 +54,9 @@ export interface PurchasedLabel {
   provider: string;
 }
 
-/**
- * `uncertain` marks outcomes where the request MAY have succeeded (network
- * failure, 5xx, unreadable body): for a purchase that moves money, the caller
- * must park the attempt rather than retry. Definite refusals (4xx, an ERROR
- * transaction) are safe to retry with corrections.
- */
-export type LabelResult<T> =
-  | { ok: true; value: T }
-  | { ok: false; error: string; uncertain?: boolean };
+// The shared result shape of every shipping adapter (./provider.ts). Here, an
+// ERROR transaction is a definite refusal too.
+export type { LabelResult };
 
 /** Imperial weight units come with imperial rulers. */
 export function distanceUnitFor(weightUnit: WeightUnit): 'in' | 'cm' {

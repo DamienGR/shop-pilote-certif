@@ -1,0 +1,22 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/shipping/v3.1/shipping-order/2610300000XXXX0000FR",
+    "body": null
+  },
+  "response": {
+    "status": 422,
+    "ms": 277,
+    "contentType": "application/json",
+    "body": {
+      "timestamp": "2026-10-30T16:32:55.474231+01:00",
+      "status": 422,
+      "errors": [
+        {
+          "code": "ShippingOrderNotFoundException",
+          "parameters": []
+        }
+      ]
+    }
+  }
+}

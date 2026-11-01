@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/cotation?colis_1.poids=35&colis_1.longueur=30&colis_1.largeur=20&colis_1.hauteur=10&code_contenu=40110&expediteur.pays=FR&expediteur.code_postal=75004&expediteur.ville=Paris&expediteur.type=entreprise&destinataire.pays=FR&destinataire.code_postal=35000&destinataire.ville=Rennes&destinataire.type=particulier&offers%5B0%5D=POFRColissimoAccess&offers%5B1%5D=MONRCpourToi&offers%5B2%5D=POFRColissimoPickupStation",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "ms": 337,
+    "contentType": "application/xml;charset=utf-8",
+    "body": "<?xml version='1.0' encoding='UTF-8'?><cotation><shipment><package><weight>35.0</weight><length>30</length><width>20</width><height>10</height><quantity>1</quantity></package><content>40110</content><delay>aucun</delay><shipper><type>entreprise</type><country>FR</country><zipcode>75004</zipcode><city>Paris</city></shipper><recipient><type>particulier</type><country>FR</country><zipcode>35000</zipcode><city>Rennes</city></recipient></shipment></cotation>"
+  }
+}

@@ -238,9 +238,10 @@ export function shop({
         rmSync(file, { force: true });
       }
     },
-    /** One query's rows, as the double's D1 answers them. */
-    query(sql) {
-      const result = this.wrangler(['d1', 'execute', 'DB', '--remote', '--json', '--command', sql]);
+    /** One query's rows, as the double's D1 answers them. `database` is the
+     *  binding, or the id of a database the configuration does not point at. */
+    query(sql, database = 'DB') {
+      const result = this.wrangler(['d1', 'execute', database, '--remote', '--json', '--command', sql]);
       if (result.status !== 0) throw new Error(`query failed: ${result.stderr || result.stdout}`);
       const start = result.stdout.search(/[[{]/);
       return JSON.parse(result.stdout.slice(start))[0].results;

@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/cotation?colis_1.poids=0.8&colis_1.longueur=30&colis_1.largeur=20&colis_1.hauteur=10&expediteur.pays=FR&expediteur.code_postal=75004&expediteur.ville=Paris&expediteur.type=entreprise&destinataire.pays=FR&destinataire.code_postal=75011&destinataire.ville=Paris&destinataire.type=particulier",
+    "body": null
+  },
+  "response": {
+    "status": 400,
+    "ms": 392,
+    "contentType": "application/xml;charset=utf-8",
+    "body": "<?xml version='1.0' encoding='UTF-8'?><error><code>bad_request</code><message>Le contenu de l'envoi doit être spécifié</message></error>"
+  }
+}
