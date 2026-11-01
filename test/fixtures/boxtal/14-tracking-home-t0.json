@@ -1,0 +1,37 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/shipping/v3.1/shipping-order/2610301632POFR56E7FR/tracking",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "ms": 135,
+    "contentType": "application/json",
+    "body": {
+      "timestamp": "2026-10-30T16:32:53.4785+01:00",
+      "status": 200,
+      "content": [
+        {
+          "packageId": "CR261030000000000UYM1",
+          "packageExternalId": "essai-dom-mvv4seit-1",
+          "trackingNumber": "CR261030000000000UYM",
+          "packageTrackingUrl": "https://www.laposte.fr/outils/suivre-vos-envois?code=CR261030000000000UYM1",
+          "trackingDateTime": "2026-10-30 00:00:00",
+          "status": "ANNOUNCED",
+          "message": "Envoi préparé",
+          "isFinal": false,
+          "history": [
+            {
+              "trackingDateTime": "2026-10-30 00:00:00",
+              "status": "ANNOUNCED",
+              "message": "Envoi préparé",
+              "location": null,
+              "isFinal": false
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/shipping/v3.1/shipping-order/2610301632MONR56E8FR/tracking",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "ms": 726,
+    "contentType": "application/json",
+    "body": {
+      "timestamp": "2026-10-30T16:33:12.150046+01:00",
+      "status": 200,
+      "content": [
+        {
+          "packageId": "CR261030000000000UYN1",
+          "packageExternalId": "essai-rel-mvv4seit-1",
+          "trackingNumber": "CR261030000000000UYN",
+          "packageTrackingUrl": "https://www.mondialrelay.com/public/permanent/tracking.aspx?ens=TTMRSDBXTT&exp=CR261030000000000UYN1&language=FR",
+          "trackingDateTime": "2026-10-30 00:00:00",
+          "status": "ANNOUNCED",
+          "message": "Envoi préparé",
+          "isFinal": false,
+          "history": [
+            {
+              "trackingDateTime": "2026-10-30 00:00:00",
+              "status": "ANNOUNCED",
+              "message": "Envoi préparé",
+              "location": null,
+              "isFinal": false
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

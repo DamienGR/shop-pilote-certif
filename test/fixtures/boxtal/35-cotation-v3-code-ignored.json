@@ -1,0 +1,14 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/cotation?colis_1.poids=0.8&colis_1.longueur=30&colis_1.largeur=20&colis_1.hauteur=10&code_contenu=40110&expediteur.pays=FR&expediteur.code_postal=75004&expediteur.ville=Paris&expediteur.type=entreprise&destinataire.pays=FR&destinataire.code_postal=75011&destinataire.ville=Paris&destinataire.type=particulier&offers%5B0%5D=MONR-CpourToi",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "ms": 998,
+    "contentType": "application/xml;charset=utf-8",
+    "body": null,
+    "sameBodyAs": "31-cotation-all-carriers.json"
+  }
+}

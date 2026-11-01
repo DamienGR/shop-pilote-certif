@@ -206,4 +206,14 @@ d'hôte, puis destruction sur le compte mutualisé.
 - la migration du pilote suit `docs/operations/sortie-client.md` à l'envers
   (fiche `docs/certification/compte-mutualise-migration-pilote.md`), répétée en
   doublure le 2026-10-28 de la sauvegarde sur B à sa destruction, nuit de la
-  flotte comprise ; ses défauts sont corrigés en v0.3.33.
+  flotte comprise ; ses défauts sont corrigés en v0.3.33 ;
+- la migration réelle, les 29 et 30 octobre 2026 (§10 de sa fiche) :
+  pilote-certif sert depuis le compte mutualisé, déployé et sauvegardé par
+  `DamienGR/minshop-fleet`, dont le premier Nightly programmé est vert ; B est
+  détruit et le dépôt de la boutique ne porte plus aucun secret Cloudflare.
+  Coupure de vingt-six minutes vue d'un poste, le cache négatif du DNS
+  compris ;
+- un `wrangler.jsonc` rendu pour le même environnement sur un autre compte
+  n'envoie plus le marqueur, le contrôle de juridiction ni la suppression de la
+  base vers l'identifiant de l'autre compte : ils s'adressent à la base par
+  son identifiant (`test/scripts/owner.test.mjs`, v0.3.34).

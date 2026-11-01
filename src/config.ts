@@ -34,6 +34,20 @@ export interface SiteConfig {
      * + session cookie) AND email configured (to send the link). See README → Accounts.
      */
     accounts: boolean;
+    /**
+     * Relay-point delivery (ADR 0020): the shipping editor offers relay rates,
+     * each naming a Boxtal relay offer, and /checkout lets the shopper pick a
+     * point. Off by default, switched on shop by shop once the core tag
+     * carrying it has been certified. A relay rate is offered at checkout only
+     * while the Boxtal keys are in the vault.
+     *
+     * The `RELAY_POINTS` var (`on`) is the default under a store.config.ts
+     * that does not set it, for a run whose vars are written by hand: `wrangler
+     * dev` with `.dev.vars`, or a test that boots the built Worker. The wrangler
+     * template renders no such var, so a deployed staging rehearses the option
+     * with the build that production will run (plan §13.3, lot 6).
+     */
+    relayPoints: boolean;
   };
   /**
    * Terms of sale, and the consent an order records.
@@ -228,6 +242,7 @@ function defaultConfig(): SiteConfig {
     timeZone: env.TIME_ZONE ?? DEFAULT_TIME_ZONE, // setup/admin settings can override this at runtime
     features: {
       accounts: false, // magic-link customer login; needs AUTH_SECRET + email
+      relayPoints: env.RELAY_POINTS === 'on', // relay rates and /checkout's point step; needs the Boxtal keys
     },
     legal: {
       termsSlug: 'conditions-generales-de-vente',

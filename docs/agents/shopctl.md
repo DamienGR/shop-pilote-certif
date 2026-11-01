@@ -98,7 +98,13 @@ is (exit 4); an unmarked database is a warning. The way out is `provision
 --claim <slug>`, the slug typed: a repository renamed or transferred is the
 case it exists for. The marker is never backed up, never restored and never
 exported, so an archive of one shop restored into another leaves the target's
-own. `fleet status` / `fleet verify` add the other half: two shops of the
+own. It is read and written by the database's ID, the one the account listing
+gave, never by its name — and so are `provision`'s jurisdiction check and
+`destroy`'s deletion, which also run before the configuration is rendered for
+the environment: wrangler resolves a name through the tree's `wrangler.jsonc`
+first and takes the id there at its word, and a render left by the same
+environment on another account sent them to that account's id (lot 8, code
+7404). `fleet status` / `fleet verify` add the other half: two shops of the
 registry whose manifests claim one name — a `workerName`, a database, a
 hostname — fail both, since the registry's slug check cannot see two slugs
 deriving the same resources. `shopctl new` asks the same question before it

@@ -1,9 +1,10 @@
 import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
-import { listOrders } from '../../../features/orders/db';
+import { listOrders, type Order } from '../../../features/orders/db';
 import { parseOrderFilters, orderFilterClause } from '../../../features/orders/filter';
 import { getConfig, toMajorUnits, currencyDecimals } from '../../../config';
 import { orderReference } from '../../../features/orders/number';
+import { orderRelayPoint, relayPointLines } from '../../../features/shipping/relay.ts';
 
 export const prerender = false;
 
@@ -15,6 +16,12 @@ const esc = (v: unknown): string => {
 // Minor units → major-unit string, scaled by the order's own currency.
 const money = (cents: number, currency: string): string =>
   toMajorUnits(cents, currency).toFixed(currencyDecimals(currency));
+
+// The delivery mode, then for a relay order the point's code and its sign.
+const deliveryCells = (o: Order): string[] => {
+  const point = orderRelayPoint(o);
+  return [o.delivery_method ?? '', point?.code ?? '', point ? relayPointLines(point).join(', ') : ''];
+};
 
 // GET /admin/orders/export.csv — download all orders as CSV.
 export const GET: APIRoute = async ({ url }) => {
@@ -40,6 +47,9 @@ export const GET: APIRoute = async ({ url }) => {
     'VAT rate', 'VAT included', 'Net of VAT',
     'Terms version', 'Terms accepted at',
     'Carrier', 'Tracking',
+    // How the parcel travels, and for a relay order the point the buyer chose:
+    // the code the carrier knows it by, then the name and address on its sign.
+    'Delivery', 'Relay point code', 'Relay point',
   ];
   const rows = orders.map((o) => [
     orderReference(o.public_id, o.id, onCfg),
@@ -75,6 +85,7 @@ export const GET: APIRoute = async ({ url }) => {
     o.terms_accepted_at ?? '',
     o.tracking_carrier ?? '',
     o.tracking_number ?? '',
+    ...deliveryCells(o),
   ]);
 
   const csv = [header, ...rows].map((r) => r.map(esc).join(',')).join('\r\n') + '\r\n';

@@ -204,7 +204,11 @@ function advanceCursor(db: D1Database, name: string, last: SweepRow): D1Prepared
     .bind(name, last.at, last.id);
 }
 
-/** A self-rendered checkout terminal for three days: its credential becomes a tombstone. */
+/**
+ * A checkout terminal for three days without an order: its credential becomes
+ * a tombstone, and the address /checkout took for a card payment (migration
+ * 0048) is let go — past Stripe's retries, no paid webhook comes to need it.
+ */
 async function hideTerminalGuestAccess(db: D1Database, scan: number): Promise<number> {
   const cursor = await readCursor(db, HIDE_CURSOR);
   const { results } = await db
@@ -222,18 +226,26 @@ async function hideTerminalGuestAccess(db: D1Database, scan: number): Promise<nu
     .all<SweepRow>();
   const rows = results ?? [];
   if (rows.length === 0) return 0;
-  const writes = rows
-    .filter((row) => row.act)
-    .map((row) =>
-      db
-        .prepare(
-          `UPDATE order_guest_access SET hidden_at = datetime('now')
-            WHERE order_public_id = ?1 AND hidden_at IS NULL
-              AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.public_id = ?1)`,
-        )
-        .bind(row.id),
-    );
-  const done = await db.batch([...writes, advanceCursor(db, HIDE_CURSOR, rows[rows.length - 1])]);
+  const acted = rows.filter((row) => row.act);
+  const writes = acted.map((row) =>
+    db
+      .prepare(
+        `UPDATE order_guest_access SET hidden_at = datetime('now')
+          WHERE order_public_id = ?1 AND hidden_at IS NULL
+            AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.public_id = ?1)`,
+      )
+      .bind(row.id),
+  );
+  const forgets = acted.map((row) =>
+    db
+      .prepare(
+        `UPDATE checkout_reservations SET ship_address = NULL
+          WHERE public_id = ?1 AND ship_address IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.public_id = ?1)`,
+      )
+      .bind(row.id),
+  );
+  const done = await db.batch([...writes, ...forgets, advanceCursor(db, HIDE_CURSOR, rows[rows.length - 1])]);
   return done.slice(0, writes.length).reduce((n, result) => n + (result.meta.changes ?? 0), 0);
 }
 

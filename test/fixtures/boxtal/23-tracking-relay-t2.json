@@ -1,0 +1,51 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/shipping/v3.1/shipping-order/2610301632MONR56E8FR/tracking",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "ms": 166,
+    "contentType": "application/json",
+    "body": {
+      "timestamp": "2026-10-30T17:02:16.718839+01:00",
+      "status": 200,
+      "content": [
+        {
+          "packageId": "CR261030000000000UYN1",
+          "packageExternalId": "essai-rel-mvv4seit-1",
+          "trackingNumber": "CR261030000000000UYN",
+          "packageTrackingUrl": "https://www.mondialrelay.com/public/permanent/tracking.aspx?ens=TTMRSDBXTT&exp=CR261030000000000UYN1&language=FR",
+          "trackingDateTime": "2026-10-30 10:00:00",
+          "status": "SHIPPED",
+          "message": "Prise en charge par le transpo",
+          "isFinal": false,
+          "history": [
+            {
+              "trackingDateTime": "2026-10-30 10:00:00",
+              "status": "SHIPPED",
+              "message": "Prise en charge par le transpo",
+              "location": "SAINT OUEN L'AUMONE",
+              "isFinal": false
+            },
+            {
+              "trackingDateTime": "2026-10-30 08:00:00",
+              "status": "ANNOUNCED",
+              "message": "Réception des données",
+              "location": null,
+              "isFinal": false
+            },
+            {
+              "trackingDateTime": "2026-10-30 00:00:00",
+              "status": "ANNOUNCED",
+              "message": "Envoi préparé",
+              "location": null,
+              "isFinal": false
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/cotation?colis_1.poids=0.8&colis_1.longueur=30&colis_1.largeur=20&colis_1.hauteur=10&code_contenu=40110&expediteur.pays=FR&expediteur.code_postal=75004&expediteur.ville=Paris&expediteur.type=entreprise&destinataire.pays=FR&destinataire.code_postal=75011&destinataire.ville=Paris&destinataire.type=particulier&offers%5B0%5D=POFRColissimoAccess&offers%5B1%5D=MONRCpourToi",
+    "body": null
+  },
+  "response": {
+    "status": 401,
+    "ms": 128,
+    "contentType": "application/xml;charset=UTF-8",
+    "body": "<UnauthorizedException><error>unauthorized</error><error_description>Full authentication is required to access this resource</error_description></UnauthorizedException>"
+  }
+}

@@ -50,6 +50,11 @@ chaque boutique reste mono-tenant à l'exécution.
 - sauvegarde et restauration ;
 - administration protégée par Cloudflare Access et Turnstile.
 
+Après le pilote, l'[ADR 0020](architecture/decisions/0020-expeditions-par-boxtal.md)
+ajoute à l'offre deux options par Boxtal : l'achat d'étiquettes avec le suivi,
+et les points relais. Le pilote ne les couvre pas ; elles entrent dans le
+périmètre certifié avec leur propre campagne (§13.3).
+
 ### 2.2 Hors périmètre
 
 - multilingue ;
@@ -57,7 +62,7 @@ chaque boutique reste mono-tenant à l'exécution.
 - abonnements ;
 - marketplace ;
 - B2B avancé ;
-- points relais ;
+- points relais, devenus une option de l'offre après le pilote (ADR 0020) ;
 - tarifs transporteur en temps réel ;
 - ERP, caisse ou comptabilité synchronisés ;
 - automatisation marketing ;
@@ -2925,9 +2930,20 @@ du compte mutualisé est une application, et une clé matérielle est à poser
 avant le lot 8 ; dg-tech.dev, choisi par Damien, porte aussi le site et les
 e-mails de l'agence. Le lot 8 a sa
 [fiche](certification/compte-mutualise-migration-pilote.md), répétée en
-doublure le 2026-10-28 : une heure et demie, cinq minutes de coupure, B détruit
-après une nuit verte de la flotte (`DamienGR/minshop-fleet`) ; les défauts
-trouvés sont corrigés en v0.3.33.
+doublure le 2026-10-28 ; les défauts trouvés sont corrigés en v0.3.33.
+
+**Le lot 8 est fait**, les 29 et 30 octobre 2026 (§10 de la fiche) :
+pilote-certif sert depuis le compte mutualisé depuis le 29 à 21 h 24 UTC,
+déployé et sauvegardé par la flotte (`DamienGR/minshop-fleet`), et B a été
+détruit le 30 après le premier Nightly programmé de la flotte, vert. La
+coupure a duré vingt-six minutes vue du poste de Damien, pas les cinq
+annoncées : le cache négatif du DNS garde une réponse vide trente minutes.
+La clé matérielle, commandée, n'était pas arrivée : la migration s'est faite
+sous l'application d'authentification, et la clé se pose à réception. Ce que
+la migration a trouvé est corrigé en v0.3.34, dont un `provision` qui, depuis
+un arbre portant le rendu de B, posait le marqueur vers la base de B. Les huit
+lots sont livrés. Le compte est encore en Workers Free
+(`MINSHOP_ACCOUNT_PLAN=free`), et la nuit le juge contre les quotas du compte.
 
 Sources relevées le 2026-10-15 puis le 2026-10-28 sur developers.cloudflare.com :
 tarifs et limites de Workers, D1, R2 et KV, tarifs d'Observability au
@@ -2948,3 +2964,147 @@ le compte de l'agence devient facultative : la production se construit
 directement sur le compte du client, fermée jusqu'à l'ouverture
 ([ADR 0015](architecture/decisions/0015-cycle-de-vie-d-une-boutique.md),
 amendé le même jour).
+
+### 13.3 Les points relais et les expéditions par Boxtal
+
+Notée le 2026-10-26 (ticket #123), **décidée le 2026-10-30** : le client
+choisit un point relais à la commande, et la boutique traite la commande
+jusqu'à ce point. Les points relais étaient hors périmètre (§2.2,
+[ADR 0007](architecture/decisions/0007-perimetre-fonctionnel.md)) ;
+l'[ADR 0020](architecture/decisions/0020-expeditions-par-boxtal.md), accepté
+par la fusion de la PR #135, en fait une option de l'offre, éteinte par défaut
+et certifiée avant la première vente qui s'en sert.
+
+Damien a fixé le 2026-10-30 un agrégateur plutôt que Mondial Relay en direct,
+puis un seul prestataire pour toutes les expéditions : **Boxtal**, sans
+abonnement, pour la recherche des points, les étiquettes à domicile et en
+relais, et le suivi. Shippo sort de l'offre, son code reste désactivé ;
+Sendcloud est le repli. La recherche des points est faite par le serveur et
+sans JavaScript obligatoire, et Stripe passe par l'étape `/checkout` dès qu'un
+tarif relais existe.
+
+Engagée en six lots, dans cet ordre :
+
+1. la décision écrite : l'ADR 0020 accepté, les statuts de l'ADR 0007, des
+   §2.1 et §2.2 et du README (faits le 2026-10-30) ; un compte de test Boxtal,
+   et un corpus de réponses relevées dans son bac à sable (recherche,
+   expédition, étiquette, suivi), relevé le 2026-10-30 dans
+   `test/fixtures/boxtal/`. L'[ADR 0021](architecture/decisions/0021-boxtal-apres-le-bac-a-sable.md),
+   accepté par la fusion de la PR #137, en tire ce qui change :
+   - pas de devis en v3 : il passe par la v1, en option, et l'achat reste en
+     v3. Le devis v1 est relevé à son tour, le même jour : le code d'offre v3
+     assemble ses codes de transporteur et de service ;
+   - pas d'idempotence : l'achat incertain se lève avec le commerçant ;
+   - l'étiquette relue à la demande ;
+   - l'URL de suivi rendue par Boxtal ;
+2. les ports `PickupPointProvider` et `LabelProvider`, `labels.ts` devenu
+   l'adaptateur Shippo, l'adaptateur Boxtal et ses clés dans le coffre, testés
+   sur ce corpus (faits le 2026-10-30, sans appelant encore : les ports dans
+   `src/features/shipping/provider.ts`, avec un troisième pour le devis,
+   Boxtal dans `src/features/shipping/boxtal/`, quatre noms au coffre). Le
+   module Shippo ne partage encore que le type de résultat : la fiche commande
+   ne passe aux ports qu'au lot 3. L'adaptateur du devis v1 :
+   - désigne une offre par son code v3, `<transporteur>-<service>`, jamais par
+     le seul service (`DomicileFrance` existe chez `MONR` et chez `BMON`) ;
+   - ne demande que les offres retenues (`offers[N]`, les deux codes collés),
+     et ne garde que celles qu'il a demandées, puisque la v1 ignore sans
+     erreur un filtre qu'elle ne connaît pas (`35`) ;
+   - rend le prix hors taxes, celui que l'achat en v3 confirme ;
+   - se teste aussi sur l'offre absente (`38`) et les erreurs (`36`, `39`) ;
+3. l'étiquette à domicile achetée chez Boxtal depuis la fiche commande, sur
+   une offre retenue dans Réglages (une offre retenue que le devis ne rend pas
+   y est « non proposée pour ce colis »), le suivi et son URL gardée sur la
+   commande, Boxtal à la place de Shippo dans Réglages et dans la liste des
+   sous-traitants, qui décrit ce qu'une boutique fait tourner (fait le
+   2026-10-30, en doublure sur le corpus : `boxtal/orderLabel.ts`, la
+   migration 0047, `test/integration/boxtal-labels.mjs`). Le bac à sable a
+   montré qu'une commande reste `PENDING` 14 à 20 s, sans suivi ni document
+   (corpus `43` à `52`) : l'achat s'enregistre d'abord, le numéro arrive à la
+   relecture du suivi, et la fiche offre « Relire le suivi » quand Boxtal
+   tarde. Boxtal exige le téléphone du destinataire, que la boutique ne
+   demandait pas : le commerçant le saisissait à l'achat, jusqu'au lot 4. Le
+   runbook
+   [etiquette-incertaine](operations/runbooks/etiquette-incertaine.md) règle
+   l'achat incertain et le doublon ;
+4. le tarif `relay` par offre Boxtal (document d'expédition en version 4),
+   l'étape `/checkout` pour tous les moyens de paiement, la valeur `relay` de
+   `delivery_method` et les colonnes du point (réservation, paiement en
+   attente, commande), classées pour l'effacement. Le téléphone du
+   destinataire se demande à la commande (décision de Damien, 2026-10-30),
+   avec l'adresse, dès que les clés v3 de Boxtal sont au coffre : une boutique
+   qui expédie à la main ne le collecte pas. L'étape `/checkout` le demande,
+   l'API JSON le lit dans `ship_to` et la page de Stripe le collecte ; il
+   entre dans l'instantané de l'adresse, que l'effacement réduit au pays, et
+   la fiche commande le préremplit à l'achat de l'étiquette (fait le
+   2026-10-30 : `features/shipping/recipient.ts`,
+   `test/integration/checkout-phone.mjs`). C'est une précision de l'ADR 0020,
+   qui le faisait demander par Stripe sur le parcours relais : ce parcours
+   passe par `/checkout`, qui le demande là, comme pour les autres moyens de
+   paiement. Le tarif `relay` existe (fait le 2026-10-30, sans appelant à
+   la commande) : il nomme l'une des neuf offres relais du devis du bac à
+   sable et se fixe au forfait ou au poids, comme un tarif à domicile ;
+   l'éditeur le propose quand `features.relayPoints` est allumé au build ; le
+   calcul ne le chiffre que pour un appelant qui sait faire choisir un point
+   (`relayOffers`), et la livraison offerte reste une livraison à domicile.
+   Le document passe en version 4. Une offre que le socle ne liste plus est
+   refusée à l'enregistrement mais ne rend pas le document invalide : elle
+   sort du choix. Le point se choisit à `/checkout` (fait le 2026-10-30 pour
+   tous les moyens de paiement : `features/shipping/relay.ts`, la migration
+   0048, `test/integration/checkout-relay.mjs`). L'étape des tarifs
+   cherche les points de chaque offre relais autour de l'adresse saisie, en
+   cache une heure par offre et par adresse ; une offre dont la recherche
+   échoue ou ne trouve rien sort du choix, et la commande continue. Un tarif
+   relais mène à une étape de plus, la liste des dix points les plus proches,
+   sans JavaScript ; un point posté n'est cru que si la recherche l'a servi.
+   Le point (offre, code, nom, adresse) entre dans la réservation, que
+   `recordPaidOrder` recopie sur la commande avec `delivery_method` = `relay`.
+   Le paiement en attente n'en garde pas de copie, contrairement à ce que
+   prévoyait l'ADR 0020 : chaque moyen de paiement règle à partir de la même
+   réservation. L'effacement réduit le point au pays sur la commande comme
+   sur la réservation, que la carte des données personnelles atteint
+   désormais. Un paiement par carte vers une zone qui a un tarif relais passe
+   aussi par `/checkout` (décision de Damien, 2026-10-30, qui s'écarte de
+   l'ADR 0020) : l'adresse et le téléphone s'y saisissent une seule fois, le
+   tarif et le point s'y choisissent, et la session Stripe ne reçoit que le
+   tarif choisi, sans collecte d'adresse ni de téléphone. Une zone sans tarif
+   relais garde le passage direct par la page de Stripe. Le webhook de Stripe
+   ne rend alors pas d'adresse : la réservation la garde (`ship_address`) et
+   `recordPaidOrder` la recopie sur la commande, puis l'efface. Une
+   réservation libérée avant que Stripe ait une session l'efface aussitôt ;
+   une réservation expirée ou en échec la garde trois jours, le temps des
+   relances de webhook de Stripe, et le balayage qui masque son lien d'invité
+   l'efface. Une session sans collecte d'adresse se vérifie en mode test
+   au lot 6, avec Stripe Tax, qui calcule alors l'impôt sur l'adresse de
+   facturation. L'option se construit (`features.relayPoints` dans le
+   `store.config.ts` de la boutique) : la staging qui la répète porte le build
+   de la production. La variable `RELAY_POINTS` (`on`) ne sert qu'aux essais
+   locaux et aux tests, le gabarit de `wrangler.jsonc` ne la rendant pas ;
+5. le point dans les e-mails, la fiche commande et l'export CSV, et
+   l'étiquette relais (fait le 2026-10-30, en doublure sur le corpus). Le
+   point se lit dans l'e-mail de confirmation, celui d'expédition, la page de
+   commande de l'acheteur, et, avec son code et son offre, dans l'avis au
+   commerçant et la fiche commande ; l'export prend le mode de livraison, le
+   code et l'adresse du point. Un point que l'effacement a réduit au pays ne
+   se lit plus nulle part. L'étiquette d'une commande en relais s'achète sur
+   l'offre du point, quelles que soient les offres à domicile retenues, et
+   vers le point lu sur la commande, jamais sur le formulaire
+   (`pickupPointCode`, corpus `11`) ; Boxtal refuse un point qu'il ne
+   connaît pas (`17`), et la fiche le dit au commerçant. Changer de point
+   après la commande n'est pas prévu : le commerçant prévient l'acheteur,
+   achète l'étiquette dans Boxtal et saisit le suivi à la main ;
+6. la campagne en doublure sur le bac à sable, puis en réel jusqu'au retrait
+   d'un vrai colis en relais, avec l'URL de suivi vérifiée ; la commande réelle
+   attend le feu vert de Damien. Sa fiche,
+   [points-relais-commandes](certification/points-relais-commandes.md)
+   (écrite le 2026-10-30, sur le socle `v0.3.35`), la mène sur pilote-certif :
+   une staging temporaire sur `workers.dev`, Boxtal en bac à sable et Stripe en
+   mode test, pour une étiquette en relais et une à domicile, puis détruite ;
+   ensuite la production, Boxtal et Stripe en réel. Le
+   [runbook des points relais](operations/runbooks/point-relais.md) prend les
+   incidents que l'ADR 0020 range dans `docs/operations/` (tarif absent, point
+   refusé, colis non retiré, retour, panne de Boxtal) ; le délai de garde de
+   Mondial Relay y entre après la commande réelle. Un écart avec la
+   vérification de l'ADR 0020 : la porte navigateur ne passe pas encore par
+   `/checkout`, faute d'un Boxtal simulé sous `wrangler dev`. Le choix du point
+   sans JavaScript est tenu par `test/integration/checkout-relay.mjs`, et la
+   fiche le regarde à la main, sur un téléphone et sans JavaScript.

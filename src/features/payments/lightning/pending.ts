@@ -1,5 +1,6 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import type { PaidOrderInput, OrderItemInput, ShippingAddress } from '../../orders/db';
+import { parseDeliveryMethod, type DeliveryMethod } from '../../shipping/calculator.ts';
 
 /**
  * Pending Lightning payments — the in-flight state between minting a BOLT11
@@ -23,7 +24,7 @@ export interface PendingPayment {
    *  Under weight bands the amount alone no longer explains itself. */
   shipping_label: string | null;
   shipping_weight_grams: number | null;
-  delivery_method: string | null; // 'pickup' | 'shipping' | NULL (legacy/none)
+  delivery_method: string | null; // 'pickup' | 'shipping' | 'relay' | NULL (legacy/none)
   ship_address: string | null; // JSON (ShippingAddress) or null
   /** Explicit link for post-0021 rows; null preserves legacy settlement. */
   reservation_id: string | null;
@@ -46,7 +47,7 @@ export interface NewPendingPayment {
   shippingCents?: number;
   shippingLabel?: string | null;
   shippingWeightGrams?: number | null;
-  deliveryMethod?: 'pickup' | 'shipping' | null;
+  deliveryMethod?: DeliveryMethod | null;
   /** Pre-serialized JSON ShippingAddress, or null. */
   shipAddressJson?: string | null;
   /** Inventory hold created with this payment; absent for legacy rows. */
@@ -155,7 +156,7 @@ export function pendingToPaidOrder(p: PendingPayment): PaidOrderInput {
     shippingCents: p.shipping_cents,
     shippingLabel: p.shipping_label,
     shippingWeightGrams: p.shipping_weight_grams,
-    deliveryMethod: p.delivery_method === 'pickup' ? 'pickup' : p.delivery_method === 'shipping' ? 'shipping' : null,
+    deliveryMethod: parseDeliveryMethod(p.delivery_method),
     shippingAddress,
     currency: p.currency,
     items,

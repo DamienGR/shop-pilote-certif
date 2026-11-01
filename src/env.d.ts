@@ -66,6 +66,11 @@ declare namespace Cloudflare {
     STORE_NAME: string;
     // Fallback IANA time zone; setup/admin settings store the runtime override.
     TIME_ZONE?: string;
+    // 'on' switches relay points on when the shop's store.config.ts leaves
+    // config.features.relayPoints unset. Local runs and tests only: the wrangler
+    // template renders no such var, so a deployed environment takes the build's
+    // switch (plan §13.3, lot 6).
+    RELAY_POINTS?: string;
     // Absolute base URL for product images (e.g. an R2 custom domain) so they
     // bypass the Worker's /images route. Absent = serve via /images.
     IMAGE_BASE_URL?: string;

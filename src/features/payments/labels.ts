@@ -46,6 +46,7 @@ export function paymentMethodCopy(method: string): PaymentMethodCopy {
 
 /** The submit-button label on /checkout, per in-app rail. */
 const RAIL_KEYS: Record<string, MessageKey> = {
+  stripe: 'payment.rail.stripe',
   lightning: 'payment.rail.lightning',
   opennode: 'payment.rail.opennode',
   demo: 'payment.rail.demo',

@@ -24,6 +24,7 @@ import {
   ORDER_METHOD_OPTIONS,
 } from '../../../features/orders/filter';
 import { listUnmatchedRefundEvents } from '../../../features/refunds/db';
+import { isPurchaseStale, listLabelsNeedingAttention } from '../../../features/shipping/labelStore';
 import { t, tn, type MessageKey } from '../../../features/i18n';
 import {
   parseOrderOrLegacyPublicId,
@@ -95,6 +96,12 @@ const arrow = (col: string) => (sort === col ? (dir === 'asc' ? ' ↑' : ' ↓')
 // they surface here rather than sitting silently in a table.
 const unmatched = await listUnmatchedRefundEvents(env.DB);
 const inventoryExceptions = await listUnresolvedInventoryExceptions(env.DB);
+// A label purchase whose outcome is unknown may have been billed: Boxtal can
+// neither replay it safely nor list it, so a human settles it, the same day
+// (ADR 0021). A purchase still inside its lease is in flight, not stuck.
+const labelsToSettle = (await listLabelsNeedingAttention(env.DB)).filter(
+  (label) => label.status === 'uncertain' || isPurchaseStale(label),
+);
 // The conflicting order for each matched event, so the warning can link and
 // label it by public ID + reference (never the row id). Bounded by the queue.
 const conflictOrders = new Map(
@@ -135,6 +142,23 @@ const statusLabel = (status: string) =>
                 {t('admin.orders.reference', { numero: orderReference(entry.order_public_id, entry.order_id, onCfg) })}
               </a>{' '}
               — {tn('admin.orders.list.inventory.oversold.one', 'admin.orders.list.inventory.oversold.other', entry.shortfall_qty)}
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
+  {
+    labelsToSettle.length > 0 && (
+      <section id="labels-to-settle" class="mb-8 rounded-lg border border-amber-300 bg-amber-50 px-5 py-4">
+        <h2 class="text-sm font-medium text-amber-900">{tn('admin.orders.list.labels.heading.one', 'admin.orders.list.labels.heading.other', labelsToSettle.length)}</h2>
+        <p class="mt-1 text-xs text-amber-800">{t('admin.orders.list.labels.intro')}</p>
+        <ul class="mt-3 space-y-2 text-sm text-amber-900">
+          {labelsToSettle.map((label) => (
+            <li>
+              <a class="font-medium underline" href={`/admin/orders/${label.order_public_id}`}>
+                {t('admin.orders.reference', { numero: orderReference(label.order_public_id, label.order_id, onCfg) })}
+              </a>
             </li>
           ))}
         </ul>

@@ -182,12 +182,15 @@ function migrate(shopRoot) {
   chmodSync(shim, 0o755);
   const statePath = join(shopRoot, 'cf-state.json');
   // The database the shop's own wrangler.jsonc binds — rendered from its
-  // manifest by the upgrade itself, so the name comes from the shop rather than
-  // from this test.
-  const database = read(shopRoot, 'wrangler.jsonc').match(/"database_name"\s*:\s*"([^"]+)"/)[1];
+  // manifest by the upgrade itself, so the name and the id come from the shop
+  // rather than from this test. The id too: wrangler takes the one the
+  // configuration carries at its word.
+  const config = read(shopRoot, 'wrangler.jsonc');
+  const database = config.match(/"database_name"\s*:\s*"([^"]+)"/)[1];
+  const uuid = config.match(/"database_id"\s*:\s*"([^"]+)"/)[1];
   writeFileSync(
     statePath,
-    JSON.stringify({ authenticated: true, accounts: [], d1: [{ name: database, uuid: '00000000-0000-4000-8000-000000000000' }], r2: [], workers: [], calls: [] }, null, 2),
+    JSON.stringify({ authenticated: true, accounts: [], d1: [{ name: database, uuid }], r2: [], workers: [], calls: [] }, null, 2),
   );
   const wrangler = (args) =>
     spawnSync(shim, args, { cwd: shopRoot, encoding: 'utf8', env: { ...GIT_ENV, WRANGLER_DOUBLE_STATE: statePath } });

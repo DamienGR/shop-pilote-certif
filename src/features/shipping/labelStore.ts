@@ -19,6 +19,9 @@ import type { D1Database } from '@cloudflare/workers-types';
 
 export type LabelStatus = 'quoted' | 'purchasing' | 'purchased' | 'failed' | 'uncertain';
 
+/** Who sold the label. Rows from before migration 0047 are Shippo's. */
+export type LabelVendor = 'shippo' | 'boxtal';
+
 /**
  * How long a 'purchasing' row is presumed to have a live request behind it.
  * This is a UI signal ONLY — "show progress" vs "offer reconciliation". It
@@ -49,6 +52,11 @@ export interface LabelRecord {
   label_url: string | null;
   error: string | null;
   claim_token: string | null;
+  vendor: LabelVendor;
+  /** Boxtal: the sender and parcel as typed at the quote (JSON), never the buyer. */
+  parcel: string | null;
+  /** Boxtal: the offers shown with the quote (JSON). */
+  offers: string | null;
   updated_at: string;
 }
 
@@ -68,15 +76,16 @@ export interface LabelAttemptRecord {
   tracking_number: string | null;
   label_url: string | null;
   error: string | null;
+  vendor: LabelVendor;
   created_at: string;
   settled_at: string;
 }
 
-/** The order must still be worth labelling: paid, unfulfilled, not a pickup. */
+/** The order must still be worth labelling: paid, unfulfilled, sent (home or relay), not a pickup. */
 const ORDER_ELIGIBLE = `EXISTS (
   SELECT 1 FROM orders
    WHERE id = ?1 AND status = 'paid' AND fulfillment_status = 'unfulfilled'
-     AND delivery_method = 'shipping'
+     AND delivery_method IN ('shipping', 'relay')
 )`;
 
 export async function getLabelRecord(db: D1Database, orderId: number): Promise<LabelRecord | null> {
@@ -113,13 +122,18 @@ export async function recordQuote(
   db: D1Database,
   orderId: number,
   shipmentId: string,
+  /** Boxtal keeps nothing between quote and purchase, so the row does. */
+  boxtal?: { parcel: string; offers: string },
 ): Promise<boolean> {
   const row = await db
     .prepare(
-      `INSERT INTO shipping_labels (order_id, status, shipment_id)
-       SELECT ?1, 'quoted', ?2 WHERE ${ORDER_ELIGIBLE}
+      `INSERT INTO shipping_labels (order_id, status, shipment_id, vendor, parcel, offers)
+       SELECT ?1, 'quoted', ?2, ?3, ?4, ?5 WHERE ${ORDER_ELIGIBLE}
        ON CONFLICT(order_id) DO UPDATE SET
          shipment_id = excluded.shipment_id,
+         vendor = excluded.vendor,
+         parcel = excluded.parcel,
+         offers = excluded.offers,
          status = 'quoted',
          rate_id = NULL,
          transaction_id = NULL,
@@ -134,7 +148,7 @@ export async function recordQuote(
        WHERE shipping_labels.status IN ('quoted', 'failed')
        RETURNING order_id`,
     )
-    .bind(orderId, shipmentId)
+    .bind(orderId, shipmentId, boxtal ? 'boxtal' : 'shippo', boxtal?.parcel ?? null, boxtal?.offers ?? null)
     .first();
   return row != null;
 }
@@ -209,11 +223,11 @@ export async function recordPurchased(
         `INSERT OR IGNORE INTO shipping_label_attempts (
            order_id, claim_token, outcome, shipment_id, rate_id, transaction_id,
            provider, service, amount_cents, tracking_number, label_url, error,
-           created_at
+           vendor, created_at
          )
          SELECT order_id, claim_token, 'purchased', shipment_id, rate_id,
                 transaction_id, provider, service, amount_cents, tracking_number,
-                label_url, error, created_at
+                label_url, error, vendor, created_at
            FROM shipping_labels
           WHERE order_id = ?1 AND status = 'purchased'
             AND claim_token = ?2 AND transaction_id = ?3`,
@@ -230,7 +244,7 @@ export async function recordPurchased(
             SET fulfillment_status = 'fulfilled', tracking_carrier = ?2, tracking_number = ?3,
                 fulfilled_at = datetime('now'), label_url = ?4
           WHERE id = ?1 AND status = 'paid' AND fulfillment_status = 'unfulfilled'
-            AND delivery_method = 'shipping'
+            AND delivery_method IN ('shipping', 'relay')
             AND EXISTS (
               SELECT 1 FROM shipping_labels
                WHERE order_id = ?1 AND status = 'purchased' AND claim_token = ?5
@@ -289,11 +303,11 @@ export async function markLabelFailed(
         `INSERT OR IGNORE INTO shipping_label_attempts (
            order_id, claim_token, outcome, shipment_id, rate_id, transaction_id,
            provider, service, amount_cents, tracking_number, label_url, error,
-           created_at
+           vendor, created_at
          )
          SELECT order_id, claim_token, 'failed', shipment_id, rate_id,
                 transaction_id, provider, service, amount_cents, tracking_number,
-                label_url, error, created_at
+                label_url, error, vendor, created_at
            FROM shipping_labels
           WHERE order_id = ?1 AND status = 'failed' AND claim_token = ?2
             AND error = ?3`,
@@ -368,11 +382,11 @@ export async function recordRefundedAttempt(
         `INSERT OR IGNORE INTO shipping_label_attempts (
            order_id, claim_token, outcome, shipment_id, rate_id, transaction_id,
            provider, service, amount_cents, tracking_number, label_url, error,
-           created_at
+           vendor, created_at
          )
          SELECT order_id, claim_token, 'refunded', shipment_id, rate_id,
                 transaction_id, provider, service, amount_cents, tracking_number,
-                label_url, error, created_at
+                label_url, error, vendor, created_at
            FROM shipping_labels
           WHERE order_id = ?1 AND status = 'failed' AND claim_token = ?2
             AND transaction_id = ?3`,
@@ -396,11 +410,11 @@ export async function forceDiscardLabelAttempt(db: D1Database, orderId: number):
         `INSERT OR IGNORE INTO shipping_label_attempts (
            order_id, claim_token, outcome, shipment_id, rate_id, transaction_id,
            provider, service, amount_cents, tracking_number, label_url, error,
-           created_at
+           vendor, created_at
          )
          SELECT order_id, claim_token, 'force_discarded', shipment_id, rate_id,
                 transaction_id, provider, service, amount_cents, tracking_number,
-                label_url, error, created_at
+                label_url, error, vendor, created_at
            FROM shipping_labels
           WHERE order_id = ?1 AND status IN ('purchasing', 'uncertain')
             AND claim_token IS NOT NULL`,
@@ -414,4 +428,151 @@ export async function forceDiscardLabelAttempt(db: D1Database, orderId: number):
       .bind(orderId),
   ]);
   return (results[1]?.meta?.changes ?? 0) > 0;
+}
+
+/**
+ * A provider that answers the purchase before it has a tracking number
+ * (Boxtal: the order is PENDING for about twenty seconds, and its tracking is
+ * an empty list until then) gets the charge recorded first, on its own: the
+ * money trail must not wait on a second call that may never come. The order
+ * stays unfulfilled until recordLabelTracking lands the number.
+ *
+ * Same fencing as recordPurchased: only the attempt holding this claim token,
+ * submitted ('purchasing') or parked ('uncertain' — a pasted provider id that
+ * proved to be this attempt's).
+ */
+export async function recordPurchasedAwaitingTracking(
+  db: D1Database,
+  orderId: number,
+  claimToken: string,
+  p: { transactionId: string; provider: string; service: string; amountCents: number | null },
+): Promise<boolean> {
+  const results = await db.batch([
+    db
+      .prepare(
+        `UPDATE shipping_labels
+            SET status = 'purchased', transaction_id = ?2, provider = ?3, service = ?4,
+                amount_cents = ?5, tracking_number = NULL, label_url = NULL, error = NULL,
+                updated_at = datetime('now')
+          WHERE order_id = ?1 AND status IN ('purchasing', 'uncertain') AND claim_token = ?6`,
+      )
+      .bind(orderId, p.transactionId, p.provider, p.service, p.amountCents, claimToken),
+    db
+      .prepare(
+        `INSERT OR IGNORE INTO shipping_label_attempts (
+           order_id, claim_token, outcome, shipment_id, rate_id, transaction_id,
+           provider, service, amount_cents, tracking_number, label_url, error,
+           vendor, created_at
+         )
+         SELECT order_id, claim_token, 'purchased', shipment_id, rate_id,
+                transaction_id, provider, service, amount_cents, tracking_number,
+                label_url, error, vendor, created_at
+           FROM shipping_labels
+          WHERE order_id = ?1 AND status = 'purchased'
+            AND claim_token = ?2 AND transaction_id = ?3`,
+      )
+      .bind(orderId, claimToken, p.transactionId),
+  ]);
+  return (results[0]?.meta?.changes ?? 0) > 0;
+}
+
+/**
+ * The tracking number of a label recorded without one: the label row, its
+ * audit copy, the guarded fulfillment and the shipped-notification outbox, in
+ * one batch — the same four writes recordPurchased makes at once.
+ *
+ * Keyed by the provider's own id, never by a claim: the claim is spent, and
+ * the id is what the tracking was read for. A second read (double click, a
+ * retry) finds the number already there and changes nothing.
+ */
+export async function recordLabelTracking(
+  db: D1Database,
+  orderId: number,
+  transactionId: string,
+  p: { trackingNumber: string; trackingUrl: string | null; carrierCode: string },
+): Promise<{ recorded: boolean; orderFulfilled: boolean }> {
+  const results = await db.batch([
+    db
+      .prepare(
+        `UPDATE shipping_labels
+            SET tracking_number = ?3, updated_at = datetime('now')
+          WHERE order_id = ?1 AND status = 'purchased' AND transaction_id = ?2
+            AND tracking_number IS NULL`,
+      )
+      .bind(orderId, transactionId, p.trackingNumber),
+    db
+      .prepare(
+        `UPDATE shipping_label_attempts
+            SET tracking_number = ?3
+          WHERE order_id = ?1 AND outcome = 'purchased' AND transaction_id = ?2
+            AND tracking_number IS NULL`,
+      )
+      .bind(orderId, transactionId, p.trackingNumber),
+    // The full eligibility again: the order may have been refunded, or fulfilled
+    // by hand, while the number was on its way.
+    db
+      .prepare(
+        `UPDATE orders
+            SET fulfillment_status = 'fulfilled', tracking_carrier = ?2, tracking_number = ?3,
+                tracking_url = ?4, fulfilled_at = datetime('now')
+          WHERE id = ?1 AND status = 'paid' AND fulfillment_status = 'unfulfilled'
+            AND delivery_method IN ('shipping', 'relay')
+            AND EXISTS (
+              SELECT 1 FROM shipping_labels
+               WHERE order_id = ?1 AND status = 'purchased' AND transaction_id = ?5
+                 AND tracking_number = ?3
+            )`,
+      )
+      .bind(orderId, p.carrierCode, p.trackingNumber, p.trackingUrl, transactionId),
+    db
+      .prepare(
+        `INSERT OR IGNORE INTO order_notifications (order_id, kind)
+         SELECT ?1, 'order-shipped'
+          WHERE EXISTS (
+            SELECT 1 FROM orders
+             WHERE id = ?1 AND fulfillment_status = 'fulfilled' AND tracking_number = ?2
+          )
+            AND EXISTS (
+              SELECT 1 FROM shipping_labels
+               WHERE order_id = ?1 AND status = 'purchased' AND transaction_id = ?3
+                 AND tracking_number = ?2
+            )`,
+      )
+      .bind(orderId, p.trackingNumber, transactionId),
+  ]);
+  return {
+    recorded: (results[0]?.meta?.changes ?? 0) > 0,
+    orderFulfilled: (results[2]?.meta?.changes ?? 0) > 0,
+  };
+}
+
+export interface LabelNeedingAttention {
+  order_id: number;
+  order_public_id: string | null;
+  status: LabelStatus;
+  updated_at: string;
+}
+
+/**
+ * Labels a human has to settle: an uncertain purchase, and a submitted one
+ * past its lease (the caller filters with isPurchaseStale). The orders list
+ * shows them so an uncertain purchase is settled the same day (ADR 0021).
+ * Reads by status (migration 0047's index), never the label history.
+ */
+export async function listLabelsNeedingAttention(
+  db: D1Database,
+  limit = 50,
+): Promise<LabelNeedingAttention[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT l.order_id, o.public_id AS order_public_id, l.status, l.updated_at
+         FROM shipping_labels l
+         JOIN orders o ON o.id = l.order_id
+        WHERE l.status IN ('uncertain', 'purchasing')
+        ORDER BY l.updated_at
+        LIMIT ?1`,
+    )
+    .bind(limit)
+    .all<LabelNeedingAttention>();
+  return results ?? [];
 }

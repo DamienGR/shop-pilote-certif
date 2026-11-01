@@ -1,0 +1,28 @@
+{
+  "request": {
+    "method": "DELETE",
+    "path": "/shipping/v3.1/shipping-order/2610301727BMON56EDFR",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "ms": 812,
+    "contentType": "application/json",
+    "body": {
+      "timestamp": "2026-10-30T17:28:06.940106+01:00",
+      "status": 200,
+      "content": {
+        "id": "2610301727BMON56EDFR",
+        "shipmentId": "227117",
+        "status": "CANCELLED",
+        "deliveryPriceExclTax": {
+          "value": 6.23,
+          "currency": "EUR"
+        },
+        "insurancePriceExclTax": null,
+        "expectedTakingOverDate": "2026-10-31",
+        "estimatedDeliveryDate": "2026-11-06"
+      }
+    }
+  }
+}

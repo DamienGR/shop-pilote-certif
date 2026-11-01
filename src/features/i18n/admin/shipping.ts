@@ -55,7 +55,15 @@ export const shipping = {
   'admin.shipping.rate.mode.flat': 'Prix forfaitaire',
   'admin.shipping.rate.mode.weight': 'Selon le poids de la commande',
   'admin.shipping.rate.mode.pickup': 'Retrait sur place',
+  'admin.shipping.rate.mode.relay': 'Point relais (Boxtal)',
   'admin.shipping.rate.pickupFee': 'Frais (0 = gratuit)',
+  'admin.shipping.rate.relayOffer': 'Offre relais',
+  'admin.shipping.rate.relayOfferChoose': 'Choisir une offre',
+  'admin.shipping.rate.relayPricing': 'Prix du relais',
+  'admin.shipping.rate.relayPricing.flat': 'Forfaitaire',
+  'admin.shipping.rate.relayPricing.weight': 'Selon le poids',
+  'admin.shipping.rate.relayHint': 'L’acheteur choisit son point parmi ceux de cette offre, et l’étiquette s’achète chez Boxtal sur la même offre. Le prix reste le vôtre ; la livraison offerte ne s’applique qu’aux tarifs à domicile.',
+  'admin.shipping.rate.relayNoKeys': 'Les clés Boxtal ne sont pas enregistrées dans Réglages : ce tarif n’est pas proposé à la commande tant qu’elles manquent.',
   'admin.shipping.rate.price': 'Prix',
   'admin.shipping.rate.remove': 'Retirer le tarif',
   'admin.shipping.rate.add': 'Ajouter un tarif',
@@ -93,6 +101,7 @@ export const shipping = {
   'admin.shipping.error.freeLabelReserved':
     '« {libelle} » est réservé tant qu’un seuil de livraison offerte est défini.',
   'admin.shipping.error.pricingMode': 'Choisissez un mode de tarification.',
+  'admin.shipping.error.relayOffer': 'Choisissez une offre de point relais.',
   'admin.shipping.error.priceRequired': 'Indiquez un prix.',
   'admin.shipping.error.bandRequired': 'Ajoutez au moins une tranche de poids.',
   'admin.shipping.error.bandsMax': 'Au maximum {max} tranches par tarif.',
@@ -139,4 +148,25 @@ export const shipping = {
   'admin.shipping.labelPurchase.answered': 'Shippo a répondu {statut}.',
   'admin.shipping.labelPurchase.ratesExpired': 'Cette liste de tarifs a expiré. Redemandez les tarifs.',
   'admin.shipping.labelPurchase.notPurchased': 'Shippo n’a pas pu acheter cette étiquette.',
+
+  // ─── Boxtal (features/shipping/boxtal/) ────────────────────────────────────────
+  'admin.shipping.boxtal.unreachable': 'Boxtal est injoignable pour le moment.',
+  'admin.shipping.boxtal.keysRejected':
+    'Boxtal a refusé les clés d’API. Vérifiez qu’elles sont celles d’une application v3, et du bon environnement (bac à sable ou production).',
+  'admin.shipping.boxtal.unreadable': 'Boxtal a répondu {statut} avec un contenu illisible.',
+  'admin.shipping.boxtal.answered': 'Boxtal a répondu {statut}.',
+  'admin.shipping.boxtal.answeredCodes': 'Boxtal a répondu {statut} ({codes}).',
+  'admin.shipping.boxtal.unexpected': 'Boxtal a répondu dans un format inattendu.',
+  'admin.shipping.boxtal.unknownOffer': 'Boxtal ne connaît pas l’offre {offre}.',
+  'admin.shipping.boxtal.pickupPointRefused':
+    'Boxtal refuse ce point relais : il n’existe plus ou ne prend plus ce colis. Prévenez l’acheteur, achetez l’étiquette dans Boxtal vers un point voisin, puis saisissez le suivi à la main.',
+  'admin.shipping.boxtal.orderNotFound': 'Boxtal ne connaît aucune expédition sous cette référence.',
+  'admin.shipping.boxtal.notCancellable':
+    'Boxtal refuse l’annulation : le transporteur a sans doute déjà pris le colis.',
+  'admin.shipping.boxtal.quoteUnreachable': 'Le devis de Boxtal est injoignable pour le moment.',
+  'admin.shipping.boxtal.quoteKeysRejected':
+    'Boxtal a refusé les clés du devis. Vérifiez qu’elles sont celles d’une application v1, et du bon environnement.',
+  'admin.shipping.boxtal.quoteAnswered': 'Le devis de Boxtal a répondu {statut}.',
+  'admin.shipping.boxtal.quoteRefused': 'Le devis de Boxtal a répondu {statut} ({code}).',
+  'admin.shipping.boxtal.quoteUnexpected': 'Le devis de Boxtal a répondu dans un format inattendu.',
 } satisfies Catalog;

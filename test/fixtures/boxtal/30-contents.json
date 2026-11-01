@@ -1,0 +1,14 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/contents",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "ms": 856,
+    "contentType": "application/xml;charset=utf-8",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<contents>\n    <content>\n        <code>100</code>\n        <label>Contenu non sp&#233;cifi&#233;</label>\n        <category>0</category>\n        <prohibited>false</prohibited>\n        <translations>\n            <translation>\n                <locale>it_IT</locale>\n                <label>Contenuto non specificato</label>\n            </translation>\n            <translation>\n                <locale>es_ES</locale>\n                <label>Contenido no especificado</label>\n            </translation>\n            <translation>\n                <locale>fr_FR</locale>\n                <label>Contenu non sp&#233;cifi&#233;</label>\n            </translation>\n            <translation>\n                <locale>en_US</locale>\n                <label>Content not specified</label>\n            </translation>\n        </translations>\n    </content>\n    <content>\n        <code>20102</code>\n        <label>Produits frais et p&#233;rissables</label>\n        <category>20000</category>\n        <prohibited>true</prohibited>\n        <translations>\n            <translation>\n                <locale>it_IT</locale>\n                <label>Prodotti freschi e deperibili</label>\n            </translation>\n            <translation>\n                <locale>es_ES</locale>\n                <label>Productos frescos y perecederos</label>\n            </translation>\n            <translation>\n                <locale>fr_FR</locale>\n                <label>Produits frais et p&#233;rissables</label>\n            </translation>\n            <translation>\n                <locale>en_US</locale>\n                <label>Fresh and perishable produce</label>\n            </translation>\n        </translations>\n    </content>\n    <content>\n        <code>40110</code>\n        <label>Tissus, v&#234;tements neufs</label>\n        <category>40000</category>\n        <prohibited>false</prohibited>\n        <translations>\n            <translation>\n                <locale>it_IT</locale>\n                <label>Tessuti, indumenti nuovi</label>\n            </translation>\n            <translation>\n                <locale>es_ES</locale>\n                <label>Telas, prendas de vestir sin estrenar</label>\n            </translation>\n            <translation>\n                <locale>fr_FR</locale>\n                <label>Tissus, v&#234;tements neufs</label>\n            </translation>\n            <translation>\n                <locale>en_US</locale>\n                <label>Fabrics, new clothes</label>\n            </translation>\n        </translations>\n    </content>\n</contents>\n"
+  },
+  "contentsReturned": 82
+}

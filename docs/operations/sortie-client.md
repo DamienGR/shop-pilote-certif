@@ -94,7 +94,11 @@ s'ouvrent plus. Ensuite :
   --reviewer <login>` avec les jetons de B : le dépôt retrouve ses
   environnements et ses workflows Deploy et Nightly ;
 - [ ] dans le DNS de B, supprimer le CNAME du domaine vers l'origine de repli :
-  la boutique ne répond plus jusqu'au déploiement qui suit ;
+  la boutique ne répond plus jusqu'au déploiement qui suit, lancé aussitôt. Un
+  résolveur qui demande le domaine dans l'intervalle garde la réponse vide
+  jusqu'au minimum du SOA de la zone, trente minutes sur une zone Cloudflare
+  laissée par défaut : annoncer au commerçant jusqu'à trente minutes de
+  coupure (vingt-six vues d'un poste à la migration du pilote, le 2026-10-29) ;
 - [ ] `gh workflow run deploy.yml -f shop=<slug> -f environment=production`,
   approuvé : le domaine personnalisé sur la zone de B, le test de fumée ;
 - [ ] Admin → Réglages, ressaisis : la clé Stripe restreinte et le secret de

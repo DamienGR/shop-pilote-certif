@@ -180,15 +180,18 @@ if (command === 'd1 list') {
 if (command.startsWith('d1 create')) {
   const name = positionals[2];
   if ((state.d1 ?? []).some((entry) => entry.name === name)) fail('A database with that name already exists');
-  const id = uuid(name);
+  // The account and the creation in the id, as Cloudflare's are unique: two
+  // accounts' databases of one name, or one deleted and re-created, never
+  // share an id — which is what a configuration rendered for the other one
+  // gets wrong (lot 8).
+  state.d1Created = (state.d1Created ?? 0) + 1;
+  const id = uuid(`${state.accounts?.[0]?.id ?? ''}/${name}/${state.d1Created}`);
   state.d1 = [...(state.d1 ?? []), { name, uuid: id, jurisdiction: jurisdictionOf() }];
   done(`✅ Successfully created DB '${name}'\n\ndatabase_id = "${id}"`);
 }
 
 if (command.startsWith('d1 info')) {
-  const name = positionals[2];
-  const entry = (state.d1 ?? []).find((candidate) => candidate.name === name);
-  if (!entry) fail(`Couldn't find DB with name '${name}'`);
+  const entry = remoteDatabase(positionals[2]);
   const payload = { uuid: entry.uuid, name: entry.name, num_tables: 0, database_size: 0 };
   // Older D1 APIs do not publish the jurisdiction back. shopctl has to report
   // that as "unverified" rather than as a pass, and this switch is how the
@@ -204,6 +207,47 @@ function configuration() {
     .split('\n')
     .filter((line) => !line.trim().startsWith('//'))
     .join('\n');
+}
+
+/**
+ * The D1 entry of the tree's configuration that `nameOrBinding` names — by its
+ * binding or by its `database_name`, the two keys wrangler matches — or null.
+ */
+function configuredDatabase(nameOrBinding) {
+  if (!existsSync('wrangler.jsonc')) return null;
+  for (const [entry] of configuration().matchAll(/\{[^{}]*"database_name"[^{}]*\}/gs)) {
+    const field = (key) => entry.match(new RegExp(`"${key}"\\s*:\\s*"([^"]+)"`))?.[1] ?? null;
+    if (nameOrBinding === field('binding') || nameOrBinding === field('database_name')) {
+      return { name: field('database_name'), id: field('database_id') };
+    }
+  }
+  return null;
+}
+
+/**
+ * The account's database a remote `d1` command reaches, resolved as wrangler 4
+ * resolves it (`getDatabaseByNameOrBinding`, shared by `execute`, `info`,
+ * `delete` and `migrations apply`): an entry of the configuration that carries
+ * an id is taken AT ITS WORD, whatever the account holds under that name;
+ * anything else is asked of the API, which takes a name or an id.
+ *
+ * The first half is the trap. A configuration rendered for another account
+ * names the right database with the other account's id, and the command fails
+ * on an id this account has never seen (lot 8, 2026-10-29) — or, read loosely,
+ * as this double once did, succeeds where the real one fails.
+ */
+function remoteDatabase(nameOrBinding) {
+  const configured = configuredDatabase(nameOrBinding);
+  const databases = state.d1 ?? [];
+  if (configured?.id) {
+    const entry = databases.find((candidate) => candidate.uuid === configured.id);
+    if (!entry) fail(`The database ${configured.id} could not be found [code: 7404]`);
+    return entry;
+  }
+  const wanted = configured?.name ?? nameOrBinding;
+  const entry = databases.find((candidate) => candidate.name === wanted || candidate.uuid === wanted);
+  if (!entry) fail(`Couldn't find a D1 DB with name or binding '${nameOrBinding}' in your config or the API.`);
+  return entry;
 }
 
 /** Which database a binding names, the way the real wrangler resolves it. */
@@ -240,12 +284,8 @@ function databaseFile(name) {
   return join(dirname(resolve(STATE)), file);
 }
 
-function openDatabase(binding) {
-  // Like wrangler, a database's own name is accepted beside a binding, and on
-  // the account it is looked up there when the configuration does not carry it.
-  const onAccount = !LOCAL && (state.d1 ?? []).some((entry) => entry.name === binding);
-  const name = onAccount ? binding : databaseNameFor(binding);
-  if (!LOCAL && !(state.d1 ?? []).some((entry) => entry.name === name)) fail(`Couldn't find DB with name '${name}'`);
+function openDatabase(nameOrBinding) {
+  const name = LOCAL ? databaseNameFor(nameOrBinding) : remoteDatabase(nameOrBinding).name;
   return { name, db: new DatabaseSync(databaseFile(name)) };
 }
 
@@ -545,9 +585,8 @@ if (command === 'kv namespace delete') {
 }
 
 if (command.startsWith('d1 delete')) {
-  const name = positionals[2];
-  const index = (state.d1 ?? []).findIndex((entry) => entry.name === name);
-  if (index === -1) fail(`Couldn't find DB with name '${name}'`);
+  const { name } = remoteDatabase(positionals[2]);
+  const index = state.d1.findIndex((entry) => entry.name === name);
   state.d1.splice(index, 1);
   // The bytes go with the record. Leaving the file would make a database
   // deleted and re-created under the same name come back with its old rows —

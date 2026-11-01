@@ -134,7 +134,7 @@ function inClause(column, values) {
  * The tables that hang off this buyer's orders, and how each is reached.
  *
  * The foreign keys do most of it: a table that points at `orders` holds rows
- * about whoever placed them. `EXTRA_LINKS` covers the four that key on a public
+ * about whoever placed them. `EXTRA_LINKS` covers the five that key on a public
  * identifier or on the payment id instead — and `unreachableTables()` is what
  * stops that list from going quietly stale.
  *

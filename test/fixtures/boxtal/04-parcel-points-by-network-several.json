@@ -1,0 +1,327 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/shipping/v3.2/parcel-point-by-network?countryIsoCode=FR&postalCode=35000&city=Rennes&searchNetworks=MONR_NETWORK&searchNetworks=CHRP_NETWORK&searchNetworks=POFR_NETWORK",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "ms": 740,
+    "contentType": "application/json",
+    "body": {
+      "timestamp": "2026-10-30T16:32:09.467293+01:00",
+      "status": 200,
+      "content": [
+        {
+          "distanceFromSearchLocation": 140,
+          "parcelPoint": {
+            "code": "812CP",
+            "name": "EPI DE LIBERTE",
+            "compatibleNetworks": [
+              "CHRP_NETWORK"
+            ],
+            "location": {
+              "street": "46 boulevard de la Liberté",
+              "city": "RENNES",
+              "postalCode": "35000",
+              "countryIsoCode": "FR",
+              "position": {
+                "longitude": -1.682608,
+                "latitude": 48.108251
+              }
+            },
+            "openingDays": {
+              "MONDAY": [
+                {
+                  "openingTime": "15:00",
+                  "closingTime": "22:00"
+                }
+              ],
+              "TUESDAY": [
+                {
+                  "openingTime": "11:00",
+                  "closingTime": "22:00"
+                }
+              ],
+              "WEDNESDAY": [
+                {
+                  "openingTime": "11:00",
+                  "closingTime": "22:00"
+                }
+              ],
+              "THURSDAY": [
+                {
+                  "openingTime": "11:00",
+                  "closingTime": "22:00"
+                }
+              ],
+              "FRIDAY": [
+                {
+                  "openingTime": "11:00",
+                  "closingTime": "22:00"
+                }
+              ],
+              "SATURDAY": [
+                {
+                  "openingTime": "11:00",
+                  "closingTime": "22:00"
+                }
+              ],
+              "SUNDAY": [
+                {
+                  "openingTime": "15:00",
+                  "closingTime": "22:00"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "distanceFromSearchLocation": 332,
+          "parcelPoint": {
+            "code": "402DL",
+            "name": "VAP'STATION",
+            "compatibleNetworks": [
+              "CHRP_NETWORK"
+            ],
+            "location": {
+              "street": "34 Rue Tronjolly",
+              "city": "RENNES",
+              "postalCode": "35000",
+              "countryIsoCode": "FR",
+              "position": {
+                "longitude": -1.681141,
+                "latitude": 48.106266
+              }
+            },
+            "openingDays": {
+              "MONDAY": [
+                {
+                  "openingTime": "09:30",
+                  "closingTime": "19:00"
+                }
+              ],
+              "TUESDAY": [
+                {
+                  "openingTime": "09:30",
+                  "closingTime": "19:00"
+                }
+              ],
+              "WEDNESDAY": [
+                {
+                  "openingTime": "09:30",
+                  "closingTime": "19:00"
+                }
+              ],
+              "THURSDAY": [
+                {
+                  "openingTime": "09:30",
+                  "closingTime": "19:00"
+                }
+              ],
+              "FRIDAY": [
+                {
+                  "openingTime": "09:30",
+                  "closingTime": "19:00"
+                }
+              ],
+              "SATURDAY": [
+                {
+                  "openingTime": "09:30",
+                  "closingTime": "19:00"
+                }
+              ],
+              "SUNDAY": []
+            }
+          }
+        },
+        {
+          "distanceFromSearchLocation": 338,
+          "parcelPoint": {
+            "code": "663997",
+            "name": "SIDIQI EXPRESS TELEPHONE",
+            "compatibleNetworks": [
+              "POFR_NETWORK",
+              "POFR_UP_TO_10_KG_NETWORK",
+              "POFR_UP_TO_16_KG_NETWORK",
+              "POFR_UP_TO_20_KG_NETWORK"
+            ],
+            "location": {
+              "street": "9 RUE DU PUITS MAUGER",
+              "city": "RENNES",
+              "postalCode": "35000",
+              "countryIsoCode": "FR",
+              "position": {
+                "longitude": -1.681975,
+                "latitude": 48.105699
+              }
+            },
+            "openingDays": {
+              "MONDAY": null,
+              "TUESDAY": null,
+              "WEDNESDAY": null,
+              "THURSDAY": null,
+              "FRIDAY": null,
+              "SATURDAY": null,
+              "SUNDAY": null
+            }
+          }
+        },
+        {
+          "distanceFromSearchLocation": 361,
+          "parcelPoint": {
+            "code": "359480",
+            "name": "BUREAU DE POSTE RENNES REPUBLIQUE",
+            "compatibleNetworks": [
+              "POFR_NETWORK",
+              "POFR_UP_TO_10_KG_NETWORK",
+              "POFR_UP_TO_16_KG_NETWORK",
+              "POFR_UP_TO_20_KG_NETWORK",
+              "POFR_UP_TO_30_KG_NETWORK"
+            ],
+            "location": {
+              "street": "PLACE DE LA REPUBLIQUE",
+              "city": "RENNES",
+              "postalCode": "35000",
+              "countryIsoCode": "FR",
+              "position": {
+                "longitude": -1.68007,
+                "latitude": 48.109598
+              }
+            },
+            "openingDays": {
+              "MONDAY": null,
+              "TUESDAY": null,
+              "WEDNESDAY": null,
+              "THURSDAY": null,
+              "FRIDAY": null,
+              "SATURDAY": null,
+              "SUNDAY": null
+            }
+          }
+        },
+        {
+          "distanceFromSearchLocation": 440,
+          "parcelPoint": {
+            "code": "33460",
+            "name": "CYBERPHONE DU MAIL",
+            "compatibleNetworks": [
+              "MONR_NETWORK",
+              "MONR_LOCKERS_EXCLUDED_UP_TO_30_KG_NETWORK"
+            ],
+            "location": {
+              "street": "53 MAIL FRANCOIS MITTERRAND",
+              "city": "RENNES",
+              "postalCode": "35000",
+              "countryIsoCode": "FR",
+              "position": {
+                "longitude": -1.6903,
+                "latitude": 48.109042
+              }
+            },
+            "openingDays": {
+              "MONDAY": [
+                {
+                  "openingTime": "09:30",
+                  "closingTime": "20:00"
+                }
+              ],
+              "TUESDAY": [
+                {
+                  "openingTime": "09:30",
+                  "closingTime": "20:00"
+                }
+              ],
+              "WEDNESDAY": [
+                {
+                  "openingTime": "09:30",
+                  "closingTime": "20:00"
+                }
+              ],
+              "THURSDAY": [
+                {
+                  "openingTime": "09:30",
+                  "closingTime": "20:00"
+                }
+              ],
+              "FRIDAY": [
+                {
+                  "openingTime": "09:30",
+                  "closingTime": "20:00"
+                }
+              ],
+              "SATURDAY": [
+                {
+                  "openingTime": "09:30",
+                  "closingTime": "20:00"
+                }
+              ],
+              "SUNDAY": [
+                {
+                  "openingTime": "11:00",
+                  "closingTime": "20:00"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "distanceFromSearchLocation": 498,
+          "parcelPoint": {
+            "code": "23437",
+            "name": "TEA TY",
+            "compatibleNetworks": [
+              "MONR_NETWORK",
+              "MONR_LOCKERS_EXCLUDED_UP_TO_30_KG_NETWORK"
+            ],
+            "location": {
+              "street": "1 RUE DE LA MONNAIE",
+              "city": "RENNES",
+              "postalCode": "35000",
+              "countryIsoCode": "FR",
+              "position": {
+                "longitude": -1.681707,
+                "latitude": 48.112322
+              }
+            },
+            "openingDays": {
+              "MONDAY": [],
+              "TUESDAY": [
+                {
+                  "openingTime": "10:00",
+                  "closingTime": "19:00"
+                }
+              ],
+              "WEDNESDAY": [
+                {
+                  "openingTime": "10:00",
+                  "closingTime": "19:00"
+                }
+              ],
+              "THURSDAY": [
+                {
+                  "openingTime": "10:00",
+                  "closingTime": "19:00"
+                }
+              ],
+              "FRIDAY": [
+                {
+                  "openingTime": "10:00",
+                  "closingTime": "19:00"
+                }
+              ],
+              "SATURDAY": [
+                {
+                  "openingTime": "09:00",
+                  "closingTime": "19:00"
+                }
+              ],
+              "SUNDAY": []
+            }
+          }
+        }
+      ]
+    },
+    "pointsReturned": 30
+  }
+}

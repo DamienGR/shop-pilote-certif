@@ -5,6 +5,7 @@ import {
 } from '../products/stock.ts';
 import { generatePublicId } from '../ids/publicId.ts';
 import { vatIncludedCents } from '../legal/vat.ts';
+import type { DeliveryMethod } from '../shipping/calculator.ts';
 
 export interface ShippingAddress {
   name: string | null;
@@ -14,6 +15,9 @@ export interface ShippingAddress {
   state: string | null;
   postal: string | null;
   country: string | null;
+  /** The recipient's phone, for the carrier. Present only when checkout asked
+   *  for it (features/shipping/recipient.ts); older snapshots have none. */
+  phone?: string | null;
 }
 
 export interface Order {
@@ -40,12 +44,17 @@ export interface Order {
   fulfillment_status: string; // 'unfulfilled' | 'fulfilled'
   tracking_carrier: string | null;
   tracking_number: string | null;
+  /** The carrier's page for the parcel, as the label provider returned it
+   *  (Boxtal); null for a number typed by hand, which trackingUrl() links. */
+  tracking_url: string | null;
   fulfilled_at: string | null;
-  /** Purchased label PDF (Shippo), or null for manual fulfillment. */
+  /** Purchased label PDF (Shippo), or null: a Boxtal label is re-read on demand. */
   label_url: string | null;
-  /** 'pickup' | 'shipping' | NULL (pre-0035 or no shipping). Unknown = shipping. */
+  /** 'pickup' | 'shipping' | 'relay' | NULL (pre-0035 or no shipping). Unknown = shipping. */
   delivery_method: string | null;
   ship_address: string | null; // JSON snapshot (ShippingAddress) or null
+  /** The relay point picked at checkout, JSON (features/shipping/relay.ts), or null. */
+  relay_point: string | null;
   /** Terms version the buyer accepted, or null when the gate was open. */
   terms_version: string | null;
   /** When they accepted, UTC "YYYY-MM-DD HH:MM:SS". Null with terms_version. */
@@ -172,7 +181,7 @@ export interface PaidOrderInput {
    *  Snapshotted so later catalog or rate edits cannot rewrite history. */
   shippingLabel?: string | null;
   shippingWeightGrams?: number | null;
-  deliveryMethod?: 'pickup' | 'shipping' | 'unknown' | null;
+  deliveryMethod?: DeliveryMethod | 'unknown' | null;
   discountCents?: number;
   taxCents?: number;
   shippingAddress?: ShippingAddress | null;
@@ -370,7 +379,7 @@ export async function fulfillOrder(
     .prepare(
       `UPDATE orders
          SET fulfillment_status = 'fulfilled', tracking_carrier = ?, tracking_number = ?,
-             fulfilled_at = datetime('now')
+             tracking_url = NULL, fulfilled_at = datetime('now')
        WHERE id = ?
          AND NOT EXISTS (
            SELECT 1 FROM shipping_labels
@@ -393,7 +402,7 @@ export async function unfulfillOrder(db: D1Database, id: number): Promise<void> 
     .prepare(
       `UPDATE orders
          SET fulfillment_status = 'unfulfilled', tracking_carrier = NULL,
-             tracking_number = NULL, fulfilled_at = NULL
+             tracking_number = NULL, tracking_url = NULL, fulfilled_at = NULL
        WHERE id = ?`,
     )
     .bind(id)
@@ -479,6 +488,33 @@ export async function recordPaidOrder(
     }
     throw new Error('inventory exception identity collision retry exhausted');
   };
+  // The terms acceptance and the VAT rate are READ OFF the reservation rather
+  // than passed in. Settlement runs in a webhook that never saw the shopper, so
+  // every rail would otherwise have to carry both through its own provider
+  // metadata — four chances to drop the fields a dispute and an audit turn on.
+  //
+  // Read here rather than joined in the INSERT so the rounding rule stays in
+  // ONE place: `vatIncludedCents` is what the tests exercise, and a SQL copy of
+  // the same arithmetic would eventually disagree with it. The insert's
+  // reservation guard still decides whether the row is written at all.
+  //
+  // The relay point travels the same way, and for the same reason. So does
+  // the address, when /checkout took it for a rail that returns none (a card
+  // payment that went through it: Stripe then collects no address).
+  const carried = o.reservationId
+    ? await db
+        .prepare(
+          'SELECT terms_version, terms_accepted_at, vat_rate_bps, relay_point, ship_address FROM checkout_reservations WHERE public_id = ?',
+        )
+        .bind(o.reservationId)
+        .first<{
+          terms_version: string | null;
+          terms_accepted_at: string | null;
+          vat_rate_bps: number | null;
+          relay_point: string | null;
+          ship_address: string | null;
+        }>()
+    : null;
   const orderValues = [
     o.providerSessionId,
     publicId,
@@ -491,49 +527,29 @@ export async function recordPaidOrder(
     o.discountCents ?? 0,
     o.taxCents ?? 0,
     o.currency,
-    o.shippingAddress ? JSON.stringify(o.shippingAddress) : null,
+    o.shippingAddress ? JSON.stringify(o.shippingAddress) : (carried?.ship_address ?? null),
     o.paymentMethod ?? null,
     // Stripe PaymentIntent. Refund webhooks identify the charge and its payment
     // but not the session, so this is what charge.refunded resolves an order by.
     o.providerPaymentId ?? null,
   ] as const;
   const settlementStatuses = "('active', 'payment_pending', 'expired', 'failed')";
-  // The terms acceptance and the VAT rate are READ OFF the reservation rather
-  // than passed in. Settlement runs in a webhook that never saw the shopper, so
-  // every rail would otherwise have to carry both through its own provider
-  // metadata — four chances to drop the fields a dispute and an audit turn on.
-  //
-  // Read here rather than joined in the INSERT so the rounding rule stays in
-  // ONE place: `vatIncludedCents` is what the tests exercise, and a SQL copy of
-  // the same arithmetic would eventually disagree with it. The insert's
-  // reservation guard still decides whether the row is written at all.
-  const carried = o.reservationId
-    ? await db
-        .prepare(
-          'SELECT terms_version, terms_accepted_at, vat_rate_bps FROM checkout_reservations WHERE public_id = ?',
-        )
-        .bind(o.reservationId)
-        .first<{
-          terms_version: string | null;
-          terms_accepted_at: string | null;
-          vat_rate_bps: number | null;
-        }>()
-    : null;
   const vatRateBps = carried?.vat_rate_bps ?? null;
-  const consentValues = [
+  const carriedValues = [
     carried?.terms_version ?? null,
     carried?.terms_accepted_at ?? null,
     vatRateBps,
     // Taken on the total the buyer actually paid, not summed per line.
     vatRateBps ? vatIncludedCents(o.amountTotalCents, vatRateBps) : null,
+    carried?.relay_point ?? null,
   ] as const;
   const orderColumns =
-    'provider_session_id, public_id, email, amount_total_cents, shipping_cents, shipping_label, shipping_weight_grams, delivery_method, discount_cents, tax_cents, currency, ship_address, status, payment_method, settlement_token, provider_payment_id, terms_version, terms_accepted_at, vat_rate_bps, vat_amount_cents';
+    'provider_session_id, public_id, email, amount_total_cents, shipping_cents, shipping_label, shipping_weight_grams, delivery_method, discount_cents, tax_cents, currency, ship_address, status, payment_method, settlement_token, provider_payment_id, terms_version, terms_accepted_at, vat_rate_bps, vat_amount_cents, relay_point';
   const insertOrder = o.reservationId
     ? db
         .prepare(
           `INSERT INTO orders (${orderColumns})
-           SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, NULL, ?, ?, ?, ?, ?
+           SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, NULL, ?, ?, ?, ?, ?, ?
             WHERE EXISTS (
               SELECT 1 FROM checkout_reservations
                WHERE public_id = ? AND status IN ${settlementStatuses}
@@ -541,11 +557,11 @@ export async function recordPaidOrder(
            ON CONFLICT(provider_session_id) DO NOTHING
            RETURNING id`,
         )
-        .bind(...orderValues, ...consentValues, o.reservationId)
+        .bind(...orderValues, ...carriedValues, o.reservationId)
     : db
         .prepare(
           `INSERT INTO orders (${orderColumns})
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, NULL, ?, NULL, NULL, NULL, NULL)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, NULL, ?, NULL, NULL, NULL, NULL, NULL)
            ON CONFLICT(provider_session_id) DO NOTHING
            RETURNING id`,
         )
@@ -745,7 +761,8 @@ export async function recordPaidOrder(
     stmts.push(
       db
         .prepare(
-          `UPDATE checkout_reservations SET status = 'settled'
+          // The order now holds the address; the reservation lets it go.
+          `UPDATE checkout_reservations SET status = 'settled', ship_address = NULL
             WHERE public_id = ? AND status IN ${settlementStatuses} AND EXISTS (
               SELECT 1 FROM orders
                WHERE provider_session_id = ? AND settlement_token = ?

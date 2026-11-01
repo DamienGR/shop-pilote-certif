@@ -220,6 +220,8 @@ describe('shopctl and the SaaS zone', () => {
       // Not "en ligne": the domain still leads wherever it led before.
       expect(result.stdout).toContain(`est déployé en production, mais https://${DOMAIN} ne mène à lui qu'une fois son nom d'hôte actif.`);
       expect(result.stdout).not.toMatch(/est en ligne/);
+      // The upload's own line too: a deploy log is read a line at a time (lot 8).
+      expect(result.stdout).toContain(`déployé — https://${DOMAIN} (nom d'hôte en attente : n'y répond pas encore)`);
     });
 
     it('goes ahead once the hostname is active', async () => {
@@ -231,6 +233,7 @@ describe('shopctl and the SaaS zone', () => {
       expect(result.status, result.stderr).toBe(EXIT_CODES.ok);
       expect(result.stdout).toMatch(new RegExp(`${DOMAIN.replaceAll('.', '\\.')} — actif sur`));
       expect(result.stdout).toContain(`est en ligne en production sur https://${DOMAIN}.`);
+      expect(result.stdout).not.toMatch(/en attente : n'y répond pas encore/);
     });
 
     it('refuses a hostname provisioning never created', async () => {

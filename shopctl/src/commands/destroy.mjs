@@ -140,6 +140,7 @@ export async function runDestroy(args, reporter) {
   reporter.section(`À supprimer — ${manifest.client.slug} en ${env}${dryRun ? ' (simulation)' : ''}`);
   const buckets = listBuckets({ cwd: root, jurisdiction });
   const database = listDatabases({ cwd: root }).find((entry) => entry.name === names.database);
+  const databaseId = database ? (database.uuid ?? database.database_id) : null;
   const worker = workerExists(names.worker, { cwd: root });
   const sessions = listKvNamespaces({ cwd: root }).find((entry) => entry.title === names.sessions) ?? null;
 
@@ -158,7 +159,7 @@ export async function runDestroy(args, reporter) {
 
   // Before the first deletion: on a shared account (ADR 0019) a database of
   // this name may be another shop's, and so may everything named beside it.
-  if (database) guardOwner({ database: names.database, root, manifest, env, reporter });
+  if (database) guardOwner({ database: names.database, databaseId, root, manifest, env, reporter });
 
   // The merchant's domain on the SaaS zone is the shop's too (ADR 0019): left
   // behind, it is a hostname the agency keeps answering for after the client
@@ -256,7 +257,7 @@ export async function runDestroy(args, reporter) {
     reporter.step(`    ${names.database} n'a pas été touchée : ${failures.length} suppression(s) ont échoué avant elle.`);
     reporter.step('    Corrigez ce qui est nommé ci-dessus puis relancez — la commande reprend là où elle s\'est arrêtée.');
   } else if (database) {
-    record(deleteDatabase(names.database, { cwd: root }), 'base D1');
+    record(deleteDatabase(names.database, { cwd: root, id: databaseId }), 'base D1');
   }
 
   const remaining = present

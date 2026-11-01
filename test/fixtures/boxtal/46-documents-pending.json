@@ -1,0 +1,22 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/shipping/v3.1/shipping-order/2610301905POFR56EJFR/shipping-document",
+    "body": null
+  },
+  "response": {
+    "status": 422,
+    "ms": 148,
+    "contentType": "application/json",
+    "body": {
+      "timestamp": "2026-10-30T19:05:45.371884+01:00",
+      "status": 422,
+      "errors": [
+        {
+          "code": "UnexpectedException",
+          "parameters": []
+        }
+      ]
+    }
+  }
+}

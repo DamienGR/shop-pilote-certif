@@ -14,6 +14,8 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import {
   FREE_SHIPPING_LABEL,
+  normalizeRate,
+  type ConfiguredRate,
   type RatePricing,
   type ShippingConfig,
   type WeightBand,
@@ -27,9 +29,15 @@ import { t } from '../i18n/index.ts';
 export const SHIPPING_CONFIG_KEY = 'shipping_config';
 
 /** 1 = flat rates only. 2 adds pricing modes and the package-weight allowance.
- *  3 adds the pickup pricing mode. Bumped so a rollback fails CLOSED on a
- *  document it cannot fully understand instead of silently dropping rates. */
-export const SHIPPING_SCHEMA_VERSION = 3;
+ *  3 adds the pickup pricing mode. 4 adds the relay mode (ADR 0020). Bumped so
+ *  a rollback fails CLOSED on a document it cannot fully understand instead of
+ *  silently dropping rates. */
+export const SHIPPING_SCHEMA_VERSION = 4;
+
+/** A provider offer code as a relay rate stores it: `<operator>-<service>`.
+ *  The shape only — whether this core can still serve the offer is decided at
+ *  checkout, so a retired offer drops out instead of failing the document. */
+const RELAY_OFFER_CODE = /^[A-Z0-9]{4}-[A-Za-z0-9]{1,60}$/;
 
 export const SHIPPING_LIMITS = {
   zones: 20,
@@ -87,7 +95,8 @@ export interface ShippingValidationError {
     | 'amount'
     | 'freeOver'
     | 'bands'
-    | 'upTo';
+    | 'upTo'
+    | 'offer';
   message: string;
 }
 
@@ -326,7 +335,20 @@ export function validateShippingDocument(doc: RuntimeShippingConfig): ShippingVa
         labels.add(label.toLowerCase());
       }
 
-      const pricing = rate?.pricing;
+      let pricing: RatePricing | undefined = rate?.pricing;
+      if (pricing?.type === 'relay') {
+        if (typeof pricing.offer !== 'string' || !RELAY_OFFER_CODE.test(pricing.offer)) {
+          errors.push({
+            zoneIndex,
+            rateIndex,
+            field: 'offer',
+            message: t('admin.shipping.error.relayOffer'),
+          });
+        }
+        // A relay rate is priced like a home rate; anything else is malformed.
+        const price: RatePricing | undefined = pricing.price;
+        pricing = price?.type === 'flat' || price?.type === 'weight' ? price : undefined;
+      }
       if (pricing?.type === 'flat' || pricing?.type === 'pickup') {
         if (!isAmount(pricing.amountCents)) {
           errors.push({
@@ -692,9 +714,17 @@ export interface ShippingFormBand {
 export interface ShippingFormRate {
   token: string;
   label: string;
-  mode: 'flat' | 'weight' | 'pickup';
+  mode: 'flat' | 'weight' | 'pickup' | 'relay';
+  /** Relay mode: the offer, and whether its price is flat or by weight. */
+  relayOffer: string;
+  relayPricing: 'flat' | 'weight';
   amountValue: string;
   bands: ShippingFormBand[];
+}
+
+/** Whether a form rate is priced by weight bands, a relay rate's own included. */
+export function rateUsesBands(rate: Pick<ShippingFormRate, 'mode' | 'relayPricing'>): boolean {
+  return rate.mode === 'weight' || (rate.mode === 'relay' && rate.relayPricing === 'weight');
 }
 
 export interface ShippingFormZone {
@@ -731,6 +761,36 @@ function decimalsFor(currency: string): number {
   }
 }
 
+/** One configured rate → its editor row. `grams` renders a band's maximum. */
+function rateToForm(
+  configured: ConfiguredRate,
+  currency: string,
+  grams: (value: number) => string,
+): ShippingFormRate {
+  const rate = normalizeRate(configured);
+  const pricing = rate.pricing;
+  const relay = pricing.type === 'relay' ? pricing : null;
+  // The fields a relay rate edits are its own price's.
+  const price = pricing.type === 'relay' ? pricing.price : pricing;
+  return {
+    token: nextToken('r'),
+    label: rate.label,
+    mode: rate.pricing.type,
+    relayOffer: relay?.offer ?? '',
+    relayPricing: relay?.price.type ?? 'flat',
+    amountValue: price.type !== 'weight' ? amountToValue(price.amountCents, currency) : '',
+    bands:
+      price.type === 'weight'
+        ? price.bands.map((band) => ({
+            token: nextToken('b'),
+            upToValue: band.upToGrams == null ? '' : grams(band.upToGrams),
+            noMax: band.upToGrams == null,
+            amountValue: amountToValue(band.amountCents, currency),
+          }))
+        : [],
+  };
+}
+
 /** Document → editable form model (for rendering an existing configuration). */
 export function documentToForm(
   doc: RuntimeShippingConfig,
@@ -747,22 +807,7 @@ export function documentToForm(
       name: zone.name,
       countries: [...zone.countries],
       freeOverValue: zone.freeOverCents == null ? '' : amountToValue(zone.freeOverCents, currency),
-      rates: zone.rates.map((rate) => ({
-        token: nextToken('r'),
-        label: rate.label,
-        mode: rate.pricing.type,
-        amountValue:
-          rate.pricing.type !== 'weight' ? amountToValue(rate.pricing.amountCents, currency) : '',
-        bands:
-          rate.pricing.type === 'weight'
-            ? rate.pricing.bands.map((band) => ({
-                token: nextToken('b'),
-                upToValue: band.upToGrams == null ? '' : formatGrams(band.upToGrams, unit),
-                noMax: band.upToGrams == null,
-                amountValue: amountToValue(band.amountCents, currency),
-              }))
-            : [],
-      })),
+      rates: zone.rates.map((rate) => rateToForm(rate, currency, (g) => formatGrams(g, unit))),
     })),
   };
 }
@@ -789,26 +834,7 @@ export function migrationCandidate(
       name: zone.name ?? legacyZoneName(zone.countries, index),
       countries: [...zone.countries],
       freeOverValue: zone.freeOverCents == null ? '' : amountToValue(zone.freeOverCents, currency),
-      rates: zone.rates.map((rate) => ({
-        token: nextToken('r'),
-        label: rate.label,
-        mode: 'pricing' in rate ? rate.pricing.type : ('flat' as const),
-        amountValue:
-          'pricing' in rate
-            ? rate.pricing.type !== 'weight'
-              ? amountToValue(rate.pricing.amountCents, currency)
-              : ''
-            : amountToValue(rate.amountCents, currency),
-        bands:
-          'pricing' in rate && rate.pricing.type === 'weight'
-            ? rate.pricing.bands.map((band) => ({
-                token: nextToken('b'),
-                upToValue: band.upToGrams == null ? '' : String(band.upToGrams),
-                noMax: band.upToGrams == null,
-                amountValue: amountToValue(band.amountCents, currency),
-              }))
-            : [],
-      })),
+      rates: zone.rates.map((rate) => rateToForm(rate, currency, String)),
     })),
   };
 }
@@ -842,7 +868,12 @@ const splitTokens = (raw: string, cap: number) =>
  */
 export function parseShippingForm(
   form: FormLike,
-  options: { currency: string; unit: WeightUnit },
+  options: {
+    currency: string;
+    unit: WeightUnit;
+    /** The relay offers a rate may name on save: the provider's catalogue. */
+    relayOffers?: readonly string[];
+  },
 ): {
   model: ShippingFormModel;
   document: Omit<RuntimeShippingConfig, 'schema' | 'revision'>;
@@ -898,13 +929,28 @@ export function parseShippingForm(
       const ratePrefix = `${prefix}[rate][${rateToken}]`;
       const label = str(form, `${ratePrefix}[label]`);
       const rawMode = str(form, `${ratePrefix}[mode]`);
-      const mode = rawMode === 'weight' ? 'weight' : rawMode === 'pickup' ? 'pickup' : 'flat';
+      const mode =
+        rawMode === 'weight' || rawMode === 'pickup' || rawMode === 'relay' ? rawMode : 'flat';
+      const relayOffer = mode === 'relay' ? str(form, `${ratePrefix}[relay_offer]`) : '';
+      const relayPricing = str(form, `${ratePrefix}[relay_pricing]`) === 'weight' ? 'weight' : 'flat';
       const amountValue = str(form, `${ratePrefix}[amount]`);
+      const byWeight = rateUsesBands({ mode, relayPricing });
 
-      const bandTokens =
-        mode === 'weight'
-          ? splitTokens(str(form, `${ratePrefix}[band_order]`), SHIPPING_LIMITS.bandsPerRate)
-          : [];
+      // Saved through the editor, a relay rate names an offer this core can buy.
+      // A stored one is only shape-checked (by the validator, which reports a
+      // malformed code itself), so an offer a later core retires drops out of
+      // checkout instead of failing the whole document.
+      if (
+        mode === 'relay' &&
+        RELAY_OFFER_CODE.test(relayOffer) &&
+        !(options.relayOffers ?? []).includes(relayOffer)
+      ) {
+        errors.push({ zoneIndex, rateIndex, field: 'offer', message: t('admin.shipping.error.relayOffer') });
+      }
+
+      const bandTokens = byWeight
+        ? splitTokens(str(form, `${ratePrefix}[band_order]`), SHIPPING_LIMITS.bandsPerRate)
+        : [];
       const bands: ShippingFormBand[] = [];
       const documentBands: WeightBand[] = [];
 
@@ -947,13 +993,18 @@ export function parseShippingForm(
           ? toMinorUnits(major, currency)
           : Number.NaN;
 
-      rates.push({ token: rateToken, label, mode, amountValue, bands });
+      rates.push({ token: rateToken, label, mode, relayOffer, relayPricing, amountValue, bands });
+      const price = byWeight
+        ? ({ type: 'weight', bands: documentBands } as const)
+        : ({ type: 'flat', amountCents: flatCents } as const);
       documentRates.push({
         label,
         pricing:
-          mode === 'weight'
-            ? { type: 'weight', bands: documentBands }
-            : { type: mode, amountCents: flatCents },
+          mode === 'relay'
+            ? { type: 'relay', offer: relayOffer, price }
+            : mode === 'pickup'
+              ? { type: 'pickup', amountCents: flatCents }
+              : price,
       });
     });
 

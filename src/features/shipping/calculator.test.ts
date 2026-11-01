@@ -8,6 +8,9 @@ import {
   allowedCountries,
   hasCatchAllZone,
   normalizeRate,
+  zoneOffersRelay,
+  deliveryMethodOf,
+  parseDeliveryMethod,
   FREE_SHIPPING_LABEL,
   type ShippingConfig,
   type WeightBand,
@@ -279,6 +282,102 @@ describe('local pickup', () => {
   });
   it('counts as a non-weight fallback, so weights stay optional', () => {
     expect(zonesRequireWeight(pickupZone)).toBe(false);
+  });
+});
+
+describe('relay points', () => {
+  const relayZone: ShippingConfig = {
+    enabled: true,
+    zones: [
+      {
+        countries: ['FR'],
+        rates: [
+          { label: 'Colissimo', pricing: { type: 'flat', amountCents: 690 } },
+          {
+            label: 'Mondial Relay',
+            pricing: { type: 'relay', offer: 'MONR-CpourToi', price: { type: 'flat', amountCents: 390 } },
+          },
+          {
+            label: 'Chrono Relais',
+            pricing: {
+              type: 'relay',
+              offer: 'CHRP-ChronoRelais',
+              price: { type: 'weight', bands: [{ upToGrams: 1000, amountCents: 590 }] },
+            },
+          },
+        ],
+        freeOverCents: 6000,
+      },
+    ],
+  };
+  const quote = (subtotalCents: number, itemWeightGrams: number | null, relayOffers?: string[]) =>
+    quoteShipping(relayZone, { subtotalCents, country: 'FR', itemWeightGrams, relayOffers });
+
+  it('are never quoted to a caller that cannot let the shopper pick a point', () => {
+    expect(quote(0, 500).options).toEqual([{ label: 'Colissimo', amountCents: 690 }]);
+    // Nor for an offer the caller does not serve, a retired one included.
+    expect(quote(0, 500, ['UPSE-StandardAP']).options).toEqual([{ label: 'Colissimo', amountCents: 690 }]);
+  });
+
+  it('carry their offer, priced flat or by weight like a home rate', () => {
+    expect(quote(0, 500, ['MONR-CpourToi', 'CHRP-ChronoRelais']).options).toEqual([
+      { label: 'Colissimo', amountCents: 690 },
+      { label: 'Mondial Relay', amountCents: 390, relayOffer: 'MONR-CpourToi' },
+      { label: 'Chrono Relais', amountCents: 590, relayOffer: 'CHRP-ChronoRelais' },
+    ]);
+    const heavy = quote(0, 2000, ['MONR-CpourToi', 'CHRP-ChronoRelais']);
+    expect(heavy.omitted).toEqual([{ label: 'Chrono Relais', reason: 'overweight' }]);
+    const unknown = quote(0, null, ['MONR-CpourToi', 'CHRP-ChronoRelais']);
+    expect(unknown.omitted).toEqual([{ label: 'Chrono Relais', reason: 'missing_weight' }]);
+  });
+
+  it('never unlock the free option, which is a home delivery', () => {
+    const relayOnly: ShippingConfig = {
+      enabled: true,
+      zones: [{ ...relayZone.zones[0]!, rates: [relayZone.zones[0]!.rates[1]!] }],
+    };
+    const options = quoteShipping(relayOnly, {
+      subtotalCents: 9000,
+      country: 'FR',
+      itemWeightGrams: 500,
+      relayOffers: ['MONR-CpourToi'],
+    }).options;
+    expect(options).toEqual([{ label: 'Mondial Relay', amountCents: 390, relayOffer: 'MONR-CpourToi' }]);
+    // Beside a home rate, the free home option appears and the relay keeps its price.
+    expect(quote(9000, 500, ['MONR-CpourToi']).options.map((o) => [o.label, o.amountCents])).toEqual([
+      [FREE_SHIPPING_LABEL, 0],
+      ['Colissimo', 690],
+      ['Mondial Relay', 390],
+    ]);
+  });
+
+  it('need a weight only when priced by weight', () => {
+    const only = (rate: ShippingConfig['zones'][number]['rates'][number]): ShippingConfig => ({
+      enabled: true,
+      zones: [{ countries: ['FR'], rates: [rate], freeOverCents: null }],
+    });
+    expect(zonesRequireWeight(only(relayZone.zones[0]!.rates[2]!))).toBe(true);
+    expect(zonesRequireWeight(only(relayZone.zones[0]!.rates[1]!))).toBe(false);
+  });
+
+  it('send a card payment through /checkout only where the zone holds one', () => {
+    const twoZones: ShippingConfig = {
+      enabled: true,
+      zones: [relayZone.zones[0]!, { countries: ['*'], rates: [{ label: 'Monde', amountCents: 1500 }], freeOverCents: null }],
+    };
+    expect(zoneOffersRelay(twoZones, 'FR')).toBe(true);
+    expect(zoneOffersRelay(twoZones, 'fr')).toBe(true);
+    expect(zoneOffersRelay(twoZones, 'BE')).toBe(false);
+    expect(zoneOffersRelay({ ...twoZones, enabled: false }, 'FR')).toBe(false);
+  });
+
+  it('record their delivery as data, read back strictly', () => {
+    expect(deliveryMethodOf({ label: 'Mondial Relay', amountCents: 390, relayOffer: 'MONR-CpourToi' })).toBe('relay');
+    expect(deliveryMethodOf({ label: 'Retrait', amountCents: 0, pickup: true })).toBe('pickup');
+    expect(deliveryMethodOf({ label: 'Point relais', amountCents: 690 })).toBe('shipping');
+    expect(parseDeliveryMethod('relay')).toBe('relay');
+    expect(parseDeliveryMethod('RELAY')).toBeNull();
+    expect(parseDeliveryMethod(null)).toBeNull();
   });
 });
 

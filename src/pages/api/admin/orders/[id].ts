@@ -5,32 +5,20 @@ import {
   getOrderByPublicId,
   fulfillOrder,
   unfulfillOrder,
-  type ShippingAddress,
   resolveInventoryException,
 } from '../../../../features/orders/db';
-import { getSecret } from '../../../../features/secrets/store';
 import { setSetting } from '../../../../features/settings/db';
+import { parseParcelForm } from '../../../../features/shipping/labels.ts';
+import { discardLabelAttempt, forceDiscardLabelAttempt } from '../../../../features/shipping/labelStore';
+import { getBoxtalLabelContext } from '../../../../features/shipping/boxtal/index.ts';
 import {
-  carrierCodeFor,
-  fetchLabelRates,
-  findTransactionForRate,
-  getShipmentRates,
-  parseParcelForm,
-  purchaseLabel,
-  type ShipFrom,
-} from '../../../../features/shipping/labels.ts';
-import {
-  claimPurchase,
-  discardLabelAttempt,
-  forceDiscardLabelAttempt,
-  getLabelRecord,
-  isPurchaseStale,
-  markLabelFailed,
-  markLabelUncertain,
-  recordPurchased,
-  recordQuote,
-  recordRefundedAttempt,
-} from '../../../../features/shipping/labelStore';
+  buyLabel,
+  prepareLabel,
+  refreshLabelTracking,
+  settleWithBoxtalId,
+  type LabelOutcome,
+  type LabelSender,
+} from '../../../../features/shipping/boxtal/orderLabel.ts';
 import { queueNotification } from '../../../../features/email/outboxStore';
 import {
   recordExternalRefund,
@@ -308,15 +296,16 @@ export const POST: APIRoute = async ({ request, params, redirect }) => {
     return willEmail;
   };
 
-  // ── Shipping labels ────────────────────────────────────────────────────────
-  // Buying moves money on the merchant's Shippo account, so every step runs
-  // through the shipping_labels state machine: one row per order, conditional
-  // claims, and an explicit human gate for ambiguous outcomes. The shipment id
-  // is NEVER taken from the request — only from this order's own row.
+  // ── Shipping labels (Boxtal) ───────────────────────────────────────────────
+  // Buying moves money on the merchant's Boxtal account, so every step runs
+  // through the shipping_labels state machine (features/shipping/boxtal/
+  // orderLabel.ts): one row per order, conditional claims, and a human gate
+  // for an ambiguous outcome. The reference a label is bought under is NEVER
+  // taken from the request — only from this order's own row.
 
   if (action === 'label_discard') {
     // Quotes and definitively-failed attempts only. A SUBMITTED purchase may
-    // still be completing at Shippo — only reconciliation can settle those.
+    // have created a shipment — only the merchant can settle those.
     return (await discardLabelAttempt(env.DB, id))
       ? notice(t('admin.orders.notice.labelDiscarded'))
       : fail(t('admin.orders.notice.labelNothingToDiscard'));
@@ -325,157 +314,49 @@ export const POST: APIRoute = async ({ request, params, redirect }) => {
   if (action === 'label_force_discard') {
     // The risk-bearing override, chosen by a human who has read what it costs:
     // deleting a submitted attempt ends the single-shot guarantee for this
-    // order — if the lost request completes after all, its label will exist
-    // only at Shippo. Reconciliation is always the safe path; this exists for
-    // attempts whose POST plausibly never left the building.
+    // order — if the lost request created a shipment after all, it exists only
+    // in the provider's dashboard. It is also the only way out of an attempt
+    // made with Shippo, which the order page no longer talks to (ADR 0020).
     return (await forceDiscardLabelAttempt(env.DB, id))
       ? notice(t('admin.orders.notice.labelForceDiscarded'))
       : fail(t('admin.orders.notice.labelNothingToForce'));
   }
 
-  // Ask Shippo what actually happened to a submitted-but-unsettled attempt.
-  // This is the ONLY path that reopens (proven no purchase → 'failed') or
-  // durably records (found a SUCCESS transaction → same guarded completion as
-  // a live purchase) an ambiguous attempt.
-  if (action === 'label_reconcile') {
-    const token = await getSecret(env.DB, 'shippo_api_key');
-    if (!token) return fail(t('admin.orders.notice.labelNoToken'));
-    const record = await getLabelRecord(env.DB, id);
-    const settleable =
-      record &&
-      record.claim_token &&
-      record.rate_id &&
-      (record.status === 'uncertain' || (record.status === 'purchasing' && isPurchaseStale(record)));
-    if (!record || !settleable) {
-      return fail(t('admin.orders.notice.labelNothingToReconcile'));
-    }
-
-    // Provider/service/amount come from the shipment's own rate list — the
-    // transaction record does not carry them.
-    const rates = await getShipmentRates(token, record.shipment_id);
-    const rate = rates.ok ? rates.value.find((r) => r.rateId === record.rate_id) : null;
-    const outcome = await findTransactionForRate(
-      token,
-      record.rate_id!,
-      rate?.provider ?? record.provider ?? 'Carrier',
-    );
-    if (!outcome.ok) {
-      return fail(t('admin.orders.notice.labelReconcileFailed', { erreur: outcome.error }));
-    }
-
-    if (outcome.value.state === 'pending') {
-      return fail(t('admin.orders.notice.labelReconcilePending'));
-    }
-    if (outcome.value.state === 'refunded') {
-      // Bought, then refunded at the provider: record the original transaction
-      // for the audit trail; only that recording reopens quoting.
-      const refFound = outcome.value.label;
-      const audited = await recordRefundedAttempt(env.DB, id, record.claim_token!, {
-        transactionId: refFound.transactionId,
-        provider: refFound.provider,
-        service: rate?.service ?? record.service ?? '',
-        amountCents: rate?.amountCents ?? record.amount_cents ?? 0,
-        trackingNumber: refFound.trackingNumber,
-        labelUrl: refFound.labelUrl,
-        carrierCode: carrierCodeFor(refFound.provider),
-      });
-      if (!audited) return fail(t('admin.orders.notice.labelChangedState'));
-      return notice(
-        t('admin.orders.notice.labelReconciledRefunded', { transaction: refFound.transactionId }),
-      );
-    }
-    if (outcome.value.state === 'none') {
-      const failed = await markLabelFailed(
-        env.DB,
-        id,
-        record.claim_token!,
-        t('admin.orders.notice.labelReconciledError'),
-      );
-      if (!failed) {
-        return fail(t('admin.orders.notice.labelChangedState'));
-      }
-      return notice(t('admin.orders.notice.labelReconciledNone'));
-    }
-    const found = outcome.value.label;
-    const recorded = await recordPurchased(env.DB, id, record.claim_token!, {
-      transactionId: found.transactionId,
-      provider: found.provider,
-      service: rate?.service ?? record.service ?? '',
-      amountCents: rate?.amountCents ?? record.amount_cents ?? 0,
-      trackingNumber: found.trackingNumber,
-      labelUrl: found.labelUrl,
-      carrierCode: carrierCodeFor(found.provider),
-    });
-    if (!recorded.recorded) {
-      return fail(t('admin.orders.notice.labelChangedState'));
-    }
-    if (!recorded.orderFulfilled) {
-      return notice(
-        t('admin.orders.notice.labelRecoveredNotFulfilled', { suivi: found.trackingNumber }),
-      );
-    }
-    await queueShippedDelivery(id);
-    return notice(t('admin.orders.notice.labelRecovered', { suivi: found.trackingNumber }));
-  }
-
-  if (action === 'label_rates' || action === 'buy_label') {
-    const token = await getSecret(env.DB, 'shippo_api_key');
-    if (!token) return fail(t('admin.orders.notice.labelNoToken'));
-    if (!existing.ship_address) return fail(t('admin.orders.notice.labelNoAddress'));
-    let raw: ShippingAddress;
-    try {
-      raw = JSON.parse(existing.ship_address) as ShippingAddress;
-    } catch {
-      return fail(t('admin.orders.notice.labelAddressUnreadable'));
-    }
-    // The snapshot's fields are nullable (provider shapes vary); a label needs
-    // the essentials, so refuse with the gap named rather than 500 at Shippo.
-    if (!raw.name || !raw.line1 || !raw.city || !raw.postal || !raw.country) {
-      return fail(t('admin.orders.notice.labelAddressIncomplete'));
-    }
-    const shipTo = {
-      name: raw.name,
-      line1: raw.line1,
-      line2: raw.line2,
-      city: raw.city,
-      state: raw.state,
-      postal: raw.postal,
-      country: raw.country,
-      email: existing.email,
-    };
+  if (
+    action === 'label_rates' ||
+    action === 'buy_label' ||
+    action === 'label_tracking' ||
+    action === 'label_reconcile'
+  ) {
+    const boxtal = await getBoxtalLabelContext(env.DB, existing.currency);
+    if (!boxtal) return fail(t('admin.orders.notice.boxtal.noKeys'));
+    const field = (name: string) => String(form.get(name) ?? '').trim();
+    let outcome: LabelOutcome;
 
     if (action === 'label_rates') {
-      const from: ShipFrom = {
-        name: String(form.get('from_name') ?? '').trim(),
-        street1: String(form.get('from_street1') ?? '').trim(),
-        city: String(form.get('from_city') ?? '').trim(),
-        state: String(form.get('from_state') ?? '').trim(),
-        zip: String(form.get('from_zip') ?? '').trim(),
-        country: String(form.get('from_country') ?? '').trim().toUpperCase(),
-      };
-      if (!from.name || !from.street1 || !from.city || !from.zip || from.country.length !== 2) {
-        return fail(t('admin.orders.notice.labelFromIncomplete'));
-      }
-      // Domestic only, for now: an international label needs a customs
-      // declaration (contents, values, phone numbers) this flow does not
-      // collect, so Shippo would refuse or the parcel would stall at export.
-      if (from.country !== shipTo.country.toUpperCase()) {
-        return fail(
-          t('admin.orders.notice.labelInternational', { pays: shipTo.country.toUpperCase() }),
-        );
-      }
       const settings = await getStoreSettings(env.DB);
+      // Centimetres, whatever the store's weight unit: Boxtal measures in them.
       const parsed = parseParcelForm(
         {
-          length: String(form.get('parcel_length') ?? ''),
-          width: String(form.get('parcel_width') ?? ''),
-          height: String(form.get('parcel_height') ?? ''),
-          weight: String(form.get('parcel_weight') ?? ''),
+          length: field('parcel_length'),
+          width: field('parcel_width'),
+          height: field('parcel_height'),
+          weight: field('parcel_weight'),
         },
         settings.weightUnit,
       );
       if (!parsed.parcel) return fail(parsed.error ?? t('admin.orders.notice.labelCheckParcel'));
-
+      const from: LabelSender = {
+        company: field('from_company'),
+        firstName: field('from_first_name'),
+        lastName: field('from_last_name'),
+        email: field('from_email'),
+        phone: field('from_phone'),
+        street: field('from_street'),
+        city: field('from_city'),
+        postalCode: field('from_postal'),
+        country: field('from_country').toUpperCase(),
+      };
       // Remember for next time regardless of whether a label gets bought.
       await setSetting(env.DB, 'ship_from', JSON.stringify(from));
       await setSetting(
@@ -487,100 +368,40 @@ export const POST: APIRoute = async ({ request, params, redirect }) => {
           height: parsed.parcel.height,
         }),
       );
-
-      const rates = await fetchLabelRates(
-        token,
+      outcome = await prepareLabel(boxtal.ctx, existing, {
         from,
-        shipTo,
-        parsed.parcel,
-        settings.weightUnit,
-        existing.public_id,
-      );
-      if (!rates.ok) return fail(rates.error);
-      // The quote binds to THIS order in D1. Refusal means a purchase is in
-      // progress, done, or the order is no longer labelable (unpaid, fulfilled,
-      // pickup) — nothing was charged either way.
-      if (!(await recordQuote(env.DB, id, rates.value.shipmentId))) {
-        return fail(t('admin.orders.notice.labelQuoteRefused'));
-      }
-      return back;
+        parcel: {
+          lengthCm: parsed.parcel.length,
+          widthCm: parsed.parcel.width,
+          heightCm: parsed.parcel.height,
+          weightGrams: parsed.parcel.weightGrams,
+        },
+      });
+      return outcome.ok ? back : fail(outcome.error);
     }
 
-    // buy_label — the claim flips this order's quote to 'purchasing'; exactly
-    // one concurrent submit wins, and the shipment bought from is the row's.
-    const rateId = String(form.get('rate') ?? '').trim();
-    if (!rateId) return fail(t('admin.orders.notice.labelPickRate'));
-    const claim = await claimPurchase(env.DB, id, rateId);
-    if (!claim) {
-      return fail(t('admin.orders.notice.labelNoQuote'));
+    if (action === 'buy_label') {
+      outcome = await buyLabel(boxtal.ctx, existing, {
+        offerCode: field('offer'),
+        recipient: {
+          firstName: field('to_first_name'),
+          lastName: field('to_last_name'),
+          phone: field('to_phone'),
+        },
+      });
+    } else if (action === 'label_tracking') {
+      outcome = await refreshLabelTracking(boxtal.ctx, existing);
+    } else {
+      // The id the merchant found in Boxtal's dashboard for an uncertain
+      // purchase: recorded only if its parcel carries this attempt's reference.
+      outcome = await settleWithBoxtalId(boxtal.ctx, existing, field('boxtal_id'));
     }
-    const rates = await getShipmentRates(token, claim.shipmentId);
-    if (!rates.ok) {
-      await markLabelFailed(env.DB, id, claim.claimToken, rates.error);
-      return fail(rates.error);
-    }
-    const rate = rates.value.find((r) => r.rateId === rateId);
-    if (!rate) {
-      await markLabelFailed(env.DB, id, claim.claimToken, t('admin.orders.notice.labelRateGone'));
-      return fail(t('admin.orders.notice.labelRateGone'));
-    }
-
-    const bought = await purchaseLabel(token, rate.rateId, rate.provider, existing.public_id);
-    if (!bought.ok) {
-      if (bought.uncertain) {
-        // The charge MAY have landed. Park it — never auto-retry a purchase —
-        // and point the merchant at the dashboard record (tagged with the
-        // order id via metadata) before they explicitly discard.
-        await markLabelUncertain(env.DB, id, claim.claimToken, bought.error);
-        return fail(
-          t('admin.orders.notice.labelUncertain', {
-            erreur: bought.error,
-            bouton: t('admin.orders.detail.label.reconcile'),
-          }),
-        );
-      }
-      await markLabelFailed(env.DB, id, claim.claimToken, bought.error);
-      return fail(bought.error);
-    }
-
-    // One batch: label row, guarded fulfillment, label URL, and the durable
-    // shipped-notification row. A crash after the charge can no longer leave a
-    // paid label unrecorded, and the email survives via the outbox sweep.
-    const recorded = await recordPurchased(env.DB, id, claim.claimToken, {
-      transactionId: bought.value.transactionId,
-      provider: rate.provider,
-      service: rate.service,
-      amountCents: rate.amountCents,
-      trackingNumber: bought.value.trackingNumber,
-      labelUrl: bought.value.labelUrl,
-      carrierCode: carrierCodeFor(bought.value.provider),
-    });
-    if (!recorded.recorded) {
-      // This attempt was superseded (its lease expired and it was discarded)
-      // while Shippo processed it — the label exists ONLY at Shippo. Nothing
-      // here was touched, by design; the charge still needs human eyes.
-      return fail(
-        t('admin.orders.notice.labelSuperseded', {
-          suivi: bought.value.trackingNumber,
-          commande: existing.public_id ?? '',
-        }),
-      );
-    }
-    if (!recorded.orderFulfilled) {
-      // The charge is real and saved, but the order refused fulfillment — it
-      // was refunded or otherwise changed state while the provider call was in
-      // flight. No shipped email was queued. Say so — pretending this
-      // succeeded is how paid labels get lost.
-      return fail(
-        t('admin.orders.notice.labelPurchasedNotFulfilled', { suivi: bought.value.trackingNumber }),
-      );
-    }
+    if (!outcome.ok) return fail(outcome.error);
+    if (!outcome.fulfilled) return notice(outcome.message);
+    // The batch that fulfilled the order queued the shipped notice; try it now.
     const willEmail = await queueShippedDelivery(id);
     return notice(
-      `${t('admin.orders.notice.labelPurchased', {
-        service: `${rate.provider} ${rate.service}`,
-        suivi: bought.value.trackingNumber,
-      })} ${
+      `${outcome.message} ${
         willEmail
           ? t('admin.orders.notice.labelEmailQueued')
           : t('admin.orders.notice.labelNoEmail')

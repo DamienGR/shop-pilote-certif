@@ -6,6 +6,9 @@ import { zonesRequireWeight, type ShippingConfig } from '../../features/shipping
 import { countProductsMissingWeight, sampleProductsMissingWeight } from '../../features/shipping/sellability';
 import { formatWeightValue, type WeightUnit } from '../../features/shipping/weight';
 import { countryOptions } from '../../features/shipping/countries';
+import { BOXTAL_RELAY_OFFERS } from '../../features/shipping/boxtal/offers';
+import { boxtalConfigured } from '../../features/settings/availability';
+import { vaultReady } from '../../features/secrets/store';
 import { t, tn } from '../../features/i18n';
 import {
   SHIPPING_LIMITS,
@@ -14,12 +17,15 @@ import {
   fingerprintRawConfig,
   migrationCandidate,
   parseShippingForm,
+  rateUsesBands,
   replaceInvalidShippingConfig,
   saveRuntimeShippingConfig,
   validateShippingDocument,
   type ShippingFormModel,
+  type ShippingFormRate,
   type ShippingValidationError,
 } from '../../features/shipping/settings';
+import type { RatePricing } from '../../features/shipping/calculator';
 
 export const prerender = false;
 
@@ -35,13 +41,18 @@ const invalidFingerprint =
   parsed.status === 'invalid' ? await fingerprintRawConfig(parsed.raw) : null;
 
 const countries = countryOptions();
+// Relay rates (ADR 0020) are a build-time option; a rate saved while it was on
+// stays editable after it is switched off, so the merchant can see and remove it.
+const relayEnabled = config.features.relayPoints;
+const relayOffers = BOXTAL_RELAY_OFFERS.map((offer) => offer.code);
+const boxtalReady = boxtalConfigured(settings?.configuredSecrets ?? [], vaultReady());
 let errors: ShippingValidationError[] = [];
 let notice: string | null = null;
 let conflict = false;
 let saved = Astro.url.searchParams.get('saved') === '1';
 
-function blankRate(token: string) {
-  return { token, label: '', mode: 'flat' as const, amountValue: '', bands: [] };
+function blankRate(token: string): ShippingFormRate {
+  return { token, label: '', mode: 'flat', relayOffer: '', relayPricing: 'flat', amountValue: '', bands: [] };
 }
 function blankZone(token: string) {
   return {
@@ -73,7 +84,7 @@ let prepopulated = false;
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
   const action = String(form.get('_action') ?? 'save');
-  const parsedForm = parseShippingForm(form, { currency, unit });
+  const parsedForm = parseShippingForm(form, { currency, unit, relayOffers });
   model = parsedForm.model;
 
   // Structural row actions re-render without touching D1, so the editor works with
@@ -200,21 +211,24 @@ function parseModelForPreview(m: ShippingFormModel): ShippingValidationError[] {
       name: z.name,
       countries: z.countries,
       freeOverCents: z.freeOverValue === '' ? null : Math.round(Number(z.freeOverValue) * 100),
-      rates: z.rates.map((r) => ({
-        label: r.label,
-        pricing:
-          r.mode === 'weight'
-            ? {
-                type: 'weight' as const,
-                bands: r.bands.map((b) => ({
-                  upToGrams: b.noMax ? null : Number(b.upToValue),
-                  amountCents: Math.round(Number(b.amountValue) * 100),
-                })),
-              }
-            : { type: 'flat' as const, amountCents: Math.round(Number(r.amountValue) * 100) },
-      })),
+      rates: z.rates.map((r) => ({ label: r.label, pricing: previewPricing(r) })),
     })),
   });
+}
+
+function previewPricing(r: ShippingFormRate): RatePricing {
+  const price = rateUsesBands(r)
+    ? {
+        type: 'weight' as const,
+        bands: r.bands.map((b) => ({
+          upToGrams: b.noMax ? null : Number(b.upToValue),
+          amountCents: Math.round(Number(b.amountValue) * 100),
+        })),
+      }
+    : { type: 'flat' as const, amountCents: Math.round(Number(r.amountValue) * 100) };
+  if (r.mode === 'relay') return { type: 'relay', offer: r.relayOffer, price };
+  if (r.mode === 'pickup' && price.type === 'flat') return { type: 'pickup', amountCents: price.amountCents };
+  return price;
 }
 
 const documentErrors = errorsFor(errors).filter((e) => e.field === 'document' || e.field === 'packageWeight');
@@ -383,9 +397,44 @@ const label = (path: string) => `text-xs uppercase tracking-widest text-gray-500
                     <option value="flat" selected={rate.mode === 'flat'}>{t('admin.shipping.rate.mode.flat')}</option>
                     <option value="weight" selected={rate.mode === 'weight'}>{t('admin.shipping.rate.mode.weight')}</option>
                     <option value="pickup" selected={rate.mode === 'pickup'}>{t('admin.shipping.rate.mode.pickup')}</option>
+                    {(relayEnabled || rate.mode === 'relay') && (
+                      <option value="relay" selected={rate.mode === 'relay'}>{t('admin.shipping.rate.mode.relay')}</option>
+                    )}
                   </select>
                 </label>
-                {rate.mode !== 'weight' && (
+                {rate.mode === 'relay' && (
+                  <label class="block">
+                    <span class={label('')}>{t('admin.shipping.rate.relayOffer')}</span>
+                    <select
+                      name={`zone[${zone.token}][rate][${rate.token}][relay_offer]`}
+                      class="mt-1 rounded border border-line px-2 py-1 text-sm"
+                    >
+                      <option value="" selected={!rate.relayOffer}>{t('admin.shipping.rate.relayOfferChoose')}</option>
+                      {BOXTAL_RELAY_OFFERS.map((offer) => (
+                        <option value={offer.code} selected={rate.relayOffer === offer.code}>
+                          {offer.carrier} — {offer.service}
+                        </option>
+                      ))}
+                      {/* An offer this core no longer lists stays visible, to be replaced. */}
+                      {rate.relayOffer && !relayOffers.includes(rate.relayOffer) && (
+                        <option value={rate.relayOffer} selected>{rate.relayOffer}</option>
+                      )}
+                    </select>
+                  </label>
+                )}
+                {rate.mode === 'relay' && (
+                  <label class="block">
+                    <span class={label('')}>{t('admin.shipping.rate.relayPricing')}</span>
+                    <select
+                      name={`zone[${zone.token}][rate][${rate.token}][relay_pricing]`}
+                      class="mt-1 rounded border border-line px-2 py-1 text-sm"
+                    >
+                      <option value="flat" selected={rate.relayPricing === 'flat'}>{t('admin.shipping.rate.relayPricing.flat')}</option>
+                      <option value="weight" selected={rate.relayPricing === 'weight'}>{t('admin.shipping.rate.relayPricing.weight')}</option>
+                    </select>
+                  </label>
+                )}
+                {!rateUsesBands(rate) && (
                   <label class="block">
                     <span class={label('')}>{rate.mode === 'pickup' ? t('admin.shipping.rate.pickupFee') : t('admin.shipping.rate.price')}</span>
                     <input
@@ -408,8 +457,14 @@ const label = (path: string) => `text-xs uppercase tracking-widest text-gray-500
               {errorsFor(errors, zoneIndex, rateIndex).map((e) => (
                 <p class="mt-2 text-sm text-red-700">{e.message}</p>
               ))}
+              {rate.mode === 'relay' && (
+                <p class="mt-2 text-xs text-gray-500">{t('admin.shipping.rate.relayHint')}</p>
+              )}
+              {rate.mode === 'relay' && !boxtalReady && (
+                <p class="mt-2 text-sm text-amber-800">{t('admin.shipping.rate.relayNoKeys')}</p>
+              )}
 
-              {rate.mode === 'weight' && (
+              {rateUsesBands(rate) && (
                 <div class="mt-3 border-t border-line pt-3">
                   <input
                     type="hidden"

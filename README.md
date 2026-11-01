@@ -110,13 +110,19 @@ Cloudflare `eu`, et pas seulement avec un hint de localisation `weur`.
 - marketplace ;
 - B2B avancé ;
 - ERP, caisse ou comptabilité synchronisés ;
-- points relais et tarifs transporteur en temps réel ;
+- tarifs transporteur en temps réel ;
 - automatisation marketing ;
 - produits hautement configurables ;
 - recherche sémantique, Lightning et MCP.
 
 Ces besoins pourront être proposés sur devis, mais ne doivent pas faire dériver
 le socle de l'offre standard.
+
+### Options à venir
+
+- achat d'étiquettes, suivi et points relais par Boxtal, éteints par défaut
+  ([ADR 0020](docs/architecture/decisions/0020-expeditions-par-boxtal.md)) :
+  en construction, proposés une fois leur campagne de certification passée.
 
 ## Modèle de dépôts
 

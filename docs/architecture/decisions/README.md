@@ -27,7 +27,7 @@ Utiliser [`0000-template.md`](0000-template.md) pour un nouvel ADR.
 | [0004](0004-localisation-des-donnees.md) | Localisation des données | Accepté |
 | [0005](0005-strategie-de-sauvegarde.md) | Stratégie de sauvegarde et de restauration | Accepté |
 | [0006](0006-politique-des-migrations.md) | Politique des migrations de schéma | Accepté |
-| [0007](0007-perimetre-fonctionnel.md) | Périmètre fonctionnel de l'offre | Accepté |
+| [0007](0007-perimetre-fonctionnel.md) | Périmètre fonctionnel de l'offre | Accepté ; amendé par 0020 pour les points relais |
 | [0008](0008-format-du-manifeste-client.md) | Format et autorité du manifeste client | Accepté |
 | [0009](0009-forme-de-la-cli-shopctl.md) | Forme, langage et livraison de la CLI `shopctl` | Accepté |
 | [0010](0010-tva-facturation-et-consentement.md) | TVA, facturation et consentement aux CGV | Accepté, sous réserve |
@@ -40,3 +40,5 @@ Utiliser [`0000-template.md`](0000-template.md) pour un nouvel ADR.
 | [0017](0017-effacement-et-portabilite.md) | Effacement et portabilité des données d'un acheteur | Accepté |
 | [0018](0018-administration-en-francais.md) | L'administration en français | Accepté |
 | [0019](0019-compte-cloudflare-mutualise.md) | Un compte Cloudflare mutualisé pour les boutiques | Accepté |
+| [0020](0020-expeditions-par-boxtal.md) | Boxtal pour toutes les expéditions, points relais compris | Accepté ; amendé par 0021 |
+| [0021](0021-boxtal-apres-le-bac-a-sable.md) | Ce que le bac à sable de Boxtal change à l'ADR 0020 | Accepté |
