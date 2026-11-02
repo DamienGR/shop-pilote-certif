@@ -1,0 +1,35 @@
+
+Compte Cloudflare
+✓ <email>'s Account (305a2bac9fb247fb3d5bc9ff46a4635b) — attendu par le manifeste (cloudflare.accountId)
+
+Ressources de pilote-certif en staging
+✓ base D1 minshop-pilote-certif-staging-db — créé (juridiction eu, 36acab30-8742-43b0-9c0a-5efaf8b476ba)
+✓ minshop-pilote-certif-staging-db — marquée pour pilote-certif (damiengr/shop-pilote-certif)
+✓ bucket images minshop-pilote-certif-staging-images — créé (juridiction eu)
+✓ bucket fichiers minshop-pilote-certif-staging-files — créé (juridiction eu)
+✓ bucket sauvegardes minshop-pilote-certif-staging-backups — créé (juridiction eu)
+
+Juridiction
+✓ minshop-pilote-certif-staging-db — juridiction eu
+✓ minshop-pilote-certif-staging-images — visible en juridiction eu, absent de la juridiction par défaut
+✓ minshop-pilote-certif-staging-files — visible en juridiction eu, absent de la juridiction par défaut
+✓ minshop-pilote-certif-staging-backups — visible en juridiction eu, absent de la juridiction par défaut
+
+Exposition publique
+✓ minshop-pilote-certif-staging-files — privé : ni URL r2.dev, ni domaine attaché
+✓ minshop-pilote-certif-staging-backups — privé : ni URL r2.dev, ni domaine attaché
+✓ minshop-pilote-certif-staging-images — images servies par le Worker (aucun domaine d'images)
+
+Conservation des sauvegardes
+✓ minshop-pilote-certif-staging-backups — archives (pilote-certif-staging-) expirées après 90 jours
+✓ minshop-pilote-certif-staging-backups — médias du pool (pool/) expirées après 180 jours
+
+Configuration et migrations
+✓ wrangler.jsonc rendu pour minshop-pilote-certif-staging (base 36acab30-8742-43b0-9c0a-5efaf8b476ba)
+✓ migrations appliquées à minshop-pilote-certif-staging-db
+
+Secrets internes
+· minshop-pilote-certif-staging n'est pas encore déployé : AUTH_SECRET et SECRETS_KEK seront posés au premier déploiement.
+    shopctl deploy --env staging les génère, puis `shopctl provision` les confirme.
+
+staging provisionné pour pilote-certif. Suite : npm run shopctl -- deploy --env staging.

@@ -1,0 +1,5 @@
+Compte : 305a2bac9fb247fb3d5bc9ff46a4635b
+Sous-domaine workers.dev : dg-tech
+Adresse de la future staging : https://minshop-pilote-certif-staging.dg-tech.workers.dev
+Worker minshop-pilote-certif-production : 1 cron(s)
+Crons du compte : 1 (Workers Free : 5 au plus ; la staging en ajoute 1)

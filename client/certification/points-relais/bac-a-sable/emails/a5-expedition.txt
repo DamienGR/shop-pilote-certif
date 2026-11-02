@@ -1,0 +1,24 @@
+Relevé de Gmail par le connecteur de l'agent, sans capture (choix de Damien, 2026-11-01).
+Masqués : l'adresse du destinataire et le jeton d'accès invité de « Voir ma commande ».
+
+De : commandes@certif-minshop.miijot.fr
+À : <Gmail de l'acheteur>
+Date : 2026-11-01T22:45:49Z
+Objet : Votre commande Certif Minshop (répétition) n°hx922abzcn est expédiée
+
+Votre commande n°hx922abzcn est expédiée !
+
+Numéro de suivi : CR261101000000000VLR
+Suivre le colis : https://www.mondialrelay.com/public/permanent/tracking.aspx?ens=TTMRSDBXTT&exp=CR261101000000000VLR1&language=FR
+
+À retirer au point relais :
+ART THE ZEN
+5 RUE PACHE
+75011 PARIS
+
+Voir ma commande : https://minshop-pilote-certif-staging.dg-tech.workers.dev/order/otk_<masqué>
+
+Constat : l'e-mail ne nomme pas le transporteur. La commande porte tracking_carrier = other
+au lieu de mondialrelay (suivi-relais.json) : défaut du socle, à corriger avant la partie B.
+La page de Mondial Relay, ouverte par Damien depuis ce lien : « Nous n’avons identifié aucun
+colis portant ce numéro de suivi 😞 » (numéro du bac à sable).

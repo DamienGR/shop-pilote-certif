@@ -1,0 +1,23 @@
+
+Compte Cloudflare
+✓ <email>'s Account (305a2bac9fb247fb3d5bc9ff46a4635b)
+
+À supprimer — pilote-certif en staging
+! Worker minshop-pilote-certif-staging
+! namespace KV des sessions minshop-pilote-certif-staging-session
+! bucket images minshop-pilote-certif-staging-images
+! bucket fichiers minshop-pilote-certif-staging-files
+! bucket sauvegardes minshop-pilote-certif-staging-backups
+! base D1 minshop-pilote-certif-staging-db
+✓ minshop-pilote-certif-staging-db — marquée pour pilote-certif (damiengr/shop-pilote-certif)
+
+Suppression
+✓ Worker minshop-pilote-certif-staging supprimé
+✓ namespace KV des sessions minshop-pilote-certif-staging-session supprimé
+✓ bucket images minshop-pilote-certif-staging-images supprimé
+✓ bucket fichiers minshop-pilote-certif-staging-files supprimé
+✓ bucket sauvegardes minshop-pilote-certif-staging-backups supprimé
+✓ base D1 minshop-pilote-certif-staging-db supprimé
+
+staging supprimé pour pilote-certif. Le dépôt Git et son historique ne sont pas touchés.
+    Le Nightly du dépôt interroge encore ce staging : posez la variable de dépôt STAGING_RETIRED (gh variable set STAGING_RETIRED --body 2026-11-02) pour qu'il cesse.

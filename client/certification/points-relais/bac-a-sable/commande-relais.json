@@ -1,0 +1,38 @@
+[
+  {
+    "results": [
+      {
+        "public_id": "ord_hx922abzcn",
+        "status": "paid",
+        "amount_total_cents": 1390,
+        "shipping_cents": 390,
+        "shipping_label": "Point relais Mondial Relay",
+        "delivery_method": "relay",
+        "payment_method": "stripe",
+        "offre": "MONR-CpourToi",
+        "code": "41132",
+        "point": "ART THE ZEN",
+        "pays": "FR",
+        "telephone": 1
+      }
+    ],
+    "success": true,
+    "meta": {
+      "served_by": "v3-prod",
+      "served_by_region": "EEUR",
+      "served_by_colo": "WAW",
+      "served_by_primary": true,
+      "timings": {
+        "sql_duration_ms": 0.2155
+      },
+      "duration": 0.2155,
+      "changes": 0,
+      "last_row_id": 0,
+      "changed_db": false,
+      "size_after": 466944,
+      "rows_read": 1,
+      "rows_written": 0,
+      "total_attempts": 1
+    }
+  }
+]

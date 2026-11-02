@@ -1,0 +1,12 @@
+Extrait de l'export CSV de l'admin (A8), 2026-11-02, sans capture (choix de Damien).
+Seules ces colonnes sont reprises ; le fichier complet reste hors du dépôt (il porte les e-mails).
+Colonnes de l'export : Order, Date, Email, Status, Fulfillment, Subtotal, Shipping, Discount, Tax, Total, Currency, Provider refunded, Externally refunded, Total refunded, Net, Refund state, Refund review, VAT rate, VAT included, Net of VAT, Terms version, Terms accepted at, Carrier, Tracking, Delivery, Relay point code, Relay point
+
+Order,Status,Total,Tax,Carrier,Tracking,Delivery,Relay point code,Relay point
+t0t1h31tet,paid,16.68,2.78,,,relay,41132,"ART THE ZEN, 5 RUE PACHE, 75011 PARIS"
+s0p0kxxva8,paid,13.90,0.00,,,relay,41132,"ART THE ZEN, 5 RUE PACHE, 75011 PARIS"
+sbchdmtkc8,paid,15.90,0.00,colissimo,CR261101000000000VLS,shipping,,
+hx922abzcn,paid,13.90,0.00,other,CR261101000000000VLR,relay,41132,"ART THE ZEN, 5 RUE PACHE, 75011 PARIS"
+
+Constat : relay, 41132 et le point sur hx922abzcn (A4), s0p0kxxva8 et t0t1h31tet (A7) ;
+shipping et aucun point sur sbchdmtkc8 (A6). Carrier = other sur hx922abzcn : le défaut d'A5.
