@@ -1,0 +1,34 @@
+
+Compte Cloudflare
+✓ <email>'s Account (305a2bac9fb247fb3d5bc9ff46a4635b)
+
+Ressources de pilote-certif en staging
+✓ minshop-pilote-certif-staging-db (36acab30-8742-43b0-9c0a-5efaf8b476ba), minshop-pilote-certif-staging-images, minshop-pilote-certif-staging-files — juridiction eu
+✓ minshop-pilote-certif-staging-db — marquée pour pilote-certif (damiengr/shop-pilote-certif)
+✓ minshop-pilote-certif-staging-files — toujours privé
+
+Configuration
+✓ wrangler.jsonc rendu pour minshop-pilote-certif-staging
+
+
+[… sortie de npm run verify omise (tests, build de contrôle) : « # fail 0 » …]
+✓ npm run verify
+Base de données
+✓ migrations appliquées à minshop-pilote-certif-staging-db
+Build et déploiement
+✓ npm run build
+✓ minshop-pilote-certif-staging déployé — https://minshop-pilote-certif-staging.dg-tech.workers.dev
+Secrets internes
+✓ AUTH_SECRET généré et transmis par entrée standard (signe les sessions de l'administration)
+✓ SECRETS_KEK généré et transmis par entrée standard (chiffre les clés de paiement saisies dans Admin → Réglages)
+Test de fumée
+! / — la vitrine répond et se déclare française (302)
+    renvoie vers /admin/setup : la boutique n'est pas encore installée (la base a répondu, l'installation y est inachevée). Ce point se vérifiera au déploiement qui suivra l'assistant.
+! /products — le catalogue rend, donc la base D1 répond (302)
+    renvoie vers /admin/setup : la boutique n'est pas encore installée (la base a répondu, l'installation y est inachevée). Ce point se vérifiera au déploiement qui suivra l'assistant.
+! /robots.txt — les fichiers de service sont servis (302)
+    renvoie vers /admin/setup : la boutique n'est pas encore installée (la base a répondu, l'installation y est inachevée). Ce point se vérifiera au déploiement qui suivra l'assistant.
+✓ /admin — l'administration n'est pas ouverte (303)
+✓ /admin/setup — l'assistant de première installation est refermé (303)
+pilote-certif est en ligne en staging sur https://minshop-pilote-certif-staging.dg-tech.workers.dev.
+exit 0

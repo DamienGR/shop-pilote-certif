@@ -1,0 +1,36 @@
+Relevé de Gmail par le connecteur de l'agent, sans capture (choix de Damien, 2026-11-01).
+Masqués : l'adresse du destinataire et le jeton d'accès invité de « Voir ma commande ».
+
+== Confirmation ==
+De : commandes@certif-minshop.miijot.fr
+À : <Gmail de l'acheteur>
+Date : 2026-11-01T22:55:28Z
+Objet : Votre commande Certif Minshop (répétition) n°sbchdmtkc8
+
+Merci pour votre commande !
+
+Commande n°sbchdmtkc8, Certif Minshop (répétition)
+
+Article de répétition × 1: 10,00 €
+Livraison : 5,90 €
+Total : 15,90 €
+dont TVA (20 %) : 2,65 €
+
+Voir ma commande : https://minshop-pilote-certif-staging.dg-tech.workers.dev/order/otk_<masqué>
+
+== Expédition ==
+De : commandes@certif-minshop.miijot.fr
+À : <Gmail de l'acheteur>
+Date : 2026-11-01T22:57:11Z
+Objet : Votre commande Certif Minshop (répétition) n°sbchdmtkc8 est expédiée
+
+Votre commande n°sbchdmtkc8 est expédiée !
+
+Transporteur : Colissimo
+Numéro de suivi : CR261101000000000VLS
+Suivre le colis : https://www.laposte.fr/outils/suivre-vos-envois?code=CR261101000000000VLS1
+
+Voir ma commande : https://minshop-pilote-certif-staging.dg-tech.workers.dev/order/otk_<masqué>
+
+Constat : aucun point relais, comme attendu. La ligne « Transporteur : Colissimo » est celle
+qui manque à l'e-mail relais d'A5 (tracking_carrier = other au lieu de mondialrelay).

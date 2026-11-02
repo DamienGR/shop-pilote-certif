@@ -1,0 +1,32 @@
+[
+  {
+    "results": [
+      {
+        "status": "paid",
+        "fulfillment_status": "fulfilled",
+        "tracking_carrier": "mondialrelay",
+        "tracking_number": "CR261102000000000VTW",
+        "tracking_url": "https://www.mondialrelay.com/public/permanent/tracking.aspx?ens=TTMRSDBXTT&exp=CR261102000000000VTW1&language=FR",
+        "delivery_method": "relay"
+      }
+    ],
+    "success": true,
+    "meta": {
+      "served_by": "v3-prod",
+      "served_by_region": "EEUR",
+      "served_by_colo": "WAW",
+      "served_by_primary": true,
+      "timings": {
+        "sql_duration_ms": 0.1373
+      },
+      "duration": 0.1373,
+      "changes": 0,
+      "last_row_id": 0,
+      "changed_db": false,
+      "size_after": 466944,
+      "rows_read": 1,
+      "rows_written": 0,
+      "total_attempts": 1
+    }
+  }
+]

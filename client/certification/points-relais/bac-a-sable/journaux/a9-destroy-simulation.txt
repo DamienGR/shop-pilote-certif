@@ -1,0 +1,14 @@
+
+Compte Cloudflare
+✓ <email>'s Account (305a2bac9fb247fb3d5bc9ff46a4635b)
+
+À supprimer — pilote-certif en staging (simulation)
+! Worker minshop-pilote-certif-staging
+! namespace KV des sessions minshop-pilote-certif-staging-session
+! bucket images minshop-pilote-certif-staging-images
+! bucket fichiers minshop-pilote-certif-staging-files
+! bucket sauvegardes minshop-pilote-certif-staging-backups
+! base D1 minshop-pilote-certif-staging-db
+✓ minshop-pilote-certif-staging-db — marquée pour pilote-certif (damiengr/shop-pilote-certif)
+
+Simulation. Pour supprimer : npm run shopctl -- destroy --env staging --confirm pilote-certif

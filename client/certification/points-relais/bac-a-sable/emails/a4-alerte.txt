@@ -1,0 +1,32 @@
+Relevé de Gmail par le connecteur de l'agent, sans capture (choix de Damien, 2026-11-01).
+L'alerte de commande va dans Gmail, pas dans Outlook : Damien n'a pas de messagerie Outlook.
+Masquée : l'adresse de l'acheteur et du destinataire.
+
+De : commandes@certif-minshop.miijot.fr
+À : <Gmail de Damien>
+Date : 2026-11-01T22:27:52Z
+Objet : Nouvelle commande Certif Minshop (répétition) n°hx922abzcn
+
+Nouvelle commande n°hx922abzcn
+Identifiant public : ord_hx922abzcn
+
+Client : <Gmail de l'acheteur>
+
+Livrer à :
+Répétition Relais
+12 place Léon-Blum
+Paris, 75011
+FR
+
+Point relais choisi :
+ART THE ZEN
+5 RUE PACHE
+75011 PARIS
+Code du point : 41132
+
+Article de répétition × 1: 10,00 €
+Livraison : 3,90 €
+Total : 13,90 €
+dont TVA (20 %) : 2,32 €
+
+Voir dans l’administration : https://minshop-pilote-certif-staging.dg-tech.workers.dev/admin/orders/ord_hx922abzcn

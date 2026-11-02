@@ -1,0 +1,26 @@
+Relevé de Gmail par le connecteur de l'agent, sans capture (choix de Damien, 2026-11-01).
+Masqués : l'adresse du destinataire et le jeton d'accès invité de « Voir ma commande ».
+
+De : commandes@certif-minshop.miijot.fr
+À : <Gmail de l'acheteur>
+Date : 2026-11-01T22:27:51Z
+Objet : Votre commande Certif Minshop (répétition) n°hx922abzcn
+
+Merci pour votre commande !
+
+Commande n°hx922abzcn, Certif Minshop (répétition)
+
+Article de répétition × 1: 10,00 €
+Livraison : 3,90 €
+Total : 13,90 €
+dont TVA (20 %) : 2,32 €
+
+Votre point relais :
+ART THE ZEN
+5 RUE PACHE
+75011 PARIS
+
+Voir ma commande : https://minshop-pilote-certif-staging.dg-tech.workers.dev/order/otk_<masqué>
+
+Page « Voir ma commande », relevée par curl : « Votre point relais », ART THE ZEN,
+5 RUE PACHE, 75011 PARIS, « Payé par Carte ».

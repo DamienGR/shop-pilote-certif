@@ -1,0 +1,24 @@
+Relevé de Gmail par le connecteur de l'agent, sans capture (choix de Damien, 2026-11-01).
+Masqués : l'adresse du destinataire et le jeton d'accès invité de « Voir ma commande ».
+Staging redéployée en socle v0.3.36 ; étiquette relais achetée par Damien sur la commande d'A7.
+
+De : commandes@certif-minshop.miijot.fr
+À : <Gmail de l'acheteur>
+Date : 2026-11-02T10:01:32Z
+Objet : Votre commande Certif Minshop (répétition) n°t0t1h31tet est expédiée
+
+Votre commande n°t0t1h31tet est expédiée !
+
+Transporteur : Mondial Relay
+Numéro de suivi : CR261102000000000VTW
+Suivre le colis : https://www.mondialrelay.com/public/permanent/tracking.aspx?ens=TTMRSDBXTT&exp=CR261102000000000VTW1&language=FR
+
+À retirer au point relais :
+ART THE ZEN
+5 RUE PACHE
+75011 PARIS
+
+Voir ma commande : https://minshop-pilote-certif-staging.dg-tech.workers.dev/order/otk_<masqué>
+
+Constat : la ligne « Transporteur : Mondial Relay », absente de l'e-mail d'A5 (v0.3.35), est là.
+L'admin affiche Mondial Relay (Damien) ; tracking_carrier = mondialrelay (v0.3.36-suivi-relais.json).
