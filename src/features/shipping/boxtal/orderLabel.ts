@@ -44,7 +44,7 @@ import type {
 import { plausiblePhone } from '../recipient.ts';
 import { orderRelayPoint, type RelayPoint } from '../relay.ts';
 import { boxtalContent, quoteContentCode } from './contents.ts';
-import { homeOffer, relayOffer } from './offers.ts';
+import { boxtalOffer, relayOffer } from './offers.ts';
 import { trackingMatchesReference } from './v3.ts';
 
 /** The sender on the label, as the label form keeps it in `ship_from`. */
@@ -216,7 +216,7 @@ export function quotedOffers(
   quote: LabelResult<QuoteResult> | null,
 ): QuotedOffers {
   const offers = retained.flatMap((code): QuotedOffer[] => {
-    const offer = homeOffer(code) ?? relayOffer(code);
+    const offer = boxtalOffer(code);
     if (!offer) return [];
     const unpriced = { code, carrier: offer.carrier, service: offer.service, priceExclTaxCents: null, currency: null };
     if (!quote?.ok) return [{ ...unpriced, available: true }];
@@ -489,7 +489,7 @@ async function readLabelTracking(
   const landed = await recordLabelTracking(ctx.db, order.id, id, {
     trackingNumber: parcel.trackingNumber,
     trackingUrl: parcel.trackingUrl,
-    carrierCode: homeOffer(record.rate_id)?.carrierCode ?? 'other',
+    carrierCode: boxtalOffer(record.rate_id)?.carrierCode ?? 'other',
   });
   if (!landed.recorded) return fail(t('admin.orders.notice.labelChangedState'));
   if (!landed.orderFulfilled) {
@@ -564,7 +564,7 @@ export async function settleWithBoxtalId(
     );
   }
 
-  const offer = homeOffer(record.rate_id);
+  const offer = boxtalOffer(record.rate_id);
   const settled = {
     transactionId: id,
     provider: offer?.carrier ?? record.rate_id!,

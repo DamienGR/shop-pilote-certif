@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { recorded } from '../../../../test/helpers/boxtal-corpus.mjs';
 import { CARRIERS } from '../../orders/tracking.ts';
 import { BOXTAL_CONTENTS, boxtalContent, quoteContentCode } from './contents.ts';
-import { BOXTAL_HOME_OFFERS, BOXTAL_RELAY_OFFERS, homeOffer, parseRetainedOffers, relayOffer } from './offers.ts';
+import {
+  BOXTAL_HOME_OFFERS,
+  BOXTAL_RELAY_OFFERS,
+  boxtalOffer,
+  homeOffer,
+  parseRetainedOffers,
+  relayOffer,
+} from './offers.ts';
 import { parseQuoteOffers } from './quote.ts';
 
 const quoted = parseQuoteOffers(recorded('31-cotation-all-carriers').response.body as string);
@@ -64,6 +71,20 @@ describe('the relay offers a rate can name', () => {
     }
     expect(relayOffer('MONR-CpourToi')?.carrier).toBe('Mondial Relay');
     expect(relayOffer('MONR-DomicileFrance')).toBeNull();
+  });
+});
+
+describe('the offer a bought label was bought on', () => {
+  it('is found among the home and the relay offers alike', () => {
+    expect(boxtalOffer('POFR-ColissimoAccess')?.carrierCode).toBe('colissimo');
+    // A relay label is tracked under its network, never as `other` (lot 6, A5).
+    expect(boxtalOffer('MONR-CpourToi')).toMatchObject({
+      carrier: 'Mondial Relay',
+      service: 'C.pourToi®',
+      carrierCode: 'mondialrelay',
+    });
+    expect(boxtalOffer('MONR-Retired')).toBeNull();
+    expect(boxtalOffer(null)).toBeNull();
   });
 });
 
