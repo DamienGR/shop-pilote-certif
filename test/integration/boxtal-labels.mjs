@@ -407,12 +407,50 @@ try {
 
     const after = await orderRow(db, order.id);
     assert.equal(after.fulfillment_status, 'fulfilled');
+    // The relay offer's carrier, which the shipping e-mail names: the
+    // rehearsal on the sandbox found `other` here (lot 6, A5).
+    assert.equal(after.tracking_carrier, 'mondialrelay');
     assert.equal(after.tracking_number, 'CR261030000000000UYN');
     assert.ok(after.tracking_url.startsWith('https://www.mondialrelay.com/'), after.tracking_url);
     assert.equal(await shippedNotices(db, order.id), 1);
     const label = await getLabelRecord(db, order.id);
     assert.equal(label.transaction_id, RELAY_ID);
     assert.equal(label.amount_cents, 419);
+    assert.equal(label.provider, 'Mondial Relay');
+    assert.equal(label.service, 'C.pourToi®');
+  });
+
+  await check('an uncertain relay purchase settles under the relay offer’s carrier', async () => {
+    const order = await newOrder(db, POINT);
+    const lost = context(db, {
+      labels: async () => {
+        throw new Error('connection reset');
+      },
+      reference: 'essai-rel-mvv4seit',
+    });
+    assert.equal((await prepareLabel(lost.ctx, order, { from: SENDER, parcel: PARCEL })).ok, true);
+    const bought = await buyLabel(lost.ctx, order, { offerCode: 'MONR-CpourToi', recipient: RECIPIENT });
+    assert.equal(bought.ok, false);
+    assert.equal((await getLabelRecord(db, order.id)).status, 'uncertain');
+
+    // The corpus holds no GET of the relay order `11`; its purchase answer
+    // carries the same content (id, status, price) and stands in for it.
+    const settled = await settleWithBoxtalId(
+      context(db, {
+        labels: ['11-order-relay-mondial-relay-no-dropoff', '19-tracking-relay-t0', '19-tracking-relay-t0'],
+      }).ctx,
+      order,
+      RELAY_ID,
+    );
+    assert.equal(settled.ok && settled.fulfilled, true, JSON.stringify(settled));
+    const label = await getLabelRecord(db, order.id);
+    assert.equal(label.status, 'purchased');
+    assert.equal(label.transaction_id, RELAY_ID);
+    assert.equal(label.provider, 'Mondial Relay');
+    assert.equal(label.service, 'C.pourToi®');
+    const after = await orderRow(db, order.id);
+    assert.equal(after.tracking_carrier, 'mondialrelay');
+    assert.equal(after.tracking_number, 'CR261030000000000UYN');
   });
 
   await check('a relay order whose point cannot be read buys nothing', async () => {

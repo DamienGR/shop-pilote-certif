@@ -68,6 +68,11 @@ export function homeOffer(code: string | null | undefined): BoxtalOffer | null {
   return BOXTAL_HOME_OFFERS.find((offer) => offer.code === code) ?? null;
 }
 
+/** The offer a label was quoted or bought on, home or relay alike. */
+export function boxtalOffer(code: string | null | undefined): BoxtalOffer | null {
+  return homeOffer(code) ?? relayOffer(code);
+}
+
 /**
  * The retained offers from their setting: known codes only, in the catalogue's
  * order, each once. A code this version no longer lists drops out instead of

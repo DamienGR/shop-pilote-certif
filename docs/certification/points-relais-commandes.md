@@ -41,7 +41,7 @@ téléphone.
 | Boxtal, production | une application API v3, et une v1 si vous voulez le devis, créées en B0, supprimées en B8 ; un envoi Mondial Relay réel, prélevé à son prix |
 | Stripe, mode test | une clé restreinte et un endpoint de webhook vers la staging, supprimés en A9 ; trois paiements de test ; Stripe Tax réglé en mode test |
 | Stripe, mode live | une clé restreinte, créée en B3, supprimée en B6 ; l'endpoint de webhook de l'étape 10, gardé ; un paiement de 4,90 € et son remboursement ; ses frais, que le remboursement ne rend pas |
-| Resend | une clé pour la staging, révoquée en A9 ; les e-mails des commandes, vers Gmail et Outlook |
+| Resend | une clé pour la staging, révoquée en A9 ; les e-mails des commandes, vers Gmail et la messagerie des alertes |
 | GitHub `shop-pilote-certif` | la pull request `socle/v0.3.35`, celle de l'interrupteur, deux pull requests de preuves |
 | GitHub `minshop-fleet` | un run `Deploy` approuvé (B1) |
 | Mondial Relay | un colis déposé dans un point, retiré dans un autre (ou le même) |
@@ -69,13 +69,17 @@ Prérequis :
 - [ ] dans le gestionnaire de mots de passe, les clés des deux applications du
   **bac à sable Boxtal** qui ont relevé le corpus : API v3 (achat, suivi,
   points) et API v1 (devis) ;
-- [ ] **Stripe, mode test** : Paramètres → Taxes, l'adresse d'origine et un
-  enregistrement pour la France (pour A7). Stripe Tax ne facture rien en mode
-  test ;
+- [ ] **Stripe, mode test** : Taxes, l'adresse d'origine et une
+  **immatriculation test** pour la France (pour A7) : « Collecter et
+  déclarer » → « Commencer à percevoir des taxes ». Le suivi des obligations,
+  où mène le lien des immatriculations, n'existe pas en mode test. Sans
+  immatriculation, Stripe affiche « Taxe 0,00 € » en A7. Stripe Tax ne
+  facture rien en mode test ;
 - [ ] **Resend** : une clé restreinte « pilote-certif staging relais »,
   envoi seul, sur le domaine `certif-minshop.miijot.fr` ;
-- [ ] deux messageries, comme à l'étape 10 : **Gmail** (l'acheteur),
-  **Outlook.com** (les alertes de commande) ; un **téléphone** pour A3.
+- [ ] une messagerie pour l'acheteur, **Gmail**, et une pour les alertes de
+  commande : **Outlook.com** comme à l'étape 10, ou la même Gmail ; un
+  **téléphone** pour A3.
 
 Toutes les commandes se lancent sous Node 22 (≥ 22.23.4), depuis le clone du
 pilote. Les jetons s'exportent sans écho, jamais en argument.
@@ -106,8 +110,8 @@ pour la production.
 ```sh
 npm run shopctl -- core upgrade --to v0.3.35 --open-pr
 gh pr checks socle/v0.3.35 --watch
-gh pr merge socle/v0.3.35 --merge
-git switch main && git pull && npm ci && npm ci --prefix mcp
+gh pr merge socle/v0.3.35 --merge                   # ou Merge dans le navigateur
+git switch main && git pull && npm ci && npm ci --prefix mcp   # npm 12 dit des scripts d'installation bloqués (esbuild, workerd) : sans effet
 npm run shopctl -- core status                       # v0.3.35
 git switch -c points-relais
 ```
@@ -159,7 +163,8 @@ Attendu :
 
 - `provision` : le compte mutualisé nommé par `cloudflare.accountId`, la base
   `minshop-pilote-certif-staging-db` et ses buckets créés en juridiction `eu`,
-  la base marquée pour `DamienGR/shop-pilote-certif`, les migrations ;
+  la base marquée pour `damiengr/shop-pilote-certif` (le dépôt en
+  minuscules), les migrations ;
 - `admin password` : le mot de passe écrit et relu ;
 - `deploy` : `npm run verify` (une dizaine de minutes), le build, `AUTH_SECRET`
   et `SECRETS_KEK` générés et transmis par entrée standard, le Worker
@@ -169,7 +174,7 @@ Attendu :
 
 ```sh
 export STG=<l'adresse que deploy affiche>
-curl -s -o /dev/null -w '%{http_code}\n' "$STG/"   # 200
+curl -s -o /dev/null -w '%{http_code}\n' "$STG/"   # 302 vers /admin/setup tant que l'assistant d'A2 n'est pas fait, 200 ensuite
 qs "SELECT repository, slug FROM _minshop_owner" > "$R/bac-a-sable/marqueur.json"
 ```
 
@@ -180,7 +185,7 @@ Minshop (répétition) », fuseau Europe/Paris. Ensuite :
 
 - **Réglages → E-mail** : Resend, la clé « pilote-certif staging relais »,
   l'expéditeur `commandes@certif-minshop.miijot.fr`, un e-mail de test reçu,
-  et l'adresse **Outlook** comme destinataire des alertes de commande.
+  et l'adresse des alertes de commande (**Outlook**, ou la même Gmail).
 - **Stripe, mode test** : Développeurs → Clés API → **Créer une clé
   restreinte** « pilote-certif staging relais » : Checkout Sessions en
   écriture, Shipping Rates en lecture, Refunds en écriture. Développeurs →
@@ -206,7 +211,8 @@ tarif** : libellé « Point relais Mondial Relay », mode « Point relais
 **Enregistrer la livraison**. Attendu : « Configuration de livraison
 enregistrée. », sans l'avis « Les clés Boxtal ne sont pas enregistrées ».
 
-**Produits → Nouveau** : « Article de répétition », 10,00 €, stock 5,
+**Produits → Nouveau** : « Article de répétition », 10,00 €, stock 5 (le
+champ vaut 0 par défaut : laissé tel quel, l'article est « Épuisé »),
 **Actif**, **Nécessite une livraison**, poids 500 g, sans image.
 
 ```sh
@@ -284,7 +290,7 @@ qs "SELECT kind, state FROM order_notifications WHERE order_id = (SELECT id FROM
 | `reservation-relais.json` | le point gardé, l'adresse effacée au règlement (1, 1) |
 | `notifications-relais.json` | la confirmation et l'alerte `sent` |
 | Gmail | la confirmation, avec « Votre point relais » : le nom, la rue, le code postal et la ville du point |
-| Outlook | l'alerte, avec « Point relais choisi » et « Code du point : … » |
+| La messagerie des alertes | l'alerte, avec « Point relais choisi » et « Code du point : … » |
 | Admin → Commandes → la commande | « Point relais », « Code …, offre MONR-CpourToi », et l'adresse de livraison |
 | « Voir ma commande », depuis Gmail | « Votre point relais » |
 
@@ -302,19 +308,26 @@ le destinataire prérempli, téléphone compris.
 
 Expéditeur (enregistré pour la suite, dans la base de la staging seulement) :
 « Certif Minshop », vos prénom et nom, votre e-mail, un téléphone, une adresse
-d'expédition fictive en France. Colis : 30 × 20 × 10 cm, 0,6 kg. **Acheter
-l'étiquette**, et noter l'heure.
+d'expédition fictive en France. Colis : les valeurs préremplies,
+10 × 20 × 10 cm et 500 g, conviennent. **Acheter l'étiquette**, et noter
+l'heure.
 
 Attendu : « Étiquette achetée chez Boxtal (…, envoi …). Le numéro de suivi
-arrive quand Boxtal a confirmé l'envoi… ». Une vingtaine de secondes plus tard,
-**Relire le suivi** : le numéro et son lien, la commande « Expédiée ».
+arrive quand Boxtal a confirmé l'envoi… ». Quelques secondes plus tard (moins
+de cinq à la répétition du 1er novembre 2026), **Relire le suivi** : le
+numéro et son lien, la commande « Expédiée », le transporteur Mondial Relay.
 Noter le délai entre l'achat et le numéro.
 
-- **Étiquette (PDF)** : un PDF s'ouvre (A4 dans le bac à sable), qui nomme le
-  point. Le garder : `etiquette-relais.pdf` ;
-- Gmail : l'e-mail d'expédition, « À retirer au point relais » et le point, le
-  numéro et son lien. Le lien mène à `mondialrelay.com/public/permanent/tracking.aspx?ens=…`.
-  Noter ce que la page de Mondial Relay montre pour un numéro du bac à sable.
+- **Étiquette (PDF)** : un PDF s'ouvre. Dans le bac à sable, c'est un
+  bordereau générique A4 (« Test Carrier », « Test Service ») adressé à
+  l'acheteur, qui **ne nomme pas le point** : la vraie étiquette se regarde
+  en B5. Le garder hors du dépôt, dans `$J` : il porte le nom et l'adresse
+  de l'expéditeur ;
+- Gmail : l'e-mail d'expédition, « Transporteur : Mondial Relay », « À
+  retirer au point relais » et le point, le numéro et son lien. Le lien mène
+  à `mondialrelay.com/public/permanent/tracking.aspx?ens=…`. Pour un numéro
+  du bac à sable, la page de Mondial Relay répond « Nous n'avons identifié
+  aucun colis portant ce numéro de suivi » : c'est attendu.
 
 ```sh
 qs "SELECT status, vendor, rate_id AS offre, tracking_number IS NOT NULL AS suivi, amount_cents FROM shipping_labels WHERE order_id = (SELECT id FROM orders WHERE public_id = '$O')" > "$R/bac-a-sable/etiquette-relais.json"
@@ -360,9 +373,11 @@ sur l'adresse de facturation (plan, §13.3, lot 4).
 Réglages → **Taxes automatiques** : activer. Puis une troisième commande en
 relais, comme en A3, jusqu'à la page de Stripe.
 
-Attendu : Stripe demande l'adresse de facturation (au moins le pays et le
-code postal), et une ligne de taxe paraît une fois l'adresse saisie. Payer
-avec `4242 4242 4242 4242`.
+Attendu : Stripe demande l'adresse de facturation (pour la France, le pays
+seul, sous la carte), et une ligne de taxe paraît une fois l'adresse saisie
+(à la répétition : 2,78 € de TVA, 16,68 € au total, la taxe ajoutée au prix).
+Payer avec `4242 4242 4242 4242`. Une « Taxe 0,00 € » dont l'infobulle parle
+d'immatriculation : celle du §0 manque. L'ajouter, puis refaire la commande.
 
 ```sh
 O3=$(qs "SELECT public_id FROM orders ORDER BY id DESC LIMIT 1" | dernier) && echo "$O3"
@@ -384,11 +399,20 @@ avant la partie B.
   `Relay point` ; `relay`, le code et le point sur les commandes d'A4 et
   d'A7, `shipping` et rien d'autre sur celle d'A6. Une capture de ces seules colonnes et du numéro de commande,
   `export.png` ; le fichier reste hors du dépôt (`$J`), il porte les e-mails.
-- Une adresse qu'aucun réseau ne sert : fenêtre privée → l'article → panier →
-  **Payer par carte** → la même adresse, code postal `99999`, ville
-  « Nulle-Part » → **Continuer vers la livraison**. Attendu : Colissimo seul,
-  aucun message d'erreur ; la commande continuerait à domicile. Ne pas payer.
-  Une capture, `sans-point.png`.
+- Une adresse inconnue : fenêtre privée → l'article → panier → **Payer par
+  carte** → la même adresse, code postal `99999`, ville « Nulle-Part » →
+  **Continuer vers la livraison**. Attendu : aucun message d'erreur, et la
+  commande peut continuer à domicile. Ne pas payer. Une capture,
+  `sans-point.png`.
+
+  Le bac à sable de Boxtal situe une adresse inconnue dès qu'elle porte une
+  ville, et rend des points loin de là : à la répétition, Mondial Relay est
+  resté proposé, avec des points dans la Creuse, sous « Les plus proches de
+  99999 … » et la distance de chacun. Relever ce qui paraît. Le repli
+  « Colissimo seul » ne se voit que sur une réponse vide (corpus `05` :
+  `00000`, sans ville) ou une panne de Boxtal : `/checkout` retire alors le
+  tarif relais (`checkout.astro`), et `test/integration/checkout-relay.mjs`
+  le tient pour la panne.
 
 ### A9. Détruire la staging (dix minutes)
 
@@ -444,8 +468,8 @@ corrige dans le socle (`v0.3.36`, si besoin) avant la partie B.
 
 Elle touche de vrais comptes : un paiement réel, une étiquette réelle que
 Boxtal prélève, un colis. **Elle attend le feu vert de Damien**, et un socle
-qui a passé la partie A : `v0.3.35`, ou la version qui corrige ce qu'elle a
-trouvé.
+qui a passé la partie A : `v0.3.36`, qui corrige ce qu'elle a trouvé (le
+transporteur d'une étiquette relais, `other` au lieu de `mondialrelay`).
 
 ### B0. Ce qui doit exister
 
@@ -463,7 +487,7 @@ trouvé.
 
 ### B1. La production au socle de la répétition (quinze minutes)
 
-Si la répétition a donné une `v0.3.36` : `npm run shopctl -- core upgrade
+La répétition a donné `v0.3.36` : `npm run shopctl -- core upgrade
 --to v0.3.36 --open-pr`, la pull request fusionnée, comme au §1.
 
 ```sh
@@ -529,7 +553,10 @@ panier** → le panier → la case des conditions générales → **Payer par ca
 Sur `/checkout` : votre adresse **Gmail**, votre nom, votre adresse, votre
 **vrai téléphone portable** → **Continuer vers la livraison** → « Point relais
 Mondial Relay » → **Continuer** → le point où vous retirerez le colis →
-**Payer par carte**.
+**Payer par carte**. Sur la liste, regarder si une rue porte une apostrophe
+doublée (« D''AUVERGNE », vu dans le bac à sable) : la boutique recopie la
+rue que Boxtal rend ; noter dans le README ce que montrent les données de
+production.
 
 Sur la page de Stripe, avant de payer : `https://checkout.stripe.com/c/pay/cs_live_`,
 aucun bandeau de test, aucun champ d'adresse ni de téléphone, « Point relais
@@ -545,8 +572,8 @@ qp "SELECT kind, state FROM order_notifications WHERE order_id = (SELECT id FROM
 Attendu : `paid`, 490, 390, « Point relais Mondial Relay », `relay`, `stripe`,
 `cs_live_`, `pi_`, `MONR-CpourToi`, `FR`, 1, 1 ; la confirmation et l'alerte
 `sent`. Le code du point et son adresse restent hors des preuves : ils disent
-où vous habitez. Dans Gmail et Outlook, le point comme en A4 ; les captures
-rognées (ni nom, ni adresse, ni point).
+où vous habitez. Dans Gmail et la messagerie des alertes, le point comme en
+A4 ; les captures rognées (ni nom, ni adresse, ni point).
 
 ### B5. L'étiquette réelle (quinze minutes)
 
@@ -568,11 +595,14 @@ Attendu : `purchased`, `boxtal`, `MONR-CpourToi`, 1, le prix ; `fulfilled`,
 `mondialrelay`, 1. Si le lien n'est pas sur `mondialrelay.com`, noter son hôte
 dans le README : c'est un constat, pas un échec.
 
-- **Étiquette (PDF)** : l'imprimer et la coller sur le colis. L'URL se
-  resigne à chaque lecture (ADR 0021) : la relire plus tard marche aussi.
-- Gmail : l'e-mail d'expédition, le point, le numéro et son lien. Ouvrir le
-  lien : la page de Mondial Relay connaît le colis (« pris en charge » ou
-  équivalent, avant tout dépôt).
+- **Étiquette (PDF)** : vérifier qu'elle nomme le point choisi, ce que le
+  bordereau du bac à sable ne montrait pas (A5). L'imprimer et la coller sur
+  le colis. L'URL se resigne à chaque lecture (ADR 0021) : la relire plus
+  tard marche aussi.
+- La fiche commande : le transporteur Mondial Relay, pas « Autre ».
+- Gmail : l'e-mail d'expédition, « Transporteur : Mondial Relay », le point,
+  le numéro et son lien. Ouvrir le lien : la page de Mondial Relay connaît
+  le colis (« pris en charge » ou équivalent, avant tout dépôt).
 - L'espace Boxtal, en production : l'envoi, son prix, son état.
 
 ### B6. Rembourser, et fermer la fenêtre (dix minutes)
@@ -665,7 +695,7 @@ garde annoncé par Mondial Relay, ce que la page de suivi a montré à chaque
 | la campagne en doublure sur le bac à sable | `bac-a-sable/` : `commande-relais.json`, `reservation-relais.json`, `etiquette-relais.json`, `suivi-relais.json`, `commande-domicile.json`, `etiquette-domicile.json`, les captures, le README | une commande en relais et une à domicile payées par carte via `/checkout`, Stripe sans adresse, une étiquette de chaque sorte avec son suivi et son URL |
 | Stripe Tax sur une session sans adresse de livraison | `commande-taxe.json`, README | la taxe calculée sur l'adresse de facturation, ou le refus de Stripe relevé et corrigé |
 | la liste des points sans JavaScript et sur un téléphone | `points.png`, `telephone-points.png`, README | un formulaire, lisible, sans défilement horizontal |
-| une recherche sans point ne bloque pas la commande | `sans-point.png` | Colissimo seul, sans erreur |
+| une recherche sans point ne bloque pas la commande | `sans-point.png`, README, `checkout-relay.mjs` | aucune erreur ; sans point, le tarif relais retiré et Colissimo seul |
 | en réel jusqu'au retrait d'un vrai colis en relais | `reel/` : `commande.json`, `etiquette.json`, `suivi.json`, `suivi-livre.png`, le README | une commande live en relais, une étiquette Mondial Relay réelle, le colis retiré au point choisi |
 | l'URL de suivi vérifiée | `suivi.json`, `suivi-livre.png` | l'URL rendue par Boxtal mène à la page de Mondial Relay du colis, jusqu'à sa livraison |
 | la boutique revenue à l'état d'avant | `commande-remboursee.json`, `cles-stripe-apres.json`, `cles-boxtal-apres.json`, `commandes-apres.json` | remboursée, aucune clé, aucune autre commande |
